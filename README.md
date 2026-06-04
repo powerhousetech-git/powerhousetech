@@ -29,9 +29,18 @@ npx vercel
 
 ### Netlify
 
+Repo: **https://github.com/aymaanshahzad23/powerhouse**
+
+1. Go to [https://app.netlify.com/start](https://app.netlify.com/start)
+2. **Import from Git** → GitHub → select `powerhouse`
+3. Netlify reads `netlify.toml` automatically (`npm run build` + Next.js plugin)
+4. Click **Deploy site**
+
+Or with CLI (after `npm i -g netlify-cli` and `netlify login`):
+
 ```bash
-npm run build
-# Connect repo; Netlify uses @netlify/plugin-nextjs via netlify.toml
+netlify init
+netlify deploy --prod
 ```
 
 ## Project structure
