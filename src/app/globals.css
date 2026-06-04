@@ -635,6 +635,140 @@ body {
   mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent);
 }
 
+/* ——— n8n-style workflow canvas ——— */
+.workflow-canvas-shell {
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  background: #0a0a0c;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5);
+}
+
+.workflow-canvas-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.workflow-canvas-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.workflow-canvas-dot-red { background: #ff5f57; }
+.workflow-canvas-dot-yellow { background: #febc2e; }
+.workflow-canvas-dot-green { background: #28c840; }
+
+.workflow-canvas-wrap {
+  height: min(52vh, 440px);
+  min-height: 320px;
+}
+
+.workflow-flow {
+  background: #08080a !important;
+}
+
+.workflow-node {
+  min-width: 168px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: linear-gradient(165deg, #1a1a1e 0%, #121214 100%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  font-family: var(--font-geist-sans);
+}
+
+.workflow-node-trigger { border-left: 3px solid #febc2e; }
+.workflow-node-ai { border-left: 3px solid #a78bfa; }
+.workflow-node-logic { border-left: 3px solid #f472b6; }
+.workflow-node-action { border-left: 3px solid #2997ff; }
+
+.workflow-node-body {
+  padding: 12px 14px;
+}
+
+.workflow-node-kind {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.workflow-node-label {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.workflow-node-sub {
+  margin-top: 2px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.workflow-handle {
+  width: 10px !important;
+  height: 10px !important;
+  border: 2px solid #0a0a0c !important;
+  background: #2997ff !important;
+}
+
+.workflow-handle:hover {
+  background: #47a6ff !important;
+  transform: scale(1.2);
+}
+
+.workflow-flow .react-flow__edge-path {
+  stroke: rgba(41, 151, 255, 0.55);
+  stroke-width: 2;
+}
+
+.workflow-flow .react-flow__edge-text {
+  fill: rgba(255, 255, 255, 0.5);
+  font-size: 10px;
+}
+
+.workflow-controls {
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+  box-shadow: none !important;
+}
+
+.workflow-controls button {
+  background: #141416 !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.workflow-controls button:hover {
+  background: #1e1e22 !important;
+  color: #fff !important;
+}
+
+.workflow-minimap {
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: 8px !important;
+  background: #0c0c0e !important;
+}
+
+@media (max-width: 640px) {
+  .workflow-canvas-wrap {
+    height: 360px;
+    min-height: 300px;
+  }
+
+  .workflow-minimap {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mesh-orb,
   .hero-beam,
@@ -646,7 +780,8 @@ body {
   .flow-line,
   .circuit-nodes,
   .scenery-orbit,
-  .scenery-wave {
+  .scenery-wave,
+  .react-flow__edge.animated path {
     animation: none !important;
   }
   html {

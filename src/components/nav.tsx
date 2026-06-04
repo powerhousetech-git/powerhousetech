@@ -32,6 +32,9 @@ export function Nav() {
           <a href="#capabilities" className="transition-colors hover:text-white">
             Capabilities
           </a>
+          <a href="#playground" className="transition-colors hover:text-white">
+            Playground
+          </a>
           <a href="#process" className="transition-colors hover:text-white">
             Process
           </a>
