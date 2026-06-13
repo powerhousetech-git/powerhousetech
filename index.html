@@ -548,6 +548,26 @@ table.preview .amt{font-family:var(--font-mono);font-size:.82rem;white-space:now
 .chip.gray{background:var(--slate-light);color:var(--ink-mid)}
 .chip.green{background:#EAF7EE;color:var(--green)}
 
+/* Tally converter */
+.tally-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-top: 4px;
+}
+.tally-field { display: flex; flex-direction: column; gap: 6px; }
+.tally-label {
+  font-size: .8rem; font-weight: 600;
+  color: var(--ink-mid); letter-spacing: .01em;
+}
+.tally-input {
+  padding: 10px 14px; border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm); font-family: inherit;
+  font-size: .92rem; color: var(--ink); background: var(--white);
+  outline: none; transition: border-color .15s;
+}
+.tally-input:focus { border-color: var(--teal); }
+
 /* dashboard mobile top bar */
 .dash-topbar{display:none}
 
@@ -572,6 +592,7 @@ table.preview .amt{font-family:var(--font-mono);font-size:.82rem;white-space:now
     padding:10px 14px;white-space:nowrap;border-radius:8px 8px 0 0;
   }
   .side-nav button.active{border-left:none;border-bottom-color:var(--teal)}
+  .tally-meta-grid { grid-template-columns: 1fr; }
   .side-user{border-top:none;padding:0;gap:8px}
   .side-user .who{display:none}
   .signout-link{
@@ -977,6 +998,13 @@ table.preview .amt{font-family:var(--font-mono);font-size:.82rem;white-space:now
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>
           Bank Statements
         </button>
+        <button data-tab="tab-tally">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 0-2-2V9m0 0h18"/>
+          </svg>
+          Tally Converter
+        </button>
       </nav>
       <div class="side-user">
         <div class="avatar" id="user-avatar">D</div>
@@ -1148,6 +1176,129 @@ table.preview .amt{font-family:var(--font-mono);font-size:.82rem;white-space:now
                 <tr><td class="amt">28-04-2026</td><td>IMPS CR — SELF TRANSFER</td><td class="amt">50,000.00</td><td><span class="chip gray">Excluded — Contra</span></td></tr>
               </tbody>
             </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: TALLY CONVERTER -->
+      <section class="tab-section" id="tab-tally">
+        <h1 class="page-title">Tally Converter</h1>
+        <p class="page-sub">
+          Upload a Tally export — get back a fully filled Schedule III financial statement
+          in the standard non-corporate entities format, ready to review and sign off.
+        </p>
+
+        <div class="dcard" id="tally-entity-card">
+          <div class="dcard-head"><h3>Entity details</h3></div>
+          <p class="sheet-note">These appear on the cover of the financial statements.</p>
+          <div class="tally-meta-grid">
+            <div class="tally-field">
+              <label class="tally-label" for="t-entity-name">Entity name</label>
+              <input class="tally-input" id="t-entity-name" type="text"
+                placeholder="e.g. M/s Sharma &amp; Associates">
+            </div>
+            <div class="tally-field">
+              <label class="tally-label" for="t-fy-end">Financial year end</label>
+              <input class="tally-input" id="t-fy-end" type="date" value="2026-03-31">
+            </div>
+            <div class="tally-field">
+              <label class="tally-label" for="t-prev-fy-end">Previous year end</label>
+              <input class="tally-input" id="t-prev-fy-end" type="date" value="2025-03-31">
+            </div>
+            <div class="tally-field">
+              <label class="tally-label" for="t-currency">Currency</label>
+              <input class="tally-input" id="t-currency" type="text" value="INR" maxlength="3">
+            </div>
+          </div>
+        </div>
+
+        <div class="dcard">
+          <div class="dcard-head"><h3>Upload Tally export</h3></div>
+          <div class="dropzone" id="tally-dropzone" tabindex="0" role="button"
+            aria-label="Upload Tally export file">
+            <div class="dz-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#424FD1"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </div>
+            <p><b>Click to upload</b> or drag and drop your Tally export</p>
+            <p class="dz-hint">Tally XML · Excel (.xlsx / .xls) · CSV · up to 25 MB</p>
+            <input type="file" id="tally-input"
+              accept=".xml,.xlsx,.xls,.csv,.txt" hidden>
+          </div>
+          <div class="file-list" id="tally-files"></div>
+          <button class="btn btn-primary" id="tally-submit" disabled style="opacity:.5">
+            Convert to financial statements
+          </button>
+          <p class="status-msg" id="tally-status"></p>
+        </div>
+
+        <div class="dcard" id="tally-result-card" hidden>
+          <div class="dcard-head">
+            <h3>Conversion result</h3>
+            <span class="chip green" id="tally-result-badge">Ready</span>
+          </div>
+          <p class="sheet-note" id="tally-result-note"></p>
+
+          <div class="tbl-wrap" id="tally-preview-wrap">
+            <table class="preview" id="tally-preview-table">
+              <thead>
+                <tr>
+                  <th>Schedule III Head</th>
+                  <th>Sheet</th>
+                  <th>Current Year (₹)</th>
+                  <th>Confidence</th>
+                </tr>
+              </thead>
+              <tbody id="tally-preview-body"></tbody>
+            </table>
+          </div>
+
+          <div id="tally-unmapped-wrap" hidden style="margin-top:20px">
+            <p style="font-size:.88rem;font-weight:600;color:#C0392B;margin-bottom:10px">
+              ⚠ Ledgers Claude could not confidently map — review manually:
+            </p>
+            <div class="tbl-wrap">
+              <table class="preview" id="tally-unmapped-table">
+                <thead>
+                  <tr><th>Ledger Name</th><th>Amount (₹)</th><th>Reason</th></tr>
+                </thead>
+                <tbody id="tally-unmapped-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:12px;margin-top:22px;flex-wrap:wrap">
+            <button class="btn btn-primary" id="tally-download">
+              ⬇ Download filled .xlsx
+            </button>
+            <button class="btn btn-ghost" id="tally-reset">
+              Start over
+            </button>
+          </div>
+        </div>
+
+        <div class="dcard">
+          <div class="dcard-head"><h3>How this works</h3></div>
+          <div class="mini-steps">
+            <div class="mini-step">
+              <span class="n">1</span>
+              <h4>Upload your Tally export</h4>
+              <p>XML, Excel or CSV — whatever Tally generates from your trial balance or ledger report.</p>
+            </div>
+            <div class="mini-step">
+              <span class="n">2</span>
+              <h4>Claude maps every ledger</h4>
+              <p>Each ledger head is matched to its correct Schedule III line item — Balance Sheet and P&amp;L.</p>
+            </div>
+            <div class="mini-step">
+              <span class="n">3</span>
+              <h4>Download filled statements</h4>
+              <p>The official non-corporate entities template, filled with your numbers, ready for review.</p>
+            </div>
           </div>
         </div>
       </section>
@@ -1342,6 +1493,11 @@ const SHEET_URL = '';
 // don't need to — paste it into the "n8n connection" panel on the dashboard
 // Home tab instead (saved in the browser, used by the Execute workflow button).
 const N8N_WEBHOOK_URL = '';
+
+// Tally Converter — Claude API (use a backend proxy in production to protect the key)
+const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
+const ANTHROPIC_API_KEY = 'YOUR_ANTHROPIC_API_KEY_HERE';
+const TEMPLATE_MAP_URL = 'template_map.json';
 // ────────────────────────────────────────────────────────────────────────────
 
 /* ==================== ELEMENT REFS ==================== */
@@ -1838,6 +1994,464 @@ setupUploader({
   submitId: 'bank-submit', statusId: 'bank-status',
   processingMessage: 'Sorting every credit into income heads and separating non-income entries…',
   doneMessage: '✓ Done — your income summary is being prepared, with large credits flagged for review. We\'ll email {email} when it\'s ready.',
+});
+
+/* ==================== TALLY CONVERTER ==================== */
+let templateMapCache = null;
+
+async function loadTemplateMap() {
+  if (templateMapCache) return templateMapCache;
+  const resp = await fetch(TEMPLATE_MAP_URL);
+  if (!resp.ok) throw new Error('Could not load template_map.json');
+  templateMapCache = await resp.json();
+  return templateMapCache;
+}
+
+function getByPath(obj, path) {
+  return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
+}
+
+function formatIndianDate(isoDate) {
+  const d = new Date(isoDate + 'T00:00:00');
+  const months = ['January','February','March','April','May','June',
+    'July','August','September','October','November','December'];
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function formatIndian(num) {
+  if (num === 0 || num === null || num === undefined) return '0';
+  const n = Math.abs(num);
+  const s = n.toFixed(2).toString();
+  const [intPart, decPart] = s.split('.');
+  const lastThree = intPart.slice(-3);
+  const rest = intPart.slice(0, -3);
+  const formatted = rest
+    ? rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + lastThree
+    : lastThree;
+  return (num < 0 ? '(' : '') + formatted + '.' + decPart + (num < 0 ? ')' : '');
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function ensureXLSX() {
+  if (typeof XLSX === 'undefined') {
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+  }
+}
+
+const tallyDropzone = document.getElementById('tally-dropzone');
+const tallyInput    = document.getElementById('tally-input');
+const tallyFileList = document.getElementById('tally-files');
+const tallySubmit   = document.getElementById('tally-submit');
+const tallyStatus   = document.getElementById('tally-status');
+let tallyFiles = [];
+
+function renderTallyFiles() {
+  tallyFileList.innerHTML = '';
+  tallyFiles.forEach((f, i) => {
+    const row = document.createElement('div');
+    row.className = 'file-row';
+    row.dataset.index = i;
+    row.innerHTML = `
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#424FD1"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+      <span class="fname"></span>
+      <span class="fsize">${formatSize(f.size)}</span>
+      <button class="fremove" aria-label="Remove">×</button>`;
+    row.querySelector('.fname').textContent = f.name;
+    row.querySelector('.fremove').addEventListener('click', e => {
+      tallyFiles.splice(parseInt(e.currentTarget.closest('.file-row').dataset.index, 10), 1);
+      renderTallyFiles();
+    });
+    tallyFileList.appendChild(row);
+  });
+  const has = tallyFiles.length > 0;
+  tallySubmit.disabled = !has;
+  tallySubmit.style.opacity = has ? '1' : '.5';
+}
+
+tallyDropzone.addEventListener('click', () => tallyInput.click());
+tallyDropzone.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tallyInput.click(); }
+});
+tallyInput.addEventListener('change', () => {
+  tallyFiles = Array.from(tallyInput.files);
+  tallyInput.value = '';
+  tallyStatus.textContent = '';
+  tallyStatus.className = 'status-msg';
+  tallyStatus.style.color = '';
+  renderTallyFiles();
+});
+['dragenter', 'dragover'].forEach(ev =>
+  tallyDropzone.addEventListener(ev, e => { e.preventDefault(); tallyDropzone.classList.add('dragover'); }));
+['dragleave', 'drop'].forEach(ev =>
+  tallyDropzone.addEventListener(ev, e => { e.preventDefault(); tallyDropzone.classList.remove('dragover'); }));
+tallyDropzone.addEventListener('drop', e => {
+  tallyFiles = Array.from(e.dataTransfer.files);
+  renderTallyFiles();
+});
+
+async function readTallyFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'xml' || ext === 'txt' || ext === 'csv') return await file.text();
+  if (ext === 'xlsx' || ext === 'xls') {
+    await ensureXLSX();
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: 'array' });
+    return wb.SheetNames.map(name => {
+      const ws = wb.Sheets[name];
+      return `--- Sheet: ${name} ---\n` + XLSX.utils.sheet_to_csv(ws);
+    }).join('\n\n');
+  }
+  throw new Error('Unsupported file type: ' + ext);
+}
+
+async function callClaudeForMapping(tallyData, entityName, fyEnd, prevFyEnd) {
+  const systemPrompt = `You are a Chartered Accountant assistant specialising in Indian accounting standards. 
+You receive raw Tally accounting software exports and map every ledger balance to the correct line item in Schedule III of the Financial Statements format for Non-Corporate Entities (as per ICAI Guidance Note).
+
+You MUST respond with ONLY valid JSON — no explanation, no markdown, no backticks.
+
+The JSON must follow this exact schema:
+{
+  "entity_name": "string",
+  "fy_end": "YYYY-MM-DD",
+  "prev_fy_end": "YYYY-MM-DD",
+  "balance_sheet": {
+    "equity_and_liabilities": {
+      "owners_capital": { "current": number, "previous": number },
+      "long_term_borrowings": { "current": number, "previous": number },
+      "other_long_term_liabilities": { "current": number, "previous": number },
+      "long_term_provisions": { "current": number, "previous": number },
+      "short_term_borrowings": { "current": number, "previous": number },
+      "trade_payables": { "current": number, "previous": number },
+      "other_current_liabilities": { "current": number, "previous": number },
+      "short_term_provisions": { "current": number, "previous": number }
+    },
+    "assets": {
+      "property_plant_equipment": { "current": number, "previous": number },
+      "intangible_assets": { "current": number, "previous": number },
+      "capital_wip": { "current": number, "previous": number },
+      "non_current_investments": { "current": number, "previous": number },
+      "long_term_loans_advances": { "current": number, "previous": number },
+      "other_non_current_assets": { "current": number, "previous": number },
+      "current_investments": { "current": number, "previous": number },
+      "inventories": { "current": number, "previous": number },
+      "trade_receivables": { "current": number, "previous": number },
+      "cash_and_bank": { "current": number, "previous": number },
+      "short_term_loans_advances": { "current": number, "previous": number },
+      "other_current_assets": { "current": number, "previous": number }
+    }
+  },
+  "profit_and_loss": {
+    "revenue_from_operations": { "current": number, "previous": number },
+    "other_income": { "current": number, "previous": number },
+    "cost_of_goods_sold": { "current": number, "previous": number },
+    "employee_benefits_expense": { "current": number, "previous": number },
+    "finance_costs": { "current": number, "previous": number },
+    "depreciation_amortization": { "current": number, "previous": number },
+    "other_expenses": { "current": number, "previous": number }
+  },
+  "notes": {
+    "owners_capital_details": [
+      { "name": "string", "share_pct": number, "opening": number, "capital_introduced": number,
+        "remuneration": number, "interest": number, "withdrawals": number, "closing": number }
+    ],
+    "revenue_breakup": {
+      "sale_of_products": { "current": number, "previous": number },
+      "sale_of_services": { "current": number, "previous": number },
+      "other_operating_revenue": { "current": number, "previous": number }
+    },
+    "other_income_breakup": {
+      "interest_income": { "current": number, "previous": number },
+      "dividend_income": { "current": number, "previous": number },
+      "other_non_operating": { "current": number, "previous": number }
+    },
+    "employee_expense_breakup": {
+      "salaries_wages_bonus": { "current": number, "previous": number },
+      "pf_and_other_funds": { "current": number, "previous": number },
+      "gratuity": { "current": number, "previous": number },
+      "staff_welfare": { "current": number, "previous": number }
+    },
+    "other_expenses_breakup": [
+      { "head": "string", "current": number, "previous": number }
+    ],
+    "trade_payables_msme": { "current": number, "previous": number },
+    "trade_payables_others": { "current": number, "previous": number },
+    "cash_in_hand": { "current": number, "previous": number },
+    "bank_balances": { "current": number, "previous": number },
+    "inventories_breakup": {
+      "stock_in_trade_opening": { "current": number, "previous": number },
+      "stock_in_trade_closing": { "current": number, "previous": number },
+      "wip_opening": { "current": number, "previous": number },
+      "wip_closing": { "current": number, "previous": number }
+    }
+  },
+  "unmapped_ledgers": [
+    { "ledger_name": "string", "amount": number, "reason": "string" }
+  ],
+  "mapping_confidence": "high|medium|low",
+  "notes_to_preparer": "string"
+}
+
+Rules:
+- All amounts must be in INR as plain numbers (no commas, no symbols). Use 0 if not present.
+- Debit balances on liability/income heads = negative. Credit balances on asset/expense heads = negative.
+- Previous year data: if not in the export, use 0 for all previous year fields.
+- If a ledger is ambiguous, map it to the most likely head and add a note in notes_to_preparer.
+- If a ledger genuinely cannot be mapped, add it to unmapped_ledgers with the reason.
+- For Tally XML: the ledger balances are in <CLOSINGBALANCE> tags under each <LEDGER> element.
+- For CSV/Excel: treat each row as a ledger with name and closing balance columns.`;
+
+  const userMessage = `Entity: ${entityName}\nFinancial year end: ${fyEnd}\nPrevious year end: ${prevFyEnd}\n\nTALLY EXPORT DATA:\n${tallyData.slice(0, 80000)}`;
+
+  const response = await fetch(CLAUDE_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error?.message || `HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+  const rawText = data.content.find(b => b.type === 'text')?.text || '';
+  const clean = rawText.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim();
+
+  try {
+    return JSON.parse(clean);
+  } catch {
+    throw new Error('Claude returned invalid JSON. Raw response: ' + rawText.slice(0, 300));
+  }
+}
+
+function showTallyError(msg) {
+  tallyStatus.className = 'status-msg';
+  tallyStatus.style.color = '#C0392B';
+  tallyStatus.textContent = '✗ ' + msg;
+  tallySubmit.disabled = false;
+  tallySubmit.style.opacity = '1';
+}
+
+async function buildAndShowResult(result, entityName, fyEnd, prevFyEnd) {
+  const map = await loadTemplateMap();
+  const tbody = document.getElementById('tally-preview-body');
+  tbody.innerHTML = '';
+
+  const confHtml = result.mapping_confidence === 'high'
+    ? '<span class="chip green">High</span>'
+    : result.mapping_confidence === 'medium'
+      ? '<span class="chip gray">Medium</span>'
+      : '<span class="chip" style="background:#FFF3CD;color:#856404">Low</span>';
+
+  (map.preview_rows || []).forEach(({ label, sheet, path }) => {
+    const amount = getByPath(result, path) ?? 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${label}</td>
+      <td><span class="chip gray">${sheet}</span></td>
+      <td class="amt">₹ ${formatIndian(amount)}</td>
+      <td>${confHtml}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  const unmappedWrap = document.getElementById('tally-unmapped-wrap');
+  const unmappedBody = document.getElementById('tally-unmapped-body');
+  unmappedBody.innerHTML = '';
+  if (result.unmapped_ledgers && result.unmapped_ledgers.length > 0) {
+    unmappedWrap.hidden = false;
+    result.unmapped_ledgers.forEach(({ ledger_name, amount, reason }) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${ledger_name}</td><td class="amt">₹ ${formatIndian(amount)}</td><td>${reason}</td>`;
+      unmappedBody.appendChild(tr);
+    });
+  } else {
+    unmappedWrap.hidden = true;
+  }
+
+  const resultCard = document.getElementById('tally-result-card');
+  document.getElementById('tally-result-note').textContent =
+    result.notes_to_preparer || 'All ledgers mapped successfully.';
+  resultCard.hidden = false;
+  resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  window._tallyResult = result;
+  window._tallyMeta = { entityName, fyEnd, prevFyEnd };
+}
+
+async function buildFilledXLSX(result, meta) {
+  await ensureXLSX();
+  const map = await loadTemplateMap();
+  const filename = map.template_filename;
+
+  const resp = await fetch(filename);
+  if (!resp.ok) throw new Error(`Template file not found. Make sure "${filename}" is in the same folder as index.html.`);
+
+  const templateBuffer = await resp.arrayBuffer();
+  const wb = XLSX.read(templateBuffer, { type: 'array', cellFormula: true, cellStyles: true });
+
+  function setCell(sheetName, cellRef, value) {
+    const ws = wb.Sheets[sheetName];
+    if (!ws) return;
+    if (!ws[cellRef]) ws[cellRef] = { t: 'n' };
+    ws[cellRef].v = value;
+    ws[cellRef].t = typeof value === 'number' ? 'n' : 's';
+    delete ws[cellRef].f;
+  }
+
+  function applyPeriodMapping(section, dataObj) {
+    Object.entries(section).forEach(([key, cfg]) => {
+      if (key === 'owners_capital_details') return;
+      const node = getByPath(dataObj, key);
+      if (!node || typeof node !== 'object') return;
+      if (cfg.current) setCell(cfg.sheet, cfg.current, node.current ?? 0);
+      if (cfg.previous) setCell(cfg.sheet, cfg.previous, node.previous ?? 0);
+    });
+  }
+
+  // Meta fields
+  Object.entries(map.meta).forEach(([key, cfg]) => {
+    let val = meta[key === 'entity_name' ? 'entityName' : key === 'fy_end' ? 'fyEnd' : 'prevFyEnd'];
+    if (cfg.format === 'indian_date') val = formatIndianDate(val);
+    setCell(cfg.sheet, cfg.cell, val);
+  });
+
+  applyPeriodMapping(map.balance_sheet, result.balance_sheet);
+  applyPeriodMapping(map.profit_and_loss, result.profit_and_loss);
+
+  // Notes — flat period mappings
+  Object.entries(map.notes).forEach(([key, cfg]) => {
+    if (key === 'owners_capital_details') return;
+    const node = getByPath(result.notes, key);
+    if (!node || typeof node !== 'object') return;
+    if (cfg.current) setCell(cfg.sheet, cfg.current, node.current ?? 0);
+    if (cfg.previous) setCell(cfg.sheet, cfg.previous, node.previous ?? 0);
+  });
+
+  // Owners' capital detail rows
+  const oc = map.notes.owners_capital_details;
+  const owners = result.notes?.owners_capital_details;
+  if (oc && owners && owners.length) {
+    owners.forEach((owner, i) => {
+      const row = oc.start_row + i;
+      if (i >= oc.max_rows) return;
+      Object.entries(oc.columns).forEach(([field, col]) => {
+        const val = owner[field];
+        if (val !== undefined && val !== null) setCell(oc.sheet, `${col}${row}`, val);
+      });
+    });
+  }
+
+  const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true });
+  return new Blob([wbOut], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+}
+
+tallySubmit.addEventListener('click', async () => {
+  if (!tallyFiles.length) return;
+
+  const entityName = document.getElementById('t-entity-name').value.trim() || 'Entity Name';
+  const fyEnd      = document.getElementById('t-fy-end').value || '2026-03-31';
+  const prevFyEnd  = document.getElementById('t-prev-fy-end').value || '2025-03-31';
+
+  tallySubmit.disabled = true;
+  tallySubmit.style.opacity = '.5';
+  document.getElementById('tally-result-card').hidden = true;
+
+  tallyStatus.className = 'status-msg processing';
+  tallyStatus.style.color = '';
+  tallyStatus.innerHTML = '<span class="spin"></span> <b>Reading file…</b> Parsing your Tally export.';
+
+  let fileText = '';
+  try {
+    fileText = await readTallyFile(tallyFiles[0]);
+  } catch (err) {
+    showTallyError('Could not read the file. Make sure it is a valid Tally XML, Excel, or CSV export.');
+    return;
+  }
+
+  tallyStatus.innerHTML = '<span class="spin"></span> <b>Sending to Claude…</b> Mapping ledgers to Schedule III heads.';
+
+  let mappingResult;
+  try {
+    mappingResult = await callClaudeForMapping(fileText, entityName, fyEnd, prevFyEnd);
+  } catch (err) {
+    showTallyError('Claude API error: ' + err.message + '. Check your API key.');
+    return;
+  }
+
+  tallyStatus.innerHTML = '<span class="spin"></span> <b>Building statements…</b> Filling the template.';
+
+  try {
+    await buildAndShowResult(mappingResult, entityName, fyEnd, prevFyEnd);
+  } catch (err) {
+    showTallyError('Error building the output file: ' + err.message);
+    return;
+  }
+
+  tallyStatus.className = 'status-msg done';
+  tallyStatus.innerHTML = '✓ Conversion complete — review the mapping below and download your statements.';
+  tallySubmit.disabled = false;
+  tallySubmit.style.opacity = '1';
+});
+
+document.getElementById('tally-download').addEventListener('click', async () => {
+  const result = window._tallyResult;
+  const meta   = window._tallyMeta;
+  if (!result) return;
+
+  const btn = document.getElementById('tally-download');
+  btn.textContent = '⏳ Building file…';
+
+  try {
+    const xlsxBlob = await buildFilledXLSX(result, meta);
+    const url  = URL.createObjectURL(xlsxBlob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `Financial_Statements_${meta.entityName.replace(/[^a-zA-Z0-9]/g, '_')}_${meta.fyEnd}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('Error building file: ' + err.message);
+  }
+
+  btn.textContent = '⬇ Download filled .xlsx';
+});
+
+document.getElementById('tally-reset').addEventListener('click', () => {
+  tallyFiles = [];
+  renderTallyFiles();
+  tallyStatus.textContent = '';
+  tallyStatus.className = 'status-msg';
+  tallyStatus.style.color = '';
+  document.getElementById('tally-result-card').hidden = true;
+  window._tallyResult = null;
+  window._tallyMeta   = null;
 });
 
 /* ==================== TOAST + FOOTER PLACEHOLDERS ==================== */
