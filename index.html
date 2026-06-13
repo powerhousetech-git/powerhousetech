@@ -1495,7 +1495,8 @@ const SHEET_URL = '';
 const N8N_WEBHOOK_URL = '';
 
 // Tally Converter — Claude mapping via server-side proxy (ANTHROPIC_API_KEY in Netlify env)
-const CLAUDE_MAP_API = '/api/claude-map';
+const CLAUDE_MAP_START_API = '/api/claude-map-background';
+const CLAUDE_MAP_STATUS_API = '/api/claude-map-status';
 const TEMPLATE_MAP_URL = 'template_map.json';
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -2117,23 +2118,88 @@ async function readTallyFile(file) {
   throw new Error('Unsupported file type: ' + ext);
 }
 
-async function callClaudeForMapping(tallyData, entityName, fyEnd, prevFyEnd) {
-  const response = await fetch(CLAUDE_MAP_API, {
+function compressTallyForMapping(raw, filename) {
+  const ext = (filename || '').split('.').pop().toLowerCase();
+
+  if (ext === 'xml' || ext === 'txt') {
+    const ledgers = [];
+    const blockRe = /<LEDGER[\s\S]*?<\/LEDGER>/gi;
+    let block;
+    while ((block = blockRe.exec(raw)) !== null) {
+      const name = block[0].match(/<NAME[^>]*>([^<]*)<\/NAME>/i)?.[1]?.trim();
+      const balance = block[0].match(/<CLOSINGBALANCE[^>]*>([^<]*)<\/CLOSINGBALANCE>/i)?.[1]?.trim()
+        || block[0].match(/<OPENINGBALANCE[^>]*>([^<]*)<\/OPENINGBALANCE>/i)?.[1]?.trim();
+      if (name && balance !== undefined) ledgers.push(`${name}\t${balance}`);
+    }
+    if (ledgers.length) {
+      return `Tally ledger balances (${ledgers.length} ledgers):\n${ledgers.join('\n')}`;
+    }
+  }
+
+  if (ext === 'csv' || ext === 'xlsx' || ext === 'xls') {
+    const lines = raw.split(/\r?\n/).filter(Boolean);
+    const compact = lines.filter((line) => /[\d,]+(\.\d+)?/.test(line));
+    if (compact.length && compact.length < lines.length) {
+      return `Trial balance rows (${compact.length} lines):\n${compact.join('\n')}`;
+    }
+  }
+
+  return raw.slice(0, 80000);
+}
+
+function tallyMappingErrorMessage(status, data) {
+  if (status === 504 || status === 502) {
+    return 'The server timed out starting the mapping job. Redeploy the site after the latest update, then try again.';
+  }
+  return data.error || `HTTP ${status}`;
+}
+
+async function callClaudeForMapping(tallyData, entityName, fyEnd, prevFyEnd, filename, onProgress) {
+  const jobId = crypto.randomUUID();
+  const compressed = compressTallyForMapping(tallyData, filename);
+
+  const startResp = await fetch(CLAUDE_MAP_START_API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      jobId,
       entityName,
       fyEnd,
       prevFyEnd,
-      tallyData: tallyData.slice(0, 80000),
+      tallyData: compressed,
     }),
   });
 
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data.error || `HTTP ${response.status}`);
+  const startData = await startResp.json().catch(() => ({}));
+  if (startResp.status !== 202) {
+    throw new Error(tallyMappingErrorMessage(startResp.status, startData));
   }
-  return data;
+
+  const deadline = Date.now() + 14 * 60 * 1000;
+  let polls = 0;
+
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, polls < 3 ? 1500 : 2500));
+    polls += 1;
+
+    const statusResp = await fetch(`${CLAUDE_MAP_STATUS_API}?jobId=${encodeURIComponent(jobId)}`);
+    const statusData = await statusResp.json().catch(() => ({}));
+
+    if (!statusResp.ok) {
+      throw new Error(tallyMappingErrorMessage(statusResp.status, statusData));
+    }
+
+    if (statusData.status === 'done') return statusData.result;
+    if (statusData.status === 'error') {
+      throw new Error(statusData.error || 'Claude mapping failed');
+    }
+
+    if (typeof onProgress === 'function') {
+      onProgress(statusData.message || 'Claude is still mapping ledgers…');
+    }
+  }
+
+  throw new Error('Mapping took too long. Try exporting a smaller trial balance from Tally.');
 }
 
 function showTallyError(msg) {
@@ -2286,7 +2352,16 @@ tallySubmit.addEventListener('click', async () => {
 
   let mappingResult;
   try {
-    mappingResult = await callClaudeForMapping(fileText, entityName, fyEnd, prevFyEnd);
+    mappingResult = await callClaudeForMapping(
+      fileText,
+      entityName,
+      fyEnd,
+      prevFyEnd,
+      tallyFiles[0].name,
+      (msg) => {
+        tallyStatus.innerHTML = `<span class="spin"></span> <b>Still working…</b> ${msg} Large exports can take 1–2 minutes.`;
+      },
+    );
   } catch (err) {
     showTallyError('Mapping failed: ' + err.message);
     return;

@@ -4,6 +4,10 @@
   functions = "netlify/functions"
   command = ""
 
+[functions]
+  # Sync functions (status poll) — background mapping runs up to 15 min
+  node_bundler = "esbuild"
+
 [dev]
   framework = "#static"
   publish = "."
