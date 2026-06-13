@@ -24,14 +24,9 @@ function blobStore(event) {
     connectLambda(event);
   }
 
-  const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
-  const token = process.env.NETLIFY_BLOB_READ_WRITE_TOKEN;
-
-  if (siteID && token) {
-    return getStore({ name: STORE_NAME, consistency: 'strong', siteID, token });
-  }
-
-  return getStore({ name: STORE_NAME, consistency: 'strong' });
+  // Default (eventual) consistency — strong consistency needs uncachedEdgeURL
+  // which is not available in Lambda compatibility mode.
+  return getStore(STORE_NAME);
 }
 
 async function setJob(jobId, data, event) {
