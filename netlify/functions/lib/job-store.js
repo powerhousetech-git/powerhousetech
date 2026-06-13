@@ -3,37 +3,51 @@ const path = require('path');
 const os = require('os');
 
 const STORE_NAME = 'tally-claude-jobs';
-const TTL_SECONDS = 60 * 60;
 const TMP_DIR = path.join(os.tmpdir(), 'ph-tally-jobs');
+const IS_DEV = process.env.NETLIFY_DEV === 'true';
 
 function tmpPath(jobId) {
   return path.join(TMP_DIR, `${jobId.replace(/[^a-zA-Z0-9_-]/g, '')}.json`);
 }
 
-async function blobStore() {
-  const { getStore } = require('@netlify/blobs');
-  return getStore({ name: STORE_NAME, consistency: 'strong' });
+function getBlobStore(event) {
+  const { connectLambda, getStore } = require('@netlify/blobs');
+  if (event && !IS_DEV) connectLambda(event);
+  return getStore(STORE_NAME);
 }
 
-async function setJob(jobId, data) {
+async function setJobTmp(jobId, data) {
+  fs.mkdirSync(TMP_DIR, { recursive: true });
+  fs.writeFileSync(tmpPath(jobId), JSON.stringify(data));
+}
+
+async function setJob(jobId, data, event) {
   try {
-    const store = await blobStore();
+    const store = getBlobStore(event);
     await store.setJSON(jobId, data, {
       metadata: { updatedAt: new Date().toISOString() },
-      ttl: TTL_SECONDS,
     });
     return;
-  } catch (_) {
-    fs.mkdirSync(TMP_DIR, { recursive: true });
-    fs.writeFileSync(tmpPath(jobId), JSON.stringify(data));
+  } catch (err) {
+    if (IS_DEV) {
+      await setJobTmp(jobId, data);
+      return;
+    }
+    console.error('Blob setJob failed:', err);
+    throw new Error('Could not save mapping job. Netlify Blobs may be unavailable.');
   }
 }
 
-async function getJob(jobId) {
+async function getJob(jobId, event) {
   try {
-    const store = await blobStore();
-    return store.get(jobId, { type: 'json' });
-  } catch (_) {
+    const store = getBlobStore(event);
+    const job = await store.get(jobId, { type: 'json' });
+    if (job) return job;
+  } catch (err) {
+    if (!IS_DEV) console.error('Blob getJob failed:', err);
+  }
+
+  if (IS_DEV) {
     const file = tmpPath(jobId);
     if (!fs.existsSync(file)) return null;
     try {
@@ -42,6 +56,8 @@ async function getJob(jobId) {
       return null;
     }
   }
+
+  return null;
 }
 
 module.exports = { setJob, getJob };

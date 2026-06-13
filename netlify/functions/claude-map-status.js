@@ -19,7 +19,7 @@ exports.handler = async (event) => {
     return json(400, { error: 'jobId query parameter is required' });
   }
 
-  const job = await getJob(jobId);
+  const job = await getJob(jobId, event);
   if (!job) {
     return json(404, { error: 'Job not found or expired' });
   }

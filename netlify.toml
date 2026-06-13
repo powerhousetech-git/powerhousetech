@@ -5,8 +5,8 @@
   command = ""
 
 [functions]
-  # Sync functions (status poll) — background mapping runs up to 15 min
   node_bundler = "esbuild"
+  external_node_modules = ["@netlify/blobs"]
 
 [dev]
   framework = "#static"

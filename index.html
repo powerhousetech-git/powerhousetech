@@ -1495,7 +1495,7 @@ const SHEET_URL = '';
 const N8N_WEBHOOK_URL = '';
 
 // Tally Converter — Claude mapping via server-side proxy (ANTHROPIC_API_KEY in Netlify env)
-const CLAUDE_MAP_START_API = '/api/claude-map-background';
+const CLAUDE_MAP_START_API = '/api/claude-map-start';
 const CLAUDE_MAP_STATUS_API = '/api/claude-map-status';
 const TEMPLATE_MAP_URL = 'template_map.json';
 // ────────────────────────────────────────────────────────────────────────────
@@ -2184,6 +2184,14 @@ async function callClaudeForMapping(tallyData, entityName, fyEnd, prevFyEnd, fil
 
     const statusResp = await fetch(`${CLAUDE_MAP_STATUS_API}?jobId=${encodeURIComponent(jobId)}`);
     const statusData = await statusResp.json().catch(() => ({}));
+
+    if (statusResp.status === 404) {
+      if (polls <= 12 && typeof onProgress === 'function') {
+        onProgress('Starting mapping job…');
+      }
+      if (polls <= 12) continue;
+      throw new Error('Job not found or expired. Redeploy the site and try again.');
+    }
 
     if (!statusResp.ok) {
       throw new Error(tallyMappingErrorMessage(statusResp.status, statusData));
