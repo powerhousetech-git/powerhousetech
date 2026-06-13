@@ -65,7 +65,7 @@ exports.handler = async (event) => {
   try {
     await setJob(jobId, {
       status: 'processing',
-      message: 'Claude is mapping ledgers to Schedule III heads…',
+      message: 'Matching ledgers to Schedule III heads…',
       payload: { entityName, fyEnd, prevFyEnd, tallyData },
       startedAt: new Date().toISOString(),
     }, event);

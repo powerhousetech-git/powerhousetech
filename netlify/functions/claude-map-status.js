@@ -29,7 +29,7 @@ exports.handler = async (event) => {
   if (!job) {
     return json(200, {
       status: 'processing',
-      message: 'Job is starting…',
+      message: 'Starting conversion…',
     });
   }
 

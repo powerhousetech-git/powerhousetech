@@ -38,7 +38,7 @@ exports.handler = async (event) => {
     await setJob(jobId, {
       ...job,
       status: 'processing',
-      message: 'Claude is mapping ledgers to Schedule III heads…',
+      message: 'Matching ledgers to Schedule III heads…',
     }, event);
 
     const result = await mapTallyWithClaude({

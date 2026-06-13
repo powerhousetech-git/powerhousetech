@@ -1250,7 +1250,7 @@ table.preview .amt{font-family:var(--font-mono);font-size:.82rem;white-space:now
                   <th>Schedule III Head</th>
                   <th>Sheet</th>
                   <th>Current Year (₹)</th>
-                  <th>Confidence</th>
+                  <th>Match quality</th>
                 </tr>
               </thead>
               <tbody id="tally-preview-body"></tbody>
@@ -1291,7 +1291,7 @@ table.preview .amt{font-family:var(--font-mono);font-size:.82rem;white-space:now
             </div>
             <div class="mini-step">
               <span class="n">2</span>
-              <h4>Claude maps every ledger</h4>
+              <h4>Map every ledger</h4>
               <p>Each ledger head is matched to its correct Schedule III line item — Balance Sheet and P&amp;L.</p>
             </div>
             <div class="mini-step">
@@ -1494,9 +1494,9 @@ const SHEET_URL = '';
 // Home tab instead (saved in the browser, used by the Execute workflow button).
 const N8N_WEBHOOK_URL = '';
 
-// Tally Converter — Claude mapping via server-side proxy (ANTHROPIC_API_KEY in Netlify env)
-const CLAUDE_MAP_START_API = '/api/claude-map-start';
-const CLAUDE_MAP_STATUS_API = '/api/claude-map-status';
+// Tally Converter — server-side mapping proxy (API key in Netlify env)
+const TALLY_MAP_START_API = '/api/claude-map-start';
+const TALLY_MAP_STATUS_API = '/api/claude-map-status';
 const TEMPLATE_MAP_URL = 'template_map.json';
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -2154,11 +2154,11 @@ function tallyMappingErrorMessage(status, data) {
   return data.error || `HTTP ${status}`;
 }
 
-async function callClaudeForMapping(tallyData, entityName, fyEnd, prevFyEnd, filename, onProgress) {
+async function runTallyMapping(tallyData, entityName, fyEnd, prevFyEnd, filename, onProgress) {
   const jobId = crypto.randomUUID();
   const compressed = compressTallyForMapping(tallyData, filename);
 
-  const startResp = await fetch(CLAUDE_MAP_START_API, {
+  const startResp = await fetch(TALLY_MAP_START_API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -2182,7 +2182,7 @@ async function callClaudeForMapping(tallyData, entityName, fyEnd, prevFyEnd, fil
     await new Promise((r) => setTimeout(r, polls < 3 ? 1500 : 2500));
     polls += 1;
 
-    const statusResp = await fetch(`${CLAUDE_MAP_STATUS_API}?jobId=${encodeURIComponent(jobId)}`);
+    const statusResp = await fetch(`${TALLY_MAP_STATUS_API}?jobId=${encodeURIComponent(jobId)}`);
     const statusData = await statusResp.json().catch(() => ({}));
 
     if (!statusResp.ok) {
@@ -2195,11 +2195,11 @@ async function callClaudeForMapping(tallyData, entityName, fyEnd, prevFyEnd, fil
 
     if (statusData.status === 'done') return statusData.result;
     if (statusData.status === 'error') {
-      throw new Error(statusData.error || 'Claude mapping failed');
+      throw new Error(statusData.error || 'Mapping failed');
     }
 
     if (typeof onProgress === 'function') {
-      onProgress(statusData.message || 'Claude is still mapping ledgers…');
+      onProgress(statusData.message || 'Matching ledgers to Schedule III heads…');
     }
   }
 
@@ -2352,11 +2352,11 @@ tallySubmit.addEventListener('click', async () => {
     return;
   }
 
-  tallyStatus.innerHTML = '<span class="spin"></span> <b>Sending to Claude…</b> Mapping ledgers to Schedule III heads.';
+  tallyStatus.innerHTML = '<span class="spin"></span> <b>Mapping ledgers…</b> Matching each line to Schedule III heads.';
 
   let mappingResult;
   try {
-    mappingResult = await callClaudeForMapping(
+    mappingResult = await runTallyMapping(
       fileText,
       entityName,
       fyEnd,

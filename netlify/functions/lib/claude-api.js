@@ -28,7 +28,7 @@ async function mapTallyWithClaude({ entityName, fyEnd, prevFyEnd, tallyData, api
   const anthropicBody = await anthropicResp.json().catch(() => ({}));
 
   if (!anthropicResp.ok) {
-    throw new Error(anthropicBody.error?.message || `Anthropic API HTTP ${anthropicResp.status}`);
+    throw new Error(`Mapping service error (HTTP ${anthropicResp.status})`);
   }
 
   const rawText = anthropicBody.content?.find((b) => b.type === 'text')?.text || '';
@@ -37,7 +37,7 @@ async function mapTallyWithClaude({ entityName, fyEnd, prevFyEnd, tallyData, api
   try {
     return JSON.parse(clean);
   } catch {
-    throw new Error('Claude returned invalid JSON');
+    throw new Error('Invalid mapping response from service');
   }
 }
 
