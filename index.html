@@ -608,6 +608,65 @@ table.preview tr.preview-section td {
   .tally-result-summary { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* Tally output template preview */
+.tally-sheet-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.tally-sheet-tab {
+  border: 1px solid var(--line);
+  background: var(--white);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--ink-mid);
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+  max-width: 100%;
+}
+.tally-sheet-tab:hover {
+  border-color: var(--teal);
+  color: var(--teal-dark);
+}
+.tally-sheet-tab.active {
+  background: var(--teal-soft);
+  border-color: var(--teal);
+  color: var(--teal-dark);
+}
+.tally-sheet-frame {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  min-height: 280px;
+  max-height: 480px;
+  overflow: auto;
+}
+.tally-sheet-frame .tbl-wrap { overflow: visible; }
+table.tally-sheet-table {
+  border-collapse: collapse;
+  font-size: .74rem;
+  min-width: max-content;
+}
+table.tally-sheet-table td {
+  border: 1px solid #e4e4ea;
+  padding: 4px 8px;
+  white-space: nowrap;
+  vertical-align: top;
+  color: var(--ink);
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tally-template-status {
+  padding: 28px 20px;
+  text-align: center;
+  color: var(--ink-light);
+  font-size: .88rem;
+}
+
 /* dashboard mobile top bar */
 .dash-topbar{display:none}
 
@@ -1360,6 +1419,22 @@ table.preview tr.preview-section td {
             </div>
           </div>
         </div>
+
+        <div class="dcard" id="tally-template-card">
+          <div class="dcard-head">
+            <h3>Output template</h3>
+            <a id="tally-blank-download" href="#" class="sheet-change-btn" download>
+              Download blank .xlsx ↗
+            </a>
+          </div>
+          <p class="sheet-note">
+            This is the workbook you receive — switch tabs to preview each sheet before you convert.
+          </p>
+          <div class="tally-sheet-tabs" id="tally-sheet-tabs" hidden></div>
+          <div class="tally-sheet-frame" id="tally-sheet-frame">
+            <p class="tally-template-status" id="tally-template-status">Loading template preview…</p>
+          </div>
+        </div>
       </section>
 
     </main>
@@ -1949,6 +2024,7 @@ document.querySelectorAll('.side-nav button').forEach(btn => {
     btn.classList.add('active');
     document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
     document.getElementById(btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'tab-tally') initTallyTemplatePreview();
     // Desktop scrolls .dash-main; mobile (sidebar as top bar) scrolls the window
     document.querySelector('.dash-main').scrollTop = 0;
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2057,6 +2133,17 @@ setupUploader({
 
 /* ==================== TALLY CONVERTER ==================== */
 let templateMapCache = null;
+let templateWorkbookCache = null;
+let tallyTemplatePreviewReady = false;
+let tallyTemplatePreviewLoading = false;
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 async function loadTemplateMap() {
   if (templateMapCache) return templateMapCache;
@@ -2104,6 +2191,90 @@ function loadScript(src) {
 async function ensureXLSX() {
   if (typeof XLSX === 'undefined') {
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+  }
+}
+
+async function loadTemplateWorkbook() {
+  if (templateWorkbookCache) return templateWorkbookCache;
+  await ensureXLSX();
+  const map = await loadTemplateMap();
+  const resp = await fetch(map.template_filename);
+  if (!resp.ok) {
+    throw new Error(`Template file not found. Make sure "${map.template_filename}" is in the same folder as index.html.`);
+  }
+  templateWorkbookCache = XLSX.read(await resp.arrayBuffer(), { type: 'array' });
+  return templateWorkbookCache;
+}
+
+function renderTallyTemplateSheet(wb, sheetName) {
+  const frame = document.getElementById('tally-sheet-frame');
+  const ws = wb.Sheets[sheetName];
+  if (!ws || !ws['!ref']) {
+    frame.innerHTML = '<p class="tally-template-status">This sheet is empty.</p>';
+    return;
+  }
+
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+  if (!rows.length) {
+    frame.innerHTML = '<p class="tally-template-status">This sheet is empty.</p>';
+    return;
+  }
+
+  const maxCols = rows.reduce((max, row) => Math.max(max, (row || []).length), 0);
+  const tbody = rows.map(row => {
+    const cells = Array.from({ length: maxCols }, (_, index) =>
+      `<td>${escapeHtml((row && row[index]) ?? '')}</td>`,
+    ).join('');
+    return `<tr>${cells}</tr>`;
+  }).join('');
+
+  frame.innerHTML = `
+    <div class="tbl-wrap">
+      <table class="tally-sheet-table">
+        <tbody>${tbody}</tbody>
+      </table>
+    </div>`;
+}
+
+function showTallyTemplateSheet(wb, sheetName) {
+  document.querySelectorAll('.tally-sheet-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.sheet === sheetName);
+  });
+  renderTallyTemplateSheet(wb, sheetName);
+}
+
+async function initTallyTemplatePreview() {
+  if (tallyTemplatePreviewReady || tallyTemplatePreviewLoading) return;
+  tallyTemplatePreviewLoading = true;
+
+  const statusEl = document.getElementById('tally-template-status');
+  const tabsEl = document.getElementById('tally-sheet-tabs');
+  const downloadEl = document.getElementById('tally-blank-download');
+
+  try {
+    const map = await loadTemplateMap();
+    downloadEl.href = map.template_filename;
+    downloadEl.download = map.template_filename;
+
+    const wb = await loadTemplateWorkbook();
+    tabsEl.innerHTML = '';
+    wb.SheetNames.forEach((name, index) => {
+      const tab = document.createElement('button');
+      tab.type = 'button';
+      tab.className = 'tally-sheet-tab' + (index === 0 ? ' active' : '');
+      tab.dataset.sheet = name;
+      tab.textContent = name;
+      tab.addEventListener('click', () => showTallyTemplateSheet(wb, name));
+      tabsEl.appendChild(tab);
+    });
+
+    tabsEl.hidden = false;
+    showTallyTemplateSheet(wb, wb.SheetNames[0]);
+    tallyTemplatePreviewReady = true;
+  } catch (err) {
+    statusEl.textContent = 'Could not load template preview: ' + err.message;
+  } finally {
+    tallyTemplatePreviewLoading = false;
   }
 }
 
