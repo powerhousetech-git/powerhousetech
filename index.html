@@ -568,6 +568,46 @@ table.preview .amt{font-family:var(--font-mono);font-size:.82rem;white-space:now
 }
 .tally-input:focus { border-color: var(--teal); }
 
+/* Tally conversion result */
+.tally-result-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.tally-summary-item {
+  background: var(--ivory);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+.tally-summary-item .k {
+  display: block;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-light);
+  margin-bottom: 4px;
+}
+.tally-summary-item .v {
+  font-size: .92rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+table.preview tr.preview-section td {
+  background: var(--slate-light);
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--ink-mid);
+  padding: 9px 14px;
+}
+@media (max-width: 900px) {
+  .tally-result-summary { grid-template-columns: repeat(2, 1fr); }
+}
+
 /* dashboard mobile top bar */
 .dash-topbar{display:none}
 
@@ -593,6 +633,7 @@ table.preview .amt{font-family:var(--font-mono);font-size:.82rem;white-space:now
   }
   .side-nav button.active{border-left:none;border-bottom-color:var(--teal)}
   .tally-meta-grid { grid-template-columns: 1fr; }
+  .tally-result-summary { grid-template-columns: 1fr; }
   .side-user{border-top:none;padding:0;gap:8px}
   .side-user .who{display:none}
   .signout-link{
@@ -1241,16 +1282,34 @@ table.preview .amt{font-family:var(--font-mono);font-size:.82rem;white-space:now
             <h3>Conversion result</h3>
             <span class="chip green" id="tally-result-badge">Ready</span>
           </div>
-          <p class="sheet-note" id="tally-result-note"></p>
+
+          <div class="tally-result-summary" id="tally-result-summary">
+            <div class="tally-summary-item">
+              <span class="k">Entity</span>
+              <span class="v" id="tally-sum-entity">—</span>
+            </div>
+            <div class="tally-summary-item">
+              <span class="k">Financial year</span>
+              <span class="v" id="tally-sum-fy">—</span>
+            </div>
+            <div class="tally-summary-item">
+              <span class="k">Line items mapped</span>
+              <span class="v" id="tally-sum-lines">—</span>
+            </div>
+            <div class="tally-summary-item">
+              <span class="k">Match quality</span>
+              <span class="v" id="tally-sum-quality">—</span>
+            </div>
+          </div>
 
           <div class="tbl-wrap" id="tally-preview-wrap">
             <table class="preview" id="tally-preview-table">
               <thead>
                 <tr>
-                  <th>Schedule III Head</th>
-                  <th>Sheet</th>
-                  <th>Current Year (₹)</th>
-                  <th>Match quality</th>
+                  <th>Schedule III line item</th>
+                  <th>Statement</th>
+                  <th>Current year (₹)</th>
+                  <th>Previous year (₹)</th>
                 </tr>
               </thead>
               <tbody id="tally-preview-body"></tbody>
@@ -1259,12 +1318,12 @@ table.preview .amt{font-family:var(--font-mono);font-size:.82rem;white-space:now
 
           <div id="tally-unmapped-wrap" hidden style="margin-top:20px">
             <p style="font-size:.88rem;font-weight:600;color:#856404;margin-bottom:10px">
-              ⚠ Items flagged for preparer review (check mapping notes below):
+              Ledgers that need manual mapping
             </p>
             <div class="tbl-wrap">
               <table class="preview" id="tally-unmapped-table">
                 <thead>
-                  <tr><th>Ledger Name</th><th>Amount (₹)</th><th>Reason</th></tr>
+                  <tr><th>Ledger</th><th>Amount (₹)</th></tr>
                 </thead>
                 <tbody id="tally-unmapped-body"></tbody>
               </table>
@@ -2219,31 +2278,65 @@ async function buildAndShowResult(result, entityName, fyEnd, prevFyEnd) {
   const tbody = document.getElementById('tally-preview-body');
   tbody.innerHTML = '';
 
-  const confHtml = result.mapping_confidence === 'high'
-    ? '<span class="chip green">High</span>'
+  const qualityLabel = result.mapping_confidence === 'high'
+    ? 'High'
     : result.mapping_confidence === 'medium'
-      ? '<span class="chip gray">Medium</span>'
-      : '<span class="chip" style="background:#FFF3CD;color:#856404">Low</span>';
+      ? 'Medium'
+      : result.mapping_confidence === 'low'
+        ? 'Low'
+        : '—';
 
+  document.getElementById('tally-sum-entity').textContent = entityName;
+  document.getElementById('tally-sum-fy').textContent = formatIndianDate(fyEnd);
+  document.getElementById('tally-sum-lines').textContent = String((map.preview_rows || []).length);
+  document.getElementById('tally-sum-quality').textContent = qualityLabel;
+
+  const badge = document.getElementById('tally-result-badge');
+  badge.textContent = 'Ready';
+  badge.className = result.mapping_confidence === 'low'
+    ? 'chip'
+    : 'chip green';
+  if (result.mapping_confidence === 'low') {
+    badge.style.background = '#FFF3CD';
+    badge.style.color = '#856404';
+  } else {
+    badge.style.background = '';
+    badge.style.color = '';
+  }
+
+  let lastSection = '';
   (map.preview_rows || []).forEach(({ label, sheet, path }) => {
-    const amount = getByPath(result, path) ?? 0;
+    if (sheet !== lastSection) {
+      const sectionRow = document.createElement('tr');
+      sectionRow.className = 'preview-section';
+      sectionRow.innerHTML = `<td colspan="4">${sheet}</td>`;
+      tbody.appendChild(sectionRow);
+      lastSection = sheet;
+    }
+
+    const basePath = path.replace(/\.current$/, '');
+    const current = getByPath(result, `${basePath}.current`) ?? 0;
+    const previous = getByPath(result, `${basePath}.previous`) ?? 0;
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${label}</td>
       <td><span class="chip gray">${sheet}</span></td>
-      <td class="amt">₹ ${formatIndian(amount)}</td>
-      <td>${confHtml}</td>`;
+      <td class="amt">₹ ${formatIndian(current)}</td>
+      <td class="amt">₹ ${formatIndian(previous)}</td>`;
     tbody.appendChild(tr);
   });
 
   const unmappedWrap = document.getElementById('tally-unmapped-wrap');
   const unmappedBody = document.getElementById('tally-unmapped-body');
   unmappedBody.innerHTML = '';
-  if (result.unmapped_ledgers && result.unmapped_ledgers.length > 0) {
+  const unmapped = (result.unmapped_ledgers || []).filter(({ ledger_name, amount }) =>
+    ledger_name && (amount !== 0 && amount != null),
+  );
+  if (unmapped.length > 0) {
     unmappedWrap.hidden = false;
-    result.unmapped_ledgers.forEach(({ ledger_name, amount, reason }) => {
+    unmapped.forEach(({ ledger_name, amount }) => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${ledger_name}</td><td class="amt">₹ ${formatIndian(amount)}</td><td>${reason}</td>`;
+      tr.innerHTML = `<td>${ledger_name}</td><td class="amt">₹ ${formatIndian(amount)}</td>`;
       unmappedBody.appendChild(tr);
     });
   } else {
@@ -2251,8 +2344,6 @@ async function buildAndShowResult(result, entityName, fyEnd, prevFyEnd) {
   }
 
   const resultCard = document.getElementById('tally-result-card');
-  document.getElementById('tally-result-note').textContent =
-    result.notes_to_preparer || 'All ledgers mapped successfully.';
   resultCard.hidden = false;
   resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
