@@ -1,0 +1,57 @@
+{
+  "entity_name": "ABC AUTOMOBILE SERVICE CENTER",
+  "fy_end": "2020-03-31",
+  "prev_fy_end": "2019-03-31",
+  "balance_sheet": {
+    "equity_and_liabilities": {
+      "owners_capital": { "current": 1686922.38, "previous": 0 },
+      "long_term_borrowings": { "current": 7221500, "previous": 0 },
+      "short_term_borrowings": { "current": 741580.26, "previous": 0 },
+      "trade_payables": { "current": 1900514.44, "previous": 0 },
+      "other_current_liabilities": { "current": 851560.25, "previous": 0 },
+      "short_term_provisions": { "current": 0, "previous": 0 }
+    },
+    "assets": {
+      "property_plant_equipment": { "current": 1651152.4, "previous": 0 },
+      "long_term_loans_advances": { "current": 1500000, "previous": 0 },
+      "inventories": { "current": 3919329.39, "previous": 0 },
+      "trade_receivables": { "current": 3541801.02, "previous": 0 },
+      "cash_and_bank": { "current": 657642.73, "previous": 0 },
+      "short_term_loans_advances": { "current": 1132151.79, "previous": 0 },
+      "other_current_assets": { "current": 0, "previous": 0 }
+    }
+  },
+  "profit_and_loss": {
+    "revenue_from_operations": { "current": 14246749.43, "previous": 0 },
+    "other_income": { "current": 218628.08, "previous": 0 },
+    "cost_of_goods_sold": { "current": 14376979.62, "previous": 0 },
+    "employee_benefits_expense": { "current": 335200, "previous": 0 },
+    "finance_costs": { "current": 89821.36, "previous": 0 },
+    "depreciation_amortization": { "current": 290448.6, "previous": 0 },
+    "other_expenses": { "current": 493693.78, "previous": 0 }
+  },
+  "notes": {
+    "revenue_breakup": {
+      "sale_of_products": { "current": 14207774.65, "previous": 0 },
+      "sale_of_services": { "current": 38974.78, "previous": 0 }
+    },
+    "other_income_breakup": {
+      "interest_income": { "current": 48946, "previous": 0 },
+      "other_non_operating": { "current": 169682.08, "previous": 0 }
+    },
+    "inventories_breakup": {
+      "stock_in_trade_opening": { "current": 3919329.39, "previous": 0 },
+      "stock_in_trade_closing": { "current": 3919329.39, "previous": 0 }
+    },
+    "cash_in_hand": { "current": 527676.09, "previous": 0 },
+    "bank_balances": { "current": 129966.64, "previous": 0 }
+  },
+  "meta": {
+    "net_profit_loss": -1120765.85,
+    "total_assets": 12402077.33,
+    "suspense_separate": 841560.25,
+    "other_current_excl_suspense": 10000,
+    "source_file": "fixtures/ABC_2019-20_source.xls",
+    "reference_file": "ABC_2019-20_STANDARDIZED_CORRECTED.xlsx"
+  }
+}

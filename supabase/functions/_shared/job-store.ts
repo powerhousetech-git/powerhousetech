@@ -15,6 +15,8 @@ export type MappingJob = {
   error?: string;
   startedAt?: string;
   finishedAt?: string;
+  entityName?: string;
+  sourceFilename?: string;
 };
 
 function adminClient() {
@@ -39,6 +41,16 @@ export async function setJob(jobId: string, data: MappingJob): Promise<void> {
 
   if (data.startedAt) {
     row.started_at = data.startedAt;
+  }
+
+  if (data.entityName) {
+    row.entity_name = data.entityName;
+  } else if (data.payload?.entityName) {
+    row.entity_name = data.payload.entityName;
+  }
+
+  if (data.sourceFilename) {
+    row.source_filename = data.sourceFilename;
   }
 
   const { error } = await adminClient()

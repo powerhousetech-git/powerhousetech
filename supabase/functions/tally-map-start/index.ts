@@ -82,6 +82,7 @@ Deno.serve(async (req) => {
   const fyEnd = String(payload.fyEnd || '2026-03-31').slice(0, 32);
   const prevFyEnd = String(payload.prevFyEnd || '2025-03-31').slice(0, 32);
   const tallyData = String(payload.tallyData || '');
+  const sourceFilename = String(payload.sourceFilename || payload.filename || '').slice(0, 500);
 
   if (!tallyData.trim()) {
     return jsonResponse(400, { error: 'tallyData is required' });
@@ -92,6 +93,8 @@ Deno.serve(async (req) => {
       status: 'processing',
       message: 'Matching ledgers to Schedule III heads…',
       payload: { entityName, fyEnd, prevFyEnd, tallyData },
+      entityName,
+      sourceFilename: sourceFilename || undefined,
       startedAt: new Date().toISOString(),
     });
   } catch (err) {

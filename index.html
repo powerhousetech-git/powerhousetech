@@ -982,7 +982,7 @@ table.tally-sheet-table td {
         <p>Sign in to your Powerhouse workspace, or talk to us about what's eating your team's hours.</p>
         <div class="actions">
           <button class="btn btn-white btn-lg js-open-signin">Sign in</button>
-          <a href="mailto:hello@powerhousetech.in" class="btn btn-ghost-white btn-lg">Talk to us</a>
+          <a href="mailto:support@powerhousetech.in" class="btn btn-ghost-white btn-lg">Talk to us</a>
         </div>
       </div>
     </div>
@@ -1631,7 +1631,7 @@ const SHEET_URL = '';
 const N8N_WEBHOOK_URL = '';
 
 // Tally Converter — Supabase Edge Functions (API key in Supabase secrets)
-const SUPABASE_URL = 'https://dznmgjbtkumtjnhycxct.supabase.co';
+const SUPABASE_URL = 'https://msratyvmnuvozuthgkmi.supabase.co';
 const TALLY_MAP_START_API = `${SUPABASE_URL}/functions/v1/tally-map-start`;
 const TALLY_MAP_STATUS_API = `${SUPABASE_URL}/functions/v1/tally-map-status`;
 const TEMPLATE_MAP_URL = 'template_map.json';
@@ -2400,6 +2400,7 @@ async function runTallyMapping(tallyData, entityName, fyEnd, prevFyEnd, filename
       fyEnd,
       prevFyEnd,
       tallyData: compressed,
+      sourceFilename: filename,
     }),
   });
 
