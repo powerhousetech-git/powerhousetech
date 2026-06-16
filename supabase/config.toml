@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.tally-map-status]
 verify_jwt = false
+
+[functions.user-credits]
+verify_jwt = false

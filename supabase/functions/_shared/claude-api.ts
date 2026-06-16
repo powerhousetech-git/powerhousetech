@@ -1,4 +1,5 @@
 import { tallySystemPrompt } from './tally-system-prompt.ts';
+import { reconcileMappingResult } from './reconcile-mapping.ts';
 
 export const MAX_TALLY_CHARS = 80000;
 
@@ -48,9 +49,13 @@ export async function mapTallyWithClaude({
     .content?.find((b) => b.type === 'text')?.text || '';
   const clean = rawText.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim();
 
+  let parsed: Record<string, unknown>;
   try {
-    return JSON.parse(clean);
+    parsed = JSON.parse(clean);
   } catch {
     throw new Error('Invalid mapping response from service');
   }
+
+  const { result } = reconcileMappingResult(parsed);
+  return result;
 }
