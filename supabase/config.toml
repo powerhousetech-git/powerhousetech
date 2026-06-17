@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.user-credits]
 verify_jwt = false
+
+[functions.book-build-start]
+verify_jwt = false
+
+[functions.book-build-status]
+verify_jwt = false

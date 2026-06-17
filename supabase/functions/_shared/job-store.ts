@@ -7,16 +7,26 @@ export type JobPayload = {
   tallyData: string;
 };
 
+export type BookBuildPayload = {
+  entityName: string;
+  fyEnd: string;
+  prevFyEnd: string;
+  coaTemplateId: string;
+  packData: string;
+  dryRun?: boolean;
+};
+
 export type MappingJob = {
   status: 'processing' | 'done' | 'error';
   message?: string;
-  payload?: JobPayload;
+  payload?: JobPayload | BookBuildPayload;
   result?: Record<string, unknown>;
   error?: string;
   startedAt?: string;
   finishedAt?: string;
   entityName?: string;
   sourceFilename?: string;
+  jobKind?: 'tally_map' | 'book_build';
 };
 
 function adminClient() {

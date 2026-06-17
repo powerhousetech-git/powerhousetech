@@ -7,6 +7,7 @@ const ALLOWED_TOOLS = new Set([
   'financial_statements',
   'reminders',
   'bank_statements',
+  'book_build',
 ]);
 
 Deno.serve(async (req) => {
@@ -46,11 +47,12 @@ Deno.serve(async (req) => {
       }
 
       const tool = String(payload.tool || '').trim();
+      const creditTool = tool === 'bank_statements' ? 'book_build' : tool;
       if (!ALLOWED_TOOLS.has(tool)) {
         return jsonResponse(400, { error: 'Invalid tool' });
       }
 
-      const result = await consumeCredit(user.email, tool);
+      const result = await consumeCredit(user.email, creditTool);
       if (!result.ok) {
         return jsonResponse(402, {
           error: 'no_credits',

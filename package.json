@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "npx --yes serve . -p 8742",
-    "dev:supabase": "npx supabase functions serve --env-file .env"
+    "dev:supabase": "npx supabase functions serve --env-file .env",
+    "deploy:functions": "bash scripts/deploy-functions.sh"
   }
 }

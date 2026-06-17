@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BookBuildResult",
+  "type": "object",
+  "required": [
+    "entity_name",
+    "fy_end",
+    "classified_transactions",
+    "ledger_summary",
+    "draft_trial_balance",
+    "stats"
+  ],
+  "properties": {
+    "entity_name": { "type": "string" },
+    "fy_end": { "type": "string", "format": "date" },
+    "prev_fy_end": { "type": "string", "format": "date" },
+    "coa_template_id": { "type": "string" },
+    "classified_transactions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "date", "narration", "ledger", "confidence"],
+        "properties": {
+          "id": { "type": "string" },
+          "date": { "type": "string" },
+          "narration": { "type": "string" },
+          "debit": { "type": "number" },
+          "credit": { "type": "number" },
+          "balance": { "type": "number" },
+          "ledger": { "type": "string" },
+          "group": { "type": "string" },
+          "confidence": { "enum": ["high", "medium", "low"] },
+          "is_transfer": { "type": "boolean" },
+          "is_personal": { "type": "boolean" },
+          "source_file": { "type": "string" },
+          "voucher_type": { "type": "string" }
+        }
+      }
+    },
+    "ledger_summary": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ledger": { "type": "string" },
+          "group": { "type": "string" },
+          "opening": { "type": "number" },
+          "debit": { "type": "number" },
+          "credit": { "type": "number" },
+          "closing": { "type": "number" }
+        }
+      }
+    },
+    "day_book": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "date": { "type": "string" },
+          "voucher_type": { "type": "string" },
+          "ledger": { "type": "string" },
+          "debit": { "type": "number" },
+          "credit": { "type": "number" },
+          "narration": { "type": "string" }
+        }
+      }
+    },
+    "draft_trial_balance": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ledger": { "type": "string" },
+          "debit": { "type": "number" },
+          "credit": { "type": "number" }
+        }
+      }
+    },
+    "unmapped_transactions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "mapping_adjustments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": { "type": "string" },
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "notes_to_preparer": { "type": "string" },
+    "stats": {
+      "type": "object",
+      "properties": {
+        "transaction_count": { "type": "integer" },
+        "classified_by_value_pct": { "type": "number" },
+        "accounts_processed": { "type": "array", "items": { "type": "string" } },
+        "date_from": { "type": "string" },
+        "date_to": { "type": "string" }
+      }
+    },
+    "tally_tb_text": { "type": "string" }
+  }
+}

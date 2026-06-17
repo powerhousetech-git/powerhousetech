@@ -43,6 +43,33 @@ const bundles = {
       { name: '../_shared/tally-system-prompt.ts', content: read('_shared/tally-system-prompt.ts') },
     ],
   },
+  'book-build-start': {
+    entrypoint_path: 'index.ts',
+    verify_jwt: false,
+    files: [
+      { name: 'index.ts', content: read('book-build-start/index.ts') },
+      { name: '../_shared/book-build-api.ts', content: read('_shared/book-build-api.ts') },
+      { name: '../_shared/book-classify-prompt.ts', content: read('_shared/book-classify-prompt.ts') },
+      { name: '../_shared/reconcile-books.ts', content: read('_shared/reconcile-books.ts') },
+      { name: '../_shared/pack-ingest.ts', content: read('_shared/pack-ingest.ts') },
+      { name: '../_shared/bank-statement.ts', content: read('_shared/bank-statement.ts') },
+      { name: '../_shared/cash-book.ts', content: read('_shared/cash-book.ts') },
+      { name: '../_shared/register.ts', content: read('_shared/register.ts') },
+      { name: '../_shared/opening-tb.ts', content: read('_shared/opening-tb.ts') },
+      { name: '../_shared/coa.ts', content: read('_shared/coa.ts') },
+      { name: '../_shared/cors.ts', content: read('_shared/cors.ts') },
+      { name: '../_shared/job-store.ts', content: read('_shared/job-store.ts') },
+    ],
+  },
+  'book-build-status': {
+    entrypoint_path: 'index.ts',
+    verify_jwt: false,
+    files: [
+      { name: 'index.ts', content: read('book-build-status/index.ts') },
+      { name: '../_shared/cors.ts', content: read('_shared/cors.ts') },
+      { name: '../_shared/job-store.ts', content: read('_shared/job-store.ts') },
+    ],
+  },
 };
 
 const outDir = path.join(root, '.edge-deploy');

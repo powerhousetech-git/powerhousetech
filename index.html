@@ -1045,7 +1045,7 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
           <p>Our first focus: the repetitive document work inside Indian CA practices.</p>
           <ul>
             <li>Trial balances converted to NCE Schedule III templates automatically</li>
-            <li>Bank statement categorisation for income computation <span style="color:var(--ink-light)">(coming soon)</span></li>
+            <li>Client packs turned into classified books and draft trial balances</li>
             <li>GST, ITR, and TDS reminders: upload a client list, customise each one, send via n8n</li>
             <li>Output formatted to your firm's templates, audit-ready, every time</li>
           </ul>
@@ -1235,10 +1235,9 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           Compliance Reminders
         </button>
-        <button data-tab="tab-bank" title="Bank statement PDF → income categories (coming soon)">
+        <button data-tab="tab-bank" title="Bank, cash, registers → classified books and draft trial balance">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>
-          Bank Categoriser
-          <span class="nav-soon-badge">Soon</span>
+          Client pack → Trial balance
         </button>
       </nav>
       <div class="side-user">
@@ -1550,39 +1549,159 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
         </div>
       </section>
 
-      <!-- TAB: BANK CATEGORISER (locked; not ready) -->
+      <!-- TAB: CLIENT PACK → TRIAL BALANCE (Tool 3) -->
       <section class="tab-section" id="tab-bank">
-        <div class="tool-title-row">
-          <h2 class="page-title" style="font-size:1.45rem">Bank Statement Categoriser</h2>
-          <span class="soon-badge">Coming soon</span>
-        </div>
+        <h2 class="page-title" style="font-size:1.45rem;margin-bottom:8px">Client pack → Trial balance</h2>
         <p class="page-sub">
-          Upload bank statement PDFs and get categorised transactions for income computation. This workflow is still in development.
+          Upload bank statements, cash books, sales/purchase registers, and opening trial balance.
+          Get back classified books, a day book, and a draft trial balance for your review — working papers
+          that feed into <button type="button" class="sheet-change-btn" data-switch-tab="tab-financial">TB → NCE Template</button>.
         </p>
 
-        <div class="dcard tool-coming-soon-card">
-          <div class="tool-coming-soon">
-            <div class="cs-icon" aria-hidden="true">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#424FD1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        <div class="dcard">
+          <div class="dcard-head"><h3>Upload client pack</h3></div>
+          <div class="dropzone" id="book-dropzone" tabindex="0" role="button"
+            aria-label="Upload client pack files">
+            <div class="dz-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#424FD1"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
               </svg>
             </div>
-            <h3>Not available in the workspace yet</h3>
-            <p>
-              We're building PDF parsing and income-head categorisation for ITR workflows.
-              It isn't ready for workspace runs. Your complimentary run won't be used here.
+            <p><b>Click to upload</b> or drag and drop client files</p>
+            <p class="dz-hint">Bank CSV/Excel/PDF · cash book · sales/purchase registers · opening TB · up to 25 MB each</p>
+            <input type="file" id="book-input" multiple
+              accept=".pdf,.csv,.xlsx,.xls,.txt,.xml" hidden>
+          </div>
+          <div class="file-list" id="book-files"></div>
+
+          <div class="tally-meta-grid" style="margin-top:18px">
+            <div class="tally-field">
+              <label class="tally-label" for="b-entity-name">Entity name</label>
+              <input class="tally-input" id="b-entity-name" type="text" placeholder="Client / proprietorship name">
+            </div>
+            <div class="tally-field">
+              <label class="tally-label" for="b-fy-end">Financial year end</label>
+              <input class="tally-input" id="b-fy-end" type="date">
+            </div>
+            <div class="tally-field">
+              <label class="tally-label" for="b-coa-template">Chart of accounts</label>
+              <select class="tally-input" id="b-coa-template">
+                <option value="proprietorship-trade">Proprietorship — trade &amp; services</option>
+              </select>
+            </div>
+          </div>
+          <p class="sheet-note" style="margin-top:10px">
+            Name files clearly (e.g. <code>alpha-bank.csv</code>, <code>sales-register.xlsx</code>, <code>opening-tb.csv</code>).
+            Outputs are working papers for CA review — not filed returns or signed financial statements.
+          </p>
+
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px">
+            <button class="btn btn-primary tool-action" id="book-submit" disabled style="opacity:.5">
+              Build working papers
+            </button>
+            <button type="button" id="book-dry-run" class="btn btn-ghost" style="padding:9px 16px;font-size:.84rem" disabled>
+              Dry run (no credit)
+            </button>
+          </div>
+          <p class="status-msg" id="book-status"></p>
+        </div>
+
+        <div class="dcard" id="book-result-card" hidden>
+          <div class="dcard-head">
+            <h3>Working papers</h3>
+            <span class="chip green" id="book-result-badge">Ready</span>
+          </div>
+
+          <div class="tally-result-summary" id="book-result-summary">
+            <div class="tally-summary-item">
+              <span class="k">Entity</span>
+              <span class="v" id="book-sum-entity">N/A</span>
+            </div>
+            <div class="tally-summary-item">
+              <span class="k">Financial year</span>
+              <span class="v" id="book-sum-fy">N/A</span>
+            </div>
+            <div class="tally-summary-item">
+              <span class="k">Transactions</span>
+              <span class="v" id="book-sum-txns">N/A</span>
+            </div>
+            <div class="tally-summary-item">
+              <span class="k">Auto-classified (by value)</span>
+              <span class="v" id="book-sum-pct">N/A</span>
+            </div>
+            <div class="tally-summary-item">
+              <span class="k">Date range</span>
+              <span class="v" id="book-sum-dates">N/A</span>
+            </div>
+          </div>
+
+          <div id="book-notes-wrap" class="fin-detected-meta" hidden style="margin:18px 0;border-color:#D8DCF5;background:#F7F8FD">
+            <p class="fin-detected-copy" id="book-notes-copy"></p>
+          </div>
+
+          <div class="tbl-wrap" id="book-preview-wrap">
+            <table class="preview" id="book-preview-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Narration</th>
+                  <th>Debit (₹)</th>
+                  <th>Credit (₹)</th>
+                  <th>Suggested ledger</th>
+                  <th>Confidence</th>
+                </tr>
+              </thead>
+              <tbody id="book-preview-body"></tbody>
+            </table>
+          </div>
+
+          <div id="book-unmapped-wrap" hidden style="margin-top:20px">
+            <p style="font-size:.88rem;font-weight:600;color:#856404;margin-bottom:10px">
+              Items needing review
             </p>
-            <p>
-              For now, try <button type="button" class="sheet-change-btn" data-switch-tab="tab-financial">TB → NCE Template</button>
-              for trial balance conversion, or
-              <button type="button" class="sheet-change-btn" data-switch-tab="tab-reminders">Compliance Reminders</button>
-              for client follow-ups.
-            </p>
-            <div class="cs-actions">
-              <a class="btn btn-primary" href="mailto:aymaan.shahzad@powerhousetech.in?subject=Powerhouse%20Bank%20Categoriser%20early%20access">
-                Request early access
-              </a>
+            <div class="tbl-wrap">
+              <table class="preview" id="book-unmapped-table">
+                <thead>
+                  <tr><th>ID</th><th>Reason</th></tr>
+                </thead>
+                <tbody id="book-unmapped-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:12px;margin-top:22px;flex-wrap:wrap">
+            <button class="btn btn-primary" id="book-download-xlsx">
+              ⬇ Download working papers (.xlsx)
+            </button>
+            <button class="btn btn-primary" id="book-handoff-tally">
+              Continue in TB → NCE Template
+            </button>
+            <button class="btn btn-ghost" id="book-reset">
+              Start over
+            </button>
+          </div>
+        </div>
+
+        <div class="dcard">
+          <div class="dcard-head"><h3>How this works</h3></div>
+          <div class="mini-steps">
+            <div class="mini-step">
+              <span class="n">1</span>
+              <h4>Upload the client pack</h4>
+              <p>Bank/cash movement, registers, and opening TB. Multiple files in one job.</p>
+            </div>
+            <div class="mini-step">
+              <span class="n">2</span>
+              <h4>Review classified books</h4>
+              <p>Each line gets a suggested ledger head, confidence score, and suspense where needed.</p>
+            </div>
+            <div class="mini-step">
+              <span class="n">3</span>
+              <h4>Export draft trial balance</h4>
+              <p>Download working papers or send the draft TB to NCE conversion when you're satisfied.</p>
             </div>
           </div>
         </div>
@@ -1610,7 +1729,7 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
     <p class="meta">Effective Date: <span class="ph">[Effective Date]</span></p>
     <p>These Terms of Service ("Terms") govern your access to and use of <b>Powerhouse</b> (<span class="ph">[Product Name]</span>), operated by <span class="ph">[Company Name]</span> ("we", "us", "our"). By creating an account or using the service, you agree to these Terms.</p>
     <h2>1. Description of Services</h2>
-    <p><span class="ph">[Description of Services]</span>: Powerhouse provides workflow automation for Chartered Accountant practices, including trial-balance-to-NCE-template conversion, bank statement categorisation for income computation, client compliance reminders, and related document-processing automations connected to your workspace.</p>
+    <p><span class="ph">[Description of Services]</span>: Powerhouse provides workflow automation for Chartered Accountant practices, including trial-balance-to-NCE-template conversion, client-pack-to-draft-trial-balance working papers, client compliance reminders, and related document-processing automations connected to your workspace.</p>
     <h2>2. Accounts</h2>
     <p>You sign in using your Google account. You are responsible for maintaining the security of your account and for all activity that occurs under it. You must provide accurate information and use the service only for lawful purposes.</p>
     <h2>3. Disclaimer of Professional Advice</h2>
@@ -1639,7 +1758,7 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
       <li><b>Name</b>: from your Google account when you sign in</li>
       <li><b>Email</b>: from your Google account when you sign in</li>
       <li><b>Google Account Information</b>: profile picture and basic profile data provided by Google Sign-In (we never see your password)</li>
-      <li><b>Uploaded Files</b>: trial balances, bank statements, and other documents you submit for processing</li>
+      <li><b>Uploaded Files</b>: trial balances, bank and cash books, sales/purchase registers, opening balances, and other client documents you submit for processing</li>
     </ul>
     <h2>2. Purpose of Collection</h2>
     <p><span class="ph">[Purpose of Collection]</span>: We use this data to operate your workspace, process the documents you upload, deliver finished output to your email, provide support, and improve the reliability of our automations. We do not sell your data.</p>
@@ -1671,7 +1790,7 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
     <h2>1. Service Description</h2>
     <p><span class="ph">[Service Description]</span>: The Processor provides document-processing automation, converting financial documents supplied by the Controller into structured, audit-ready output.</p>
     <h2>2. Categories of Data Processed</h2>
-    <p><span class="ph">[Categories of Data Processed]</span>: Client financial records contained in trial balances and bank statements, including names, account details, and transaction data of the Controller's clients.</p>
+    <p><span class="ph">[Categories of Data Processed]</span>: Client financial records contained in trial balances, bank/cash books, registers, and related working papers, including names, account details, and transaction data of the Controller's clients.</p>
     <h2>3. Security Measures</h2>
     <p><span class="ph">[Security Measures]</span>: The Processor maintains encryption of data in transit and at rest, role-based access controls, audit logging, and staff confidentiality obligations.</p>
     <h2>4. Data Retention &amp; Deletion</h2>
@@ -1778,6 +1897,8 @@ const N8N_WEBHOOK_URL = 'https://aymaanshahzad23.app.n8n.cloud/webhook/ca-filing
 const SUPABASE_URL = 'https://msratyvmnuvozuthgkmi.supabase.co';
 const TALLY_MAP_START_API = `${SUPABASE_URL}/functions/v1/tally-map-start`;
 const TALLY_MAP_STATUS_API = `${SUPABASE_URL}/functions/v1/tally-map-status`;
+const BOOK_BUILD_START_API = `${SUPABASE_URL}/functions/v1/book-build-start`;
+const BOOK_BUILD_STATUS_API = `${SUPABASE_URL}/functions/v1/book-build-status`;
 const CREDITS_API = `${SUPABASE_URL}/functions/v1/user-credits`;
 const TEAM_CONTACT_EMAIL = 'aymaan.shahzad@powerhousetech.in';
 const TEMPLATE_MAP_URL = 'template_map.json';
@@ -2980,89 +3101,435 @@ function formatSize(bytes){
   return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
-function setupUploader({ dropzoneId, inputId, listId, submitId, statusId, processingMessage, doneMessage }){
-  const dropzone = document.getElementById(dropzoneId);
-  const input    = document.getElementById(inputId);
-  const list     = document.getElementById(listId);
-  const submit   = document.getElementById(submitId);
-  const status   = document.getElementById(statusId);
-  let files = [];
+/* ==================== TOOL 3: CLIENT PACK → TRIAL BALANCE ==================== */
+const bookDropzone = document.getElementById('book-dropzone');
+const bookInput    = document.getElementById('book-input');
+const bookFileList = document.getElementById('book-files');
+const bookSubmit   = document.getElementById('book-submit');
+const bookDryRun   = document.getElementById('book-dry-run');
+const bookStatus   = document.getElementById('book-status');
+let bookFiles = [];
+let bookBuildResult = null;
 
-  function render(){
-    list.innerHTML = '';
-    files.forEach((f, i) => {
-      const row = document.createElement('div');
-      row.className = 'file-row';
-      row.dataset.index = i;
-      row.innerHTML = `
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#424FD1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        <span class="fname"></span>
-        <span class="fsize">${formatSize(f.size)}</span>
-        <button class="fremove" aria-label="Remove file">×</button>`;
-      row.querySelector('.fname').textContent = f.name;
-      row.querySelector('.fremove').addEventListener('click', (e) => {
-        const idx = parseInt(e.currentTarget.closest('.file-row').dataset.index, 10);
-        files.splice(idx, 1);
-        render();
-      });
-      list.appendChild(row);
+function renderBookFiles() {
+  bookFileList.innerHTML = '';
+  bookFiles.forEach((f, i) => {
+    const row = document.createElement('div');
+    row.className = 'file-row';
+    row.dataset.index = i;
+    row.innerHTML = `
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#424FD1"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+      <span class="fname"></span>
+      <span class="fsize">${formatSize(f.size)}</span>
+      <button class="fremove" aria-label="Remove">×</button>`;
+    row.querySelector('.fname').textContent = f.name;
+    row.querySelector('.fremove').addEventListener('click', e => {
+      bookFiles.splice(parseInt(e.currentTarget.closest('.file-row').dataset.index, 10), 1);
+      renderBookFiles();
     });
-    const has = files.length > 0;
-    submit.disabled = !has;
-    submit.style.opacity = has ? '1' : '.5';
-  }
-
-  function addFiles(fileList){
-    files = files.concat(Array.from(fileList));
-    status.textContent = '';
-    status.className = 'status-msg';
-    render();
-  }
-
-  dropzone.addEventListener('click', () => input.click());
-  dropzone.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); input.click(); }
+    bookFileList.appendChild(row);
   });
-  input.addEventListener('change', () => { addFiles(input.files); input.value = ''; });
+  const has = bookFiles.length > 0;
+  bookSubmit.disabled = !has;
+  bookSubmit.style.opacity = has ? '1' : '.5';
+  if (bookDryRun) {
+    bookDryRun.disabled = !has;
+    bookDryRun.style.opacity = has ? '1' : '.5';
+  }
+}
 
-  ['dragenter','dragover'].forEach(ev =>
-    dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('dragover'); }));
-  ['dragleave','drop'].forEach(ev =>
-    dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('dragover'); }));
-  dropzone.addEventListener('drop', e => addFiles(e.dataTransfer.files));
+bookDropzone.addEventListener('click', () => bookInput.click());
+bookDropzone.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bookInput.click(); }
+});
+bookInput.addEventListener('change', () => {
+  bookFiles = bookFiles.concat(Array.from(bookInput.files));
+  bookInput.value = '';
+  bookStatus.textContent = '';
+  bookStatus.className = 'status-msg';
+  renderBookFiles();
+});
+['dragenter', 'dragover'].forEach(ev =>
+  bookDropzone.addEventListener(ev, e => { e.preventDefault(); bookDropzone.classList.add('dragover'); }));
+['dragleave', 'drop'].forEach(ev =>
+  bookDropzone.addEventListener(ev, e => { e.preventDefault(); bookDropzone.classList.remove('dragover'); }));
+bookDropzone.addEventListener('drop', e => {
+  bookFiles = bookFiles.concat(Array.from(e.dataTransfer.files));
+  renderBookFiles();
+});
 
-  submit.addEventListener('click', async () => {
-    if (!files.length) return;
-    if (!currentUser?.uid) { openSignin(); return; }
-    if (!(await consumeRunCredit('bank_statements'))) return;
+async function ensurePdfJs() {
+  if (typeof pdfjsLib === 'undefined') {
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+}
 
-    const n = files.length;
-    const emailStr = currentUser.email || 'your registered email';
-    submit.disabled = true;
-    submit.style.opacity = '.5';
+async function readPackFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'pdf') {
+    await ensurePdfJs();
+    const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    const pages = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      pages.push(content.items.map((item) => item.str).join(' '));
+    }
+    return pages.join('\n');
+  }
+  if (ext === 'xml' || ext === 'txt' || ext === 'csv') return await file.text();
+  if (ext === 'xlsx' || ext === 'xls') {
+    await ensureXLSX();
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: 'array' });
+    return wb.SheetNames.map((name) => {
+      const ws = wb.Sheets[name];
+      return `--- Sheet: ${name} ---\n` + XLSX.utils.sheet_to_csv(ws);
+    }).join('\n\n');
+  }
+  throw new Error('Unsupported file type: ' + ext);
+}
 
-    // Stage 1: uploading
-    status.className = 'status-msg processing';
-    status.innerHTML = '<span class="spin"></span> <b>Uploading ' + n + ' file' + (n > 1 ? 's' : '') + '…</b> Adding to the processing queue.';
+async function buildPackData(files) {
+  const parts = [];
+  for (const file of files) {
+    const body = await readPackFile(file);
+    parts.push(`--- File: ${file.name} ---\n${body}`);
+  }
+  return parts.join('\n\n');
+}
 
-    // Stage 2: processing
-    setTimeout(() => {
-      status.innerHTML = '<span class="spin"></span> <b>Processing…</b> ' + processingMessage;
-    }, 1400);
+function bookBuildErrorMessage(status, data) {
+  if (status === 504 || status === 502) {
+    return 'The server timed out starting the book build job. Check that Supabase Edge Functions are deployed, then try again.';
+  }
+  return data.error || `HTTP ${status}`;
+}
 
-    // Done
-    setTimeout(() => {
-      status.className = 'status-msg done';
-      status.innerHTML = doneMessage.replace('{email}', emailStr);
-      files = [];
-      render();
-      submit.disabled = true;
-      submit.style.opacity = '.5';
-    }, 3200);
+async function runBookBuild(packData, entityName, fyEnd, prevFyEnd, coaTemplateId, sourceFilename, onProgress, { dryRun = false } = {}) {
+  const jobId = crypto.randomUUID();
+
+  const startResp = await fetch(BOOK_BUILD_START_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jobId,
+      entityName,
+      fyEnd,
+      prevFyEnd,
+      coaTemplateId,
+      packData,
+      sourceFilename,
+      dryRun,
+    }),
+  });
+
+  const startData = await startResp.json().catch(() => ({}));
+  if (startResp.status !== 202) {
+    throw new Error(bookBuildErrorMessage(startResp.status, startData));
+  }
+
+  const deadline = Date.now() + 14 * 60 * 1000;
+  let polls = 0;
+
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, polls < 3 ? 1500 : 2500));
+    polls += 1;
+
+    const statusResp = await fetch(`${BOOK_BUILD_STATUS_API}?jobId=${encodeURIComponent(jobId)}`);
+    const statusData = await statusResp.json().catch(() => ({}));
+
+    if (!statusResp.ok) {
+      if (statusResp.status === 404) {
+        if (typeof onProgress === 'function') onProgress('Waiting for job to start…');
+        continue;
+      }
+      throw new Error(bookBuildErrorMessage(statusResp.status, statusData));
+    }
+
+    if (statusData.status === 'done') return statusData.result;
+    if (statusData.status === 'error') {
+      throw new Error(statusData.error || 'Book build failed');
+    }
+
+    if (typeof onProgress === 'function') {
+      onProgress(statusData.message || 'Classifying transactions…');
+    }
+  }
+
+  throw new Error('Book build took too long. Try a smaller client pack or fewer files.');
+}
+
+function showBookError(msg) {
+  bookStatus.className = 'status-msg';
+  bookStatus.style.color = '#C0392B';
+  bookStatus.textContent = '✗ ' + msg;
+  bookSubmit.disabled = false;
+  bookSubmit.style.opacity = '1';
+  if (bookDryRun) {
+    bookDryRun.disabled = bookFiles.length === 0;
+    bookDryRun.style.opacity = bookFiles.length ? '1' : '.5';
+  }
+}
+
+function showBookBuildResult(result) {
+  bookBuildResult = result;
+  const card = document.getElementById('book-result-card');
+  card.hidden = false;
+
+  document.getElementById('book-sum-entity').textContent = result.entity_name || 'N/A';
+  document.getElementById('book-sum-fy').textContent = formatIndianDate(result.fy_end || defaultFyEndIso());
+  document.getElementById('book-sum-txns').textContent = String(result.stats?.transaction_count ?? 0);
+  const pct = result.stats?.classified_by_value_pct;
+  document.getElementById('book-sum-pct').textContent =
+    pct != null ? `${pct.toFixed(1)}%` : 'N/A';
+  const from = result.stats?.date_from || '';
+  const to = result.stats?.date_to || '';
+  document.getElementById('book-sum-dates').textContent =
+    from && to ? `${from} → ${to}` : 'N/A';
+
+  const notes = String(result.notes_to_preparer || '').trim();
+  const notesWrap = document.getElementById('book-notes-wrap');
+  if (notes) {
+    notesWrap.hidden = false;
+    document.getElementById('book-notes-copy').textContent = notes;
+  } else {
+    notesWrap.hidden = true;
+  }
+
+  const tbody = document.getElementById('book-preview-body');
+  tbody.innerHTML = '';
+  const preview = (result.classified_transactions || []).slice(0, 80);
+  preview.forEach((row) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(row.date || '')}</td>
+      <td>${escapeHtml((row.narration || '').slice(0, 80))}</td>
+      <td>${row.debit ? formatIndian(row.debit) : ''}</td>
+      <td>${row.credit ? formatIndian(row.credit) : ''}</td>
+      <td>${escapeHtml(row.ledger || '')}</td>
+      <td>${escapeHtml(row.confidence || '')}</td>`;
+    tbody.appendChild(tr);
+  });
+  if ((result.classified_transactions || []).length > 80) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="6" style="color:var(--ink-light);font-size:.85rem">Showing first 80 of ${result.classified_transactions.length} lines. Download .xlsx for the full book.</td>`;
+    tbody.appendChild(tr);
+  }
+
+  const unmapped = result.unmapped_transactions || [];
+  const unmappedWrap = document.getElementById('book-unmapped-wrap');
+  const unmappedBody = document.getElementById('book-unmapped-body');
+  if (unmapped.length) {
+    unmappedWrap.hidden = false;
+    unmappedBody.innerHTML = '';
+    unmapped.forEach((u) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHtml(u.id || '')}</td><td>${escapeHtml(u.reason || '')}</td>`;
+      unmappedBody.appendChild(tr);
+    });
+  } else {
+    unmappedWrap.hidden = true;
+  }
+
+  const badge = document.getElementById('book-result-badge');
+  const pctVal = result.stats?.classified_by_value_pct ?? 0;
+  if (pctVal >= 85) {
+    badge.textContent = 'Ready';
+    badge.className = 'chip green';
+  } else {
+    badge.textContent = 'Review suggested';
+    badge.className = 'chip';
+    badge.style.background = '#FFF3CD';
+    badge.style.color = '#856404';
+  }
+}
+
+async function buildBookBuildXlsx(result) {
+  await ensureXLSX();
+  const wb = XLSX.utils.book_new();
+
+  const classifiedRows = [
+    ['Date', 'Narration', 'Debit', 'Credit', 'Balance', 'Ledger', 'Group', 'Confidence', 'Transfer', 'Personal', 'Source'],
+    ...(result.classified_transactions || []).map((r) => [
+      r.date, r.narration, r.debit || '', r.credit || '', r.balance ?? '',
+      r.ledger, r.group, r.confidence, r.is_transfer ? 'Y' : '', r.is_personal ? 'Y' : '', r.source_file,
+    ]),
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(classifiedRows), 'Classified book');
+
+  const summaryRows = [
+    ['Ledger', 'Group', 'Opening', 'Debit', 'Credit', 'Closing'],
+    ...(result.ledger_summary || []).map((r) => [r.ledger, r.group, r.opening, r.debit, r.credit, r.closing]),
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), 'Ledger summary');
+
+  const dayRows = [
+    ['Date', 'Voucher type', 'Ledger', 'Debit', 'Credit', 'Narration'],
+    ...(result.day_book || []).map((r) => [r.date, r.voucher_type, r.ledger, r.debit, r.credit, r.narration]),
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dayRows), 'Day book');
+
+  const tbRows = [
+    ['Ledger', 'Debit', 'Credit'],
+    ...(result.draft_trial_balance || []).map((r) => [r.ledger, r.debit || '', r.credit || '']),
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tbRows), 'Draft trial balance');
+
+  const reviewRows = [
+    ['Type', 'Field', 'From', 'To', 'Reason'],
+    ...(result.mapping_adjustments || []).map((a) => ['adjustment', a.field, a.from, a.to, a.reason]),
+    ...(result.unmapped_transactions || []).map((u) => ['unmapped', u.id, '', '', u.reason]),
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(reviewRows), 'Review pack');
+
+  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  return new Blob([out], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
 }
 
-/* Bank Categoriser: locked until backend is ready (no uploader wired) */
+async function runBookBuildJob({ dryRun = false, consumeCredit = true } = {}) {
+  if (!bookFiles.length) return;
+  if (!currentUser?.uid) { openSignin(); return; }
+  if (consumeCredit && !(await consumeRunCredit('book_build'))) return;
+
+  const entityName = document.getElementById('b-entity-name').value.trim() || 'Entity Name';
+  const fyEnd = document.getElementById('b-fy-end').value || defaultFyEndIso();
+  const prevFyEnd = prevFyEndIso(fyEnd);
+  const coaTemplateId = document.getElementById('b-coa-template').value || 'proprietorship-trade';
+
+  bookSubmit.disabled = true;
+  bookSubmit.style.opacity = '.5';
+  if (bookDryRun) {
+    bookDryRun.disabled = true;
+    bookDryRun.style.opacity = '.5';
+  }
+  document.getElementById('book-result-card').hidden = true;
+
+  bookStatus.className = 'status-msg processing';
+  bookStatus.style.color = '';
+  bookStatus.innerHTML = dryRun
+    ? '<span class="spin"></span> <b>Dry run…</b> Parsing pack with rule-based classification only (no credit used).'
+    : '<span class="spin"></span> <b>Reading files…</b> Parsing your client pack.';
+
+  let packData;
+  try {
+    packData = await buildPackData(bookFiles);
+  } catch (err) {
+    showBookError('Could not read files: ' + err.message);
+    return;
+  }
+
+  if (!dryRun) {
+    bookStatus.innerHTML = '<span class="spin"></span> <b>Building books…</b> Classifying transactions to ledger heads.';
+  }
+
+  let result;
+  try {
+    result = await runBookBuild(
+      packData,
+      entityName,
+      fyEnd,
+      prevFyEnd,
+      coaTemplateId,
+      bookFiles.map((f) => f.name).join(', '),
+      (msg) => {
+        bookStatus.innerHTML = `<span class="spin"></span> <b>Still working…</b> ${msg} Large packs can take 1–2 minutes.`;
+      },
+      { dryRun },
+    );
+  } catch (err) {
+    showBookError('Book build failed: ' + err.message);
+    return;
+  }
+
+  try {
+    showBookBuildResult(result);
+  } catch (err) {
+    showBookError('Could not display results: ' + err.message);
+    return;
+  }
+
+  bookStatus.className = 'status-msg done';
+  bookStatus.innerHTML = dryRun
+    ? '✓ Dry run complete — rule-based preview only. Run <b>Build working papers</b> for full AI classification.'
+    : '✓ Working papers ready. Review the classified book and download, or continue to NCE conversion.';
+  bookSubmit.disabled = false;
+  bookSubmit.style.opacity = '1';
+  if (bookDryRun) {
+    bookDryRun.disabled = false;
+    bookDryRun.style.opacity = '1';
+  }
+}
+
+bookSubmit.addEventListener('click', () => runBookBuildJob({ dryRun: false, consumeCredit: true }));
+bookDryRun?.addEventListener('click', () => runBookBuildJob({ dryRun: true, consumeCredit: false }));
+
+document.getElementById('book-download-xlsx').addEventListener('click', async () => {
+  if (!bookBuildResult) return;
+  const btn = document.getElementById('book-download-xlsx');
+  btn.textContent = '⏳ Building file…';
+  try {
+    const blob = await buildBookBuildXlsx(bookBuildResult);
+    const entity = (bookBuildResult.entity_name || 'Client').replace(/[^a-zA-Z0-9]/g, '_');
+    const fy = bookBuildResult.fy_end || defaultFyEndIso();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Working_Papers_${entity}_${fy}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('Error building file: ' + err.message);
+  }
+  btn.textContent = '⬇ Download working papers (.xlsx)';
+});
+
+document.getElementById('book-handoff-tally').addEventListener('click', () => {
+  if (!bookBuildResult?.tally_tb_text) {
+    showToast('No draft trial balance available yet.');
+    return;
+  }
+
+  const tbText = bookBuildResult.tally_tb_text;
+  const meta = {
+    entityName: bookBuildResult.entity_name || document.getElementById('b-entity-name').value.trim() || 'Entity Name',
+    fyEnd: bookBuildResult.fy_end || document.getElementById('b-fy-end').value || defaultFyEndIso(),
+    prevFyEnd: bookBuildResult.prev_fy_end || prevFyEndIso(bookBuildResult.fy_end),
+    fyDetected: true,
+  };
+
+  finStatementMeta = { ...meta };
+  tallyFileTextCache = tbText;
+  tallyFiles = [new File([tbText], 'draft_trial_balance.txt', { type: 'text/plain' })];
+  renderTallyFiles();
+  syncMetaEditFields();
+  renderDetectedMetaCopy();
+  document.getElementById('fin-detected-meta').hidden = false;
+  document.getElementById('tally-result-card').hidden = true;
+  tallyStatus.className = 'status-msg done';
+  tallyStatus.innerHTML = '✓ Draft trial balance loaded from Tool 3. Click <b>Convert to NCE template</b> when ready.';
+
+  switchDashboardTab('tab-financial');
+  showToast('Draft TB loaded — review and convert to NCE template.');
+});
+
+document.getElementById('book-reset').addEventListener('click', () => {
+  bookFiles = [];
+  bookBuildResult = null;
+  renderBookFiles();
+  bookStatus.textContent = '';
+  bookStatus.className = 'status-msg';
+  bookStatus.style.color = '';
+  document.getElementById('book-result-card').hidden = true;
+});
 
 /* ==================== TB → NCE TEMPLATE ==================== */
 let templateMapCache = null;
@@ -3310,6 +3777,9 @@ function defaultFyEndIso() {
   const fyYear = now.getMonth() < 3 ? now.getFullYear() : now.getFullYear() + 1;
   return `${fyYear}-03-31`;
 }
+
+const bookFyInput = document.getElementById('b-fy-end');
+if (bookFyInput && !bookFyInput.value) bookFyInput.value = defaultFyEndIso();
 
 function toIsoDate(day, month, year) {
   const dd = String(day).padStart(2, '0');
