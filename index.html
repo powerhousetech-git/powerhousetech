@@ -4372,11 +4372,9 @@ function compressTallyForMapping(raw, filename) {
       body = `Tally ledger balances (${ledgers.length} ledgers):\n${ledgers.join('\n')}`;
     }
   } else if (ext === 'csv' || ext === 'xlsx' || ext === 'xls') {
-    const lines = raw.split(/\r?\n/).filter(Boolean);
-    const compact = lines.filter((line) => /[\d,]+(\.\d+)?/.test(line));
-    if (compact.length && compact.length < lines.length) {
-      body = `Trial balance rows (${compact.length} lines):\n${compact.join('\n')}`;
-    }
+    // Keep full sheet pack. Stripping non-numeric lines removes --- Sheet --- markers and
+    // breaks flat trial balance detection (Ledger | Group | Dr | Cr).
+    body = raw;
   }
 
   const tradingHints = extractTradingAccount(body);
