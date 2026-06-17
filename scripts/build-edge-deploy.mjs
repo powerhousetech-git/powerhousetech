@@ -38,6 +38,8 @@ const bundles = {
       { name: '../_shared/cors.ts', content: read('_shared/cors.ts') },
       { name: '../_shared/job-store.ts', content: read('_shared/job-store.ts') },
       { name: '../_shared/reconcile-mapping.ts', content: read('_shared/reconcile-mapping.ts') },
+      { name: '../_shared/trading-account.ts', content: read('_shared/trading-account.ts') },
+      { name: '../_shared/balance-sheet.ts', content: read('_shared/balance-sheet.ts') },
       { name: '../_shared/tally-system-prompt.ts', content: read('_shared/tally-system-prompt.ts') },
     ],
   },

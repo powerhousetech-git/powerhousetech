@@ -2690,6 +2690,12 @@ function renderReminderFileList() {
   list.appendChild(row);
 }
 
+function collapseReminderClients() {
+  reminderExpandedId = null;
+  reminderExpandedAll = false;
+  if (reminderClients.length) renderReminderClientsTable();
+}
+
 function initComplianceRemindersUI() {
   document.getElementById('reminder-preview-btn')?.addEventListener('click', toggleReminderPayloadPreview);
 
@@ -2735,7 +2741,7 @@ function initComplianceRemindersUI() {
       if (!rows.length) throw new Error('No valid client rows found. Check name and email columns.');
       reminderClients = rows.map((r) => newReminderClient(r.name, r.email));
       reminderUploadFile = file;
-      reminderExpandedId = reminderClients[0]?.id || null;
+      reminderExpandedId = null;
       reminderExpandedAll = false;
       renderUploadWarnings(report);
       renderReminderFileList();
@@ -2952,6 +2958,7 @@ document.querySelectorAll('.side-nav button').forEach(btn => {
     document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
     document.getElementById(btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'tab-financial') initTallyTemplatePreview();
+    if (btn.dataset.tab === 'tab-reminders') collapseReminderClients();
     // Desktop scrolls .dash-main; mobile (sidebar as top bar) scrolls the window
     document.querySelector('.dash-main').scrollTop = 0;
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3146,29 +3153,137 @@ function computeBsTotals(bs) {
   return out;
 }
 
-function reconcileMappingResult(result) {
+function reconcileMappingResult(result, tradingHints, balanceHints) {
   const out = structuredClone(result);
   const adjustments = [];
+
+  function shouldApplyCogsHint(mapped, expected) {
+    if (expected <= 0) return false;
+    const diff = Math.abs(expected - mapped);
+    return diff > Math.max(500, Math.abs(expected) * 0.002);
+  }
+
+  function applyBsHint(side, key, hintValue, period, label) {
+    if (hintValue == null || hintValue <= 0) return;
+    const node = side[key] || { current: 0, previous: 0 };
+    side[key] = node;
+    const mapped = periodVal(node, period);
+    if (Math.abs(mapped - hintValue) <= Math.max(100, hintValue * 0.01)) return;
+    adjustments.push({
+      field: label,
+      period,
+      from: mapped,
+      to: hintValue,
+      reason: `${label} aligned to parsed balance sheet figure`,
+    });
+    node[period] = roundMoney(hintValue);
+  }
+
+  if (tradingHints && tradingHints.confidence !== 'low' && tradingHints.confidence !== 'none') {
+    const pl = out.profit_and_loss;
+    const expected = tradingHints.current?.cogs;
+    if (pl && expected > 0) {
+      const cogs = pl.cost_of_goods_sold || { current: 0, previous: 0 };
+      pl.cost_of_goods_sold = cogs;
+      const mapped = periodVal(cogs, 'current');
+      if (shouldApplyCogsHint(mapped, expected)) {
+        adjustments.push({
+          field: 'Cost of goods sold',
+          period: 'current',
+          from: mapped,
+          to: expected,
+          reason: 'COGS recomputed from opening stock + purchases + rate difference − closing stock in source trading account',
+        });
+        cogs.current = roundMoney(expected);
+        const inv = out.notes?.inventories_breakup || {};
+        out.notes = out.notes || {};
+        out.notes.inventories_breakup = inv;
+        if (tradingHints.current.openingStock > 0) {
+          inv.stock_in_trade_opening = inv.stock_in_trade_opening || { current: 0, previous: 0 };
+          inv.stock_in_trade_opening.current = tradingHints.current.openingStock;
+        }
+        if (tradingHints.current.closingStock > 0) {
+          inv.stock_in_trade_closing = inv.stock_in_trade_closing || { current: 0, previous: 0 };
+          inv.stock_in_trade_closing.current = tradingHints.current.closingStock;
+        }
+      }
+      const other = pl.other_expenses || { current: 0, previous: 0 };
+      pl.other_expenses = other;
+      const rate = tradingHints.current.rateDifference || 0;
+      if (rate > 0 && other.current >= rate && other.current - rate > 1000) {
+        const cogsNow = periodVal(cogs, 'current');
+        if (Math.abs(cogsNow - expected) <= Math.max(500, expected * 0.01)) {
+          const adjusted = roundMoney(other.current - rate);
+          adjustments.push({
+            field: 'Other expenses',
+            period: 'current',
+            from: other.current,
+            to: adjusted,
+            reason: 'Removed rate difference from other expenses (belongs in COGS)',
+          });
+          other.current = adjusted;
+        }
+      }
+    }
+  }
+
+  if (balanceHints && balanceHints.confidence !== 'low' && balanceHints.confidence !== 'none') {
+    const bs = out.balance_sheet;
+    if (bs?.equity_and_liabilities && bs.assets) {
+      const eq = bs.equity_and_liabilities;
+      const assets = bs.assets;
+      const c = balanceHints.current;
+      applyBsHint(eq, 'long_term_borrowings', c.long_term_borrowings, 'current', 'Long-term borrowings');
+      applyBsHint(eq, 'short_term_borrowings', c.short_term_borrowings, 'current', 'Short-term borrowings');
+      applyBsHint(eq, 'trade_payables', c.trade_payables, 'current', 'Trade payables');
+      applyBsHint(eq, 'other_current_liabilities', c.other_current_liabilities, 'current', 'Other current liabilities');
+      applyBsHint(assets, 'long_term_loans_advances', c.long_term_loans_advances, 'current', 'Long-term loans & advances');
+      applyBsHint(assets, 'short_term_loans_advances', c.short_term_loans_advances, 'current', 'Short-term loans & advances');
+      if (c.other_current_assets > 0) {
+        applyBsHint(assets, 'other_current_assets', c.other_current_assets, 'current', 'Other current assets');
+      }
+    }
+  }
 
   const bs = out.balance_sheet;
   if (bs?.equity_and_liabilities && bs.assets) {
     ['current', 'previous'].forEach((period) => {
       const totalLiab = roundMoney(BS_LIAB_KEYS.reduce((s, k) => s + periodVal(bs.equity_and_liabilities[k], period), 0));
       const totalAssets = roundMoney(BS_ASSET_KEYS.reduce((s, k) => s + periodVal(bs.assets[k], period), 0));
-      const diff = roundMoney(totalAssets - totalLiab);
-      if (Math.abs(diff) > 1) {
-        const ocl = bs.equity_and_liabilities.other_current_liabilities || { current: 0, previous: 0 };
-        const from = periodVal(ocl, period);
-        const to = roundMoney(from + diff);
+      let diff = roundMoney(totalAssets - totalLiab);
+      if (Math.abs(diff) <= 1) return;
+
+      const ocl = bs.equity_and_liabilities.other_current_liabilities || { current: 0, previous: 0 };
+      bs.equity_and_liabilities.other_current_liabilities = ocl;
+      const oclVal = periodVal(ocl, period);
+      const hintedOcl = period === 'current' ? balanceHints?.current?.other_current_liabilities : undefined;
+
+      if (hintedOcl != null && oclVal > hintedOcl + 1000 && Math.abs(diff) < Math.abs(oclVal - hintedOcl) * 1.1) {
         adjustments.push({
           field: 'Other current liabilities',
-          from,
-          to,
-          reason: 'Books imbalance (suspense) added so assets = liabilities',
+          period,
+          from: oclVal,
+          to: hintedOcl,
+          reason: 'Removed book imbalance plug from other current liabilities',
         });
-        bs.equity_and_liabilities.other_current_liabilities = ocl;
-        ocl[period] = to;
+        ocl[period] = roundMoney(hintedOcl);
+        diff = roundMoney(totalAssets - roundMoney(BS_LIAB_KEYS.reduce((s, k) => s + periodVal(bs.equity_and_liabilities[k], period), 0)));
       }
+
+      const otl = bs.equity_and_liabilities.other_long_term_liabilities || { current: 0, previous: 0 };
+      bs.equity_and_liabilities.other_long_term_liabilities = otl;
+      const from = periodVal(otl, period);
+      const to = roundMoney(from + diff);
+      adjustments.push({
+        field: 'Other long-term liabilities (suspense)',
+        period,
+        from,
+        to,
+        reason: 'Books imbalance disclosed as other long-term liabilities (suspense pending reconciliation)',
+      });
+      otl[period] = to;
+      out.notes = out.notes || {};
+      out.notes.books_suspense_disclosed = true;
     });
   }
 
@@ -3208,11 +3323,11 @@ function prevFyEndIso(isoDate) {
   return toIsoDate(d, m, y - 1);
 }
 
-function detectStatementMeta(raw) {
+function detectStatementMeta(raw, filename = '') {
   let fyEnd = null;
 
   const dmy = raw.match(
-    /(?:balance\s+sheet|as\s+on|year\s+ended)[^\d]{0,40}(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/i,
+    /(?:balance\s+sheet|as\s+on|as\s+at|year\s+ended)[^\d]{0,40}(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/i,
   );
   if (dmy) fyEnd = toIsoDate(dmy[1], dmy[2], dmy[3]);
 
@@ -3241,11 +3356,18 @@ function detectStatementMeta(raw) {
       const start = sheetMatch.index + sheetMatch[0].length;
       const firstLine = raw.slice(start).split(/\r?\n/).find((l) => l.trim());
       if (firstLine) {
-        const candidate = firstLine.split(',')[0].replace(/^"|"$/g, '').trim();
-        const skip = /^(balance\s+sheet|liabilit|asset|trial\s+balance|particular|ledger|amount|debit|credit|year\s+ended|profit)/i;
+        const candidate = firstLine.split(/[,\t]/)[0].replace(/^"|"$/g, '').trim();
+        const skip = /^(balance\s+sheet|liabilit|asset|trial\s+balance|particular|ledger|amount|debit|credit|year\s+ended|profit|trading)/i;
         if (candidate.length >= 3 && !skip.test(candidate)) entityName = candidate;
       }
     }
+  }
+
+  if (!entityName && filename) {
+    const base = filename.replace(/\.[^.]+$/, '');
+    const fromName = base.match(/^([A-Za-z][A-Za-z0-9 _-]+?)_(?:\d{4}[-/]\d{2}|FY|fy)/i)
+      || base.match(/^([A-Za-z][A-Za-z0-9 _-]+?)_/);
+    if (fromName) entityName = fromName[1].replace(/_/g, ' ').trim();
   }
 
   const fy = fyEnd || defaultFyEndIso();
@@ -3333,7 +3455,7 @@ async function refreshStatementMetaFromFile() {
 
   try {
     tallyFileTextCache = await readTallyFile(tallyFiles[0]);
-    finStatementMeta = detectStatementMeta(tallyFileTextCache);
+    finStatementMeta = detectStatementMeta(tallyFileTextCache, tallyFiles[0]?.name || '');
     syncMetaEditFields();
     renderDetectedMetaCopy();
   } catch {
@@ -3549,8 +3671,257 @@ async function readTallyFile(file) {
   throw new Error('Unsupported file type: ' + ext);
 }
 
+function extractTradingAccount(sourceText) {
+  const lines = String(sourceText || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return null;
+
+  const OPENING = /\b(opening\s*stock|op\.?\s*stock|opening\s*inventory)\b/i;
+  const PURCHASE = /\b(purchases?|purchase\s+account)\b/i;
+  const RATE_DIFF = /\b(rate\s*diff(?:erence)?|rd\s+on\s+purchase|purchase\s*rate\s*diff)\b/i;
+  const CLOSING = /\b(closing\s*stock|cl\.?\s*stock|closing\s*inventory)\b/i;
+  const NET_PROFIT = /\bnet\s+(profit|loss)\b/i;
+  const matchedLabels = [];
+  let openingStock = 0, purchases = 0, rateDifference = 0, closingStock = 0, netProfitCurrent;
+  let inTradingSection = false;
+
+  function splitLine(line) {
+    return line.includes('\t') ? line.split('\t').map((c) => c.trim()) : line.split(',').map((c) => c.trim());
+  }
+  function parseNum(raw) {
+    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+    const n = Number(String(raw ?? '').replace(/,/g, '').trim());
+    return Number.isFinite(n) ? n : null;
+  }
+  function rowNums(cells) {
+    return cells.map(parseNum).filter((n) => n != null && Math.abs(n) > 0.001);
+  }
+  function rowLabel(cells) { return cells.slice(0, 3).filter(Boolean).join(' ').trim(); }
+  function findIdx(cells, re) { return cells.findIndex((c) => re.test(String(c || '').trim())); }
+  function debitAmt(cells) {
+    const nums = rowNums(cells);
+    return nums.length ? Math.abs(nums[0]) : 0;
+  }
+  function isTradingDebit(label) {
+    return /^to\s+/i.test(label) && !/\b(gross\s+profit|sale|depreciation|audit|rent|salary|interest|expense|charges|fees|repair|electric|telephone|promotion|printing|bank|shop|staff|late\s+fees)\b/i.test(label);
+  }
+
+  for (const line of lines) {
+    if (/trading\s+and\s+profit|profit\s*&\s*loss|profit\s+and\s+loss/i.test(line)) inTradingSection = true;
+    const cells = splitLine(line);
+    const label = rowLabel(cells);
+    const labelLower = label.toLowerCase();
+
+    const closingIdx = findIdx(cells, CLOSING);
+    if (closingIdx >= 0 && /^by\s+/i.test(String(cells[closingIdx]).trim())) {
+      const after = rowNums(cells.slice(closingIdx + 1));
+      if (after.length) {
+        closingStock = Math.max(closingStock, ...after.map((n) => Math.abs(n)));
+        matchedLabels.push(String(cells[closingIdx]).trim());
+        inTradingSection = true;
+      }
+    }
+
+    if (NET_PROFIT.test(labelLower) || cells.some((c) => NET_PROFIT.test(String(c || '')))) {
+      const nums = rowNums(cells);
+      if (nums.length) netProfitCurrent = nums[0];
+      continue;
+    }
+    if (!inTradingSection && findIdx(cells, OPENING) < 0 && !PURCHASE.test(labelLower)) continue;
+
+    const openingIdx = findIdx(cells, OPENING);
+    if (openingIdx >= 0 && /^to\s+/i.test(String(cells[openingIdx]).trim())) {
+      const amt = debitAmt(cells.slice(openingIdx));
+      if (amt > 0) { openingStock = amt; matchedLabels.push(String(cells[openingIdx]).trim()); inTradingSection = true; }
+      continue;
+    }
+    if (OPENING.test(labelLower) && isTradingDebit(label)) {
+      openingStock = debitAmt(cells); matchedLabels.push(label); inTradingSection = true; continue;
+    }
+
+    const purchaseIdx = findIdx(cells, PURCHASE);
+    if (purchaseIdx >= 0 && /^to\s+/i.test(String(cells[purchaseIdx]).trim()) && !/return/i.test(String(cells[purchaseIdx]))) {
+      const amt = debitAmt(cells.slice(purchaseIdx));
+      if (amt > 0) { purchases = roundMoney(purchases + amt); matchedLabels.push(String(cells[purchaseIdx]).trim()); inTradingSection = true; }
+      continue;
+    }
+    if (PURCHASE.test(labelLower) && isTradingDebit(label) && !/return/i.test(labelLower)) {
+      purchases = roundMoney(purchases + debitAmt(cells)); matchedLabels.push(label); inTradingSection = true; continue;
+    }
+
+    const rateIdx = findIdx(cells, RATE_DIFF);
+    if (rateIdx >= 0 && /^to\s+/i.test(String(cells[rateIdx]).trim())) {
+      const amt = debitAmt(cells.slice(rateIdx));
+      if (amt > 0) { rateDifference = roundMoney(rateDifference + amt); matchedLabels.push(String(cells[rateIdx]).trim()); inTradingSection = true; }
+      continue;
+    }
+    if (RATE_DIFF.test(labelLower) && isTradingDebit(label)) {
+      rateDifference = roundMoney(rateDifference + debitAmt(cells)); matchedLabels.push(label); inTradingSection = true;
+    }
+  }
+
+  const cogs = roundMoney(openingStock + purchases + rateDifference - closingStock);
+  let confidence = 'none';
+  if (purchases > 0 && cogs > 0 && (openingStock > 0 || closingStock > 0 || rateDifference > 0)) {
+    confidence = openingStock > 0 && closingStock > 0 ? 'high' : 'medium';
+  } else if (purchases > 0 && cogs > 0) confidence = 'medium';
+  else if (purchases > 0) confidence = 'low';
+  if (confidence === 'none') return null;
+  return {
+    confidence,
+    current: { openingStock, purchases, rateDifference, closingStock, cogs },
+    netProfitCurrent,
+    matchedLabels,
+  };
+}
+
+function formatTradingAccountBlock(hints) {
+  const c = hints.current;
+  return [
+    'PARSED_TRADING_ACCOUNT (deterministic — prefer these COGS components for cost_of_goods_sold.current):',
+    `opening_stock: ${c.openingStock}`,
+    `purchases: ${c.purchases}`,
+    `rate_difference: ${c.rateDifference}`,
+    `closing_stock: ${c.closingStock}`,
+    `cost_of_goods_sold_computed: ${c.cogs}`,
+    hints.netProfitCurrent != null ? `net_profit_current: ${hints.netProfitCurrent}` : null,
+    `confidence: ${hints.confidence}`,
+  ].filter(Boolean).join('\n');
+}
+
+function extractBalanceSheetHints(sourceText) {
+  const lines = String(sourceText || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return null;
+
+  function splitLine(line) {
+    return line.includes('\t') ? line.split('\t').map((c) => c.trim()) : line.split(',').map((c) => c.trim());
+  }
+  function parseNum(raw) {
+    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+    const n = Number(String(raw ?? '').replace(/,/g, '').trim());
+    return Number.isFinite(n) ? n : null;
+  }
+  function rowNums(cells) {
+    return cells.map(parseNum).filter((n) => n != null && Math.abs(n) > 0.001);
+  }
+  function rowLabel(cells) { return cells.filter(Boolean).join(' ').trim(); }
+  function pickLiabilityAmount(cells) {
+    const nums = rowNums(cells);
+    return nums.length ? Math.max(...nums.map((n) => Math.abs(n))) : 0;
+  }
+
+  const matchedLabels = [];
+  let longTermBorrowings = 0, shortTermBorrowings = 0, tradePayables = 0, otherCurrentLiabilities = 0;
+  let longTermLoansAdvances = 0, shortTermLoansAdvances = 0, otherCurrentAssets = 0;
+  let totalLiabilities = 0, totalAssets = 0;
+  let inBs = false, inCreditors = false;
+
+  for (const line of lines) {
+    if (/balance\s+sheet|as\s+on|as\s+at/i.test(line)) inBs = true;
+    const cells = splitLine(line);
+    const label = rowLabel(cells);
+    const ll = label.toLowerCase();
+
+    if (/\b(sundry\s+creditors?|trade\s+payables?|goods\s+creditors?)\b/i.test(ll) && !/asset/i.test(ll)) inCreditors = true;
+
+    if (/\bunsecured\s+loans?\b/i.test(ll)) {
+      const amt = pickLiabilityAmount(cells);
+      if (amt > 0) { longTermBorrowings = roundMoney(longTermBorrowings + amt); matchedLabels.push(label); inBs = true; }
+      continue;
+    }
+    if (/\b(secured\s+loans?|cc\s+limit|cash\s+credit|overdraft)\b/i.test(ll) && !/\bunsecured\b/i.test(ll)) {
+      const amt = pickLiabilityAmount(cells);
+      if (amt > 0) { shortTermBorrowings = roundMoney(shortTermBorrowings + amt); matchedLabels.push(label); inBs = true; }
+      continue;
+    }
+    if (/\baudit\s+fees?\s+payable\b/i.test(ll)) {
+      const amt = pickLiabilityAmount(cells);
+      if (amt > 0) { otherCurrentLiabilities = roundMoney(otherCurrentLiabilities + amt); matchedLabels.push(label); inBs = true; }
+      continue;
+    }
+    if (inBs && inCreditors && !/\baudit\s+fees?\s+payable\b/i.test(ll)) {
+      const name = cells[0]?.trim() || '';
+      const nums = rowNums(cells.slice(1));
+      const amt = nums.length ? Math.abs(nums[0]) : 0;
+      if (amt > 50000 && name && !/^(current|liabilit|provision|total|secured|unsecured|audit)/i.test(name)) {
+        tradePayables = roundMoney(Math.max(tradePayables, amt));
+        matchedLabels.push(`trade creditor: ${name}`);
+      }
+    }
+    if (/\bsecurity\s+deposit/i.test(ll)) {
+      const amt = pickLiabilityAmount(cells);
+      if (amt > 0) longTermLoansAdvances = roundMoney(Math.max(longTermLoansAdvances, amt));
+    }
+    if (/\b(gst\s+input|gst\s+receivable|gst\b)/i.test(ll) && !/paid|payable/i.test(ll)) {
+      const amt = pickLiabilityAmount(cells);
+      if (amt > 0) otherCurrentAssets = roundMoney(Math.max(otherCurrentAssets, amt));
+    }
+    if (/\btds\s+(deducted|receivable)/i.test(ll)) {
+      const amt = pickLiabilityAmount(cells);
+      if (amt > 0) shortTermLoansAdvances = roundMoney(shortTermLoansAdvances + amt);
+    }
+    if (inBs && /^total/i.test(ll)) {
+      const nums = rowNums(cells);
+      if (nums.length >= 2) {
+        totalLiabilities = roundMoney(Math.max(totalLiabilities, Math.abs(nums[0])));
+        totalAssets = roundMoney(Math.max(totalAssets, Math.abs(nums[nums.length - 1])));
+      } else if (nums.length === 1) {
+        if (totalLiabilities === 0) totalLiabilities = roundMoney(Math.abs(nums[0]));
+        else totalAssets = roundMoney(Math.abs(nums[0]));
+      }
+    }
+  }
+
+  const booksImbalance = totalAssets > 0 && totalLiabilities > 0
+    ? roundMoney(totalAssets - totalLiabilities) : 0;
+  const signals = [
+    longTermBorrowings > 0, shortTermBorrowings > 0, tradePayables > 0,
+    otherCurrentLiabilities > 0, totalAssets > 0,
+  ].filter(Boolean).length;
+  let confidence = 'none';
+  if (signals >= 3) confidence = 'high';
+  else if (signals >= 2) confidence = 'medium';
+  else if (signals >= 1) confidence = 'low';
+  if (confidence === 'none') return null;
+
+  return {
+    confidence,
+    current: {
+      long_term_borrowings: longTermBorrowings,
+      short_term_borrowings: shortTermBorrowings,
+      trade_payables: tradePayables,
+      other_current_liabilities: otherCurrentLiabilities,
+      long_term_loans_advances: longTermLoansAdvances,
+      short_term_loans_advances: shortTermLoansAdvances,
+      other_current_assets: otherCurrentAssets,
+      total_liabilities: totalLiabilities,
+      total_assets: totalAssets,
+    },
+    booksImbalance,
+    matchedLabels,
+  };
+}
+
+function formatBalanceSheetBlock(hints) {
+  const c = hints.current;
+  return [
+    'PARSED_BALANCE_SHEET (deterministic — prefer these mapped totals when present):',
+    `long_term_borrowings: ${c.long_term_borrowings}`,
+    `short_term_borrowings: ${c.short_term_borrowings}`,
+    `trade_payables: ${c.trade_payables}`,
+    `other_current_liabilities: ${c.other_current_liabilities}`,
+    `long_term_loans_advances: ${c.long_term_loans_advances}`,
+    `short_term_loans_advances: ${c.short_term_loans_advances}`,
+    `other_current_assets: ${c.other_current_assets}`,
+    `source_total_liabilities: ${c.total_liabilities}`,
+    `source_total_assets: ${c.total_assets}`,
+    `books_imbalance: ${hints.booksImbalance}`,
+    `confidence: ${hints.confidence}`,
+  ].join('\n');
+}
+
 function compressTallyForMapping(raw, filename) {
   const ext = (filename || '').split('.').pop().toLowerCase();
+  let body = raw;
 
   if (ext === 'xml' || ext === 'txt') {
     const ledgers = [];
@@ -3563,19 +3934,21 @@ function compressTallyForMapping(raw, filename) {
       if (name && balance !== undefined) ledgers.push(`${name}\t${balance}`);
     }
     if (ledgers.length) {
-      return `Tally ledger balances (${ledgers.length} ledgers):\n${ledgers.join('\n')}`;
+      body = `Tally ledger balances (${ledgers.length} ledgers):\n${ledgers.join('\n')}`;
     }
-  }
-
-  if (ext === 'csv' || ext === 'xlsx' || ext === 'xls') {
+  } else if (ext === 'csv' || ext === 'xlsx' || ext === 'xls') {
     const lines = raw.split(/\r?\n/).filter(Boolean);
     const compact = lines.filter((line) => /[\d,]+(\.\d+)?/.test(line));
     if (compact.length && compact.length < lines.length) {
-      return `Trial balance rows (${compact.length} lines):\n${compact.join('\n')}`;
+      body = `Trial balance rows (${compact.length} lines):\n${compact.join('\n')}`;
     }
   }
 
-  return raw.slice(0, 80000);
+  const tradingHints = extractTradingAccount(body);
+  if (tradingHints) body += `\n\n${formatTradingAccountBlock(tradingHints)}`;
+  const balanceHints = extractBalanceSheetHints(body);
+  if (balanceHints) body += `\n\n${formatBalanceSheetBlock(balanceHints)}`;
+  return body.slice(0, 80000);
 }
 
 function tallyMappingErrorMessage(status, data) {
@@ -3846,6 +4219,60 @@ async function buildFilledXLSX(result, meta) {
       setCell(sheet, `${col}18`, profitBefore);
       setCell(sheet, `${col}22`, profitBefore);
       setCell(sheet, `${col}26`, profitBefore);
+      setCell(sheet, `${col}29`, profitBefore);
+      setCell(sheet, `${col}31`, 0);
+      setCell(sheet, `${col}32`, 0);
+      setCell(sheet, `${col}33`, 0);
+      setCell(sheet, `${col}34`, 0);
+      setCell(sheet, `${col}36`, profitBefore);
+      setCell(sheet, `${col}40`, 0);
+      setCell(sheet, `${col}42`, profitBefore);
+    });
+  }
+
+  function sanitizeWorkbookFormulas() {
+    Object.keys(wb.Sheets).forEach((sn) => {
+      const ws = wb.Sheets[sn];
+      if (!ws['!ref']) return;
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let R = range.s.r; R <= range.e.r; R++) {
+        for (let C = range.s.c; C <= range.e.c; C++) {
+          const ref = XLSX.utils.encode_cell({ r: R, c: C });
+          const cell = ws[ref];
+          if (!cell?.f) continue;
+          const f = String(cell.f);
+          if (/#REF!|#ERROR!|'Balance Sheet'!/i.test(f)) {
+            cell.v = 0;
+            cell.t = 'n';
+            delete cell.f;
+          }
+        }
+      }
+    });
+  }
+
+  function replacePlaceholdersAcrossSheets() {
+    const fyLabel = formatIndianDate(meta.fyEnd);
+    const prevLabel = formatIndianDate(meta.prevFyEnd);
+    const entity = meta.entityName || 'Entity Name';
+    Object.keys(wb.Sheets).forEach((sn) => {
+      const ws = wb.Sheets[sn];
+      if (!ws['!ref']) return;
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let R = range.s.r; R <= range.e.r; R++) {
+        for (let C = range.s.c; C <= range.e.c; C++) {
+          const ref = XLSX.utils.encode_cell({ r: R, c: C });
+          const cell = ws[ref];
+          if (!cell || cell.t !== 's' || typeof cell.v !== 'string') continue;
+          let v = cell.v;
+          if (/entity\s+name/i.test(v)) v = entity;
+          if (/31\s+march\s+20xx/i.test(v)) v = v.replace(/31\s+march\s+20xx/gi, fyLabel);
+          if (/20xx/i.test(v) && /march|year|ended|as\s+at/i.test(v)) {
+            v = v.replace(/20xx/gi, meta.fyEnd.slice(0, 4));
+          }
+          if (v !== cell.v) cell.v = v;
+        }
+      }
     });
   }
 
@@ -3898,6 +4325,9 @@ async function buildFilledXLSX(result, meta) {
     });
   }
 
+  sanitizeWorkbookFormulas();
+  replacePlaceholdersAcrossSheets();
+
   const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true });
   return new Blob([wbOut], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -3949,7 +4379,11 @@ tallySubmit.addEventListener('click', async () => {
     return;
   }
 
-  mappingResult = reconcileMappingResult(mappingResult);
+  mappingResult = reconcileMappingResult(
+    mappingResult,
+    extractTradingAccount(fileText),
+    extractBalanceSheetHints(fileText),
+  );
   const meta = resolveStatementMeta(mappingResult, hints);
   finStatementMeta = { ...finStatementMeta, ...meta, fyDetected: finStatementMeta.fyDetected };
   syncMetaEditFields();

@@ -102,10 +102,12 @@ Rules:
 
 Balance Sheet — Equity & Liabilities:
 - Capital / partners' capital → owners_capital
-- Term loans, vehicle loans (long-term) → long_term_borrowings
-- Cash credit, CC, overdraft → short_term_borrowings (never long_term_borrowings)
-- Trade / goods creditors → trade_payables (goods suppliers only — exclude audit fee payable, expense creditors)
-- Audit fees payable, GST/TDS payable, salary payable, expense creditors, advances received → other_current_liabilities
+- Unsecured loans / unsecured loan (not CC/overdraft) → long_term_borrowings
+- Secured loan, cash credit (CC), overdraft → short_term_borrowings (never long_term_borrowings)
+- Trade / goods creditors (e.g. MRF, suppliers) → trade_payables only
+- Audit fees payable, GST/TDS payable, salary payable → other_current_liabilities (actual creditor balances only)
+- If PARSED_BALANCE_SHEET appears, use those liability totals for the matching heads
+- Books imbalance (assets − liabilities in source) → other_long_term_liabilities as disclosed suspense — NEVER bury in other_current_liabilities or trade_payables
 - Audit fee expense (P&L) AND audit fees payable (BS) are both valid — expense in other_expenses, payable in other_current_liabilities
 - Provisions by nature → long_term_provisions or short_term_provisions
 
@@ -120,6 +122,8 @@ Profit & Loss — revenue and COGS:
 - Sales of goods + services minus returns → revenue_from_operations (notes.revenue_breakup)
 - Non-operating income → other_income (notes.other_income_breakup)
 - cost_of_goods_sold (Schedule III face line) = opening stock + purchases + rate difference/additions − closing stock ONLY
+- If PARSED_TRADING_ACCOUNT appears in the input, use cost_of_goods_sold_computed for cost_of_goods_sold.current unless clearly wrong
+- If PARSED_BALANCE_SHEET appears, use long_term_borrowings, short_term_borrowings, trade_payables, and other_current_liabilities from that block for current-year mapping
 - Do NOT include factory power, freight inward, or other manufacturing overheads in cost_of_goods_sold unless the source explicitly nets them into purchases
 - When pl trading account shows closing stock on the same row as gross profit, still read the closing stock figure
 - Include the full rate difference / rate diff line in COGS
@@ -133,7 +137,7 @@ Profit & Loss — other expense lines:
 
 Consistency checks (you must satisfy these):
 - Total income − total expenses ≈ net profit/(loss) implied by source (capital adjustment or net profit line)
-- Sum of mapped asset balances vs liability balances: if source books do not tally, add the difference to other_current_liabilities (suspense) so totals match
+- Sum of mapped asset balances vs liability balances: if source books do not tally, add the difference to other_long_term_liabilities as disclosed suspense — never hide in other_current_liabilities
 - Do not double-count: payable on BS + expense on P&L for the same item is correct; do not also add payables to trade_payables
 
 Critical:

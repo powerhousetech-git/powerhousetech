@@ -1,5 +1,7 @@
 import { tallySystemPrompt } from './tally-system-prompt.ts';
 import { reconcileMappingResult } from './reconcile-mapping.ts';
+import { extractTradingAccount, formatTradingAccountBlock } from './trading-account.ts';
+import { extractBalanceSheetHints, formatBalanceSheetBlock } from './balance-sheet.ts';
 
 export const MAX_TALLY_CHARS = 80000;
 
@@ -21,8 +23,13 @@ export async function mapTallyWithClaude({
     throw new Error('tallyData is required');
   }
 
+  const tradingHints = extractTradingAccount(trimmed);
+  const balanceHints = extractBalanceSheetHints(trimmed);
+  const tradingBlock = tradingHints ? `\n\n${formatTradingAccountBlock(tradingHints)}\n` : '';
+  const balanceBlock = balanceHints ? `\n\n${formatBalanceSheetBlock(balanceHints)}\n` : '';
+
   const userMessage =
-    `Entity: ${entityName}\nFinancial year end: ${fyEnd}\nPrevious year end: ${prevFyEnd}\n\nTALLY EXPORT DATA:\n${trimmed}`;
+    `Entity: ${entityName}\nFinancial year end: ${fyEnd}\nPrevious year end: ${prevFyEnd}\n\nTALLY EXPORT DATA:\n${trimmed}${tradingBlock}${balanceBlock}`;
 
   const anthropicResp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -56,6 +63,6 @@ export async function mapTallyWithClaude({
     throw new Error('Invalid mapping response from service');
   }
 
-  const { result } = reconcileMappingResult(parsed);
+  const { result } = reconcileMappingResult(parsed, tradingHints, balanceHints);
   return result;
 }
