@@ -47,7 +47,7 @@ function sheetBodies(sourceText: string, namePattern: RegExp): string[] {
     const name = (sections[i] || '').trim();
     if (namePattern.test(name)) out.push(sections[i + 1] || '');
   }
-  return out.length ? out : [sourceText];
+  return out;
 }
 
 function rowLabel(cells: string[]): string {
@@ -88,6 +88,7 @@ const LOAN_ADVANCE = /\bloan\s+and\s+advance\b/i;
 
 export function extractBalanceSheetHints(sourceText: string): BalanceSheetHints | null {
   const bodies = sheetBodies(sourceText, /\bbs\b|balance\s+sheet/i);
+  if (!bodies.length) return null;
   const lines = bodies
     .flatMap((body) => body.split(/\r?\n/))
     .map((l) => l.replace(/\r/g, ''))

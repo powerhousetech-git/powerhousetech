@@ -41,7 +41,7 @@ function sheetBodies(sourceText: string, namePattern: RegExp): string[] {
     const name = (sections[i] || '').trim();
     if (namePattern.test(name)) out.push(sections[i + 1] || '');
   }
-  return out.length ? out : [sourceText];
+  return out;
 }
 
 function rowLabel(cells: string[]): string {
@@ -120,6 +120,7 @@ function parseSplitRow(cells: string[], matchedLabels: string[]): Partial<Tradin
  */
 export function extractTradingAccount(sourceText: string): TradingAccountHints | null {
   const bodies = sheetBodies(sourceText, /\bpl\b|profit|trading/i);
+  if (!bodies.length) return null;
   const lines = bodies
     .flatMap((body) => body.split(/\r?\n/))
     .map((l) => l.replace(/\r/g, ''))

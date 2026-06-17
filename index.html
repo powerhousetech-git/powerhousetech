@@ -4098,7 +4098,7 @@ async function readTallyFile(file) {
     await ensureXLSX();
     const buffer = await file.arrayBuffer();
     const wb = XLSX.read(buffer, { type: 'array' });
-    return wb.SheetNames.map(name => {
+    return wb.SheetNames.filter((name) => !/^readme$/i.test(name)).map(name => {
       const ws = wb.Sheets[name];
       return `--- Sheet: ${name} ---\n` + sheetToPackCsv(ws);
     }).join('\n\n');
@@ -4377,10 +4377,7 @@ function compressTallyForMapping(raw, filename) {
     body = raw;
   }
 
-  const tradingHints = extractTradingAccount(body);
-  if (tradingHints) body += `\n\n${formatTradingAccountBlock(tradingHints)}`;
-  const balanceHints = extractBalanceSheetHints(body);
-  if (balanceHints) body += `\n\n${formatBalanceSheetBlock(balanceHints)}`;
+  // Server re-extracts trading/BS hints; do not append client-side hint blocks (stale/wrong on flat TB).
   return body.slice(0, 80000);
 }
 
@@ -4845,7 +4842,7 @@ tallySubmit.addEventListener('click', async () => {
   }
 
   tallyStatus.className = 'status-msg done';
-  tallyStatus.innerHTML = '✓ Conversion complete. Review the mapping below and download your NCE workbook.';
+  tallyStatus.innerHTML = '✓ Conversion complete (mapper v2). Review the mapping below — revenue should be ~₹2.59 Cr for NOVA — then download.';
   tallySubmit.disabled = false;
   tallySubmit.style.opacity = '1';
 });
