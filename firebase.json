@@ -19,14 +19,17 @@
         "oAuthBrandDisplayName": "Powerhouse",
         "supportEmail": "support@powerhousetech.in",
         "authorizedRedirectUris": [
-          "https://powerhouse-tech-f6da1.firebaseapp.com"
+          "https://powerhouse-tech-f6da1.firebaseapp.com",
+          "https://powerhousetech.in"
         ]
       }
     },
     "authorizedDomains": [
       "localhost",
       "powerhouse-tech-f6da1.firebaseapp.com",
-      "powerhouse-tech-f6da1.web.app"
+      "powerhouse-tech-f6da1.web.app",
+      "powerhousetech.in",
+      "powerhousetech.netlify.app"
     ]
   }
 }
