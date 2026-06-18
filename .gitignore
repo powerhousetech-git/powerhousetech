@@ -57,3 +57,25 @@ supabase/.temp/
 # Cursor agent skills (local IDE tooling, not part of the app)
 .agents/
 skills-lock.json
+
+# Firebase CLI local state (auth cache, deploy logs — not the app)
+.firebase/
+firebase-debug.log
+.firebaserc.local
+
+# One-off local audit scratch (not shipped with the product)
+fixtures/nce/audit-report.json
+scripts/audit-nce-cell-report.py
+scripts/audit-run-mapper.ts
+node_modules/
+.next/
+dist/
+.cache/
+__pycache__/
+*.pyc
+firebase-debug.log
+
+# Python
+__pycache__/
+*.pyc
+nce_converter/
