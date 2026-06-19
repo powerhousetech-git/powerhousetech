@@ -1,0 +1,9 @@
+{
+  "product": "nce_converter",
+  "displayName": "Powerhouse NCE Converter",
+  "platform": "macos",
+  "filename": "Powerhouse-macOS.dmg",
+  "version": "1.0.0",
+  "minOsVersion": "12.0",
+  "description": "Desktop app for converting Trial Balance files to ICAI NCE financial statements."
+}

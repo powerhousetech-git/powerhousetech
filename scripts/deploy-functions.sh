@@ -19,6 +19,7 @@ FUNCTIONS=(
   user-credits
   book-build-start
   book-build-status
+  software-download
 )
 
 echo "Deploying: ${FUNCTIONS[*]}"

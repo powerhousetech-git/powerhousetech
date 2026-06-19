@@ -405,6 +405,60 @@ h3{font-size:1.1rem;font-weight:700;letter-spacing:-0.01em}
 }
 .side-nav button svg{flex-shrink:0}
 
+.app-mode-switch{
+  display:flex;gap:6px;padding:0 16px 14px;margin-bottom:4px;
+}
+.app-mode-btn{
+  flex:1;font-size:.72rem;font-weight:600;padding:9px 8px;border-radius:10px;
+  color:var(--ink-mid);text-align:center;transition:background .15s,color .15s;
+  border:1.5px solid var(--line);background:var(--white);line-height:1.25;
+}
+.app-mode-btn:hover{color:var(--teal);border-color:var(--teal-soft)}
+.app-mode-btn.active{
+  background:var(--teal-soft);color:var(--teal);border-color:var(--teal);
+}
+.app-mode-desktop .side-nav-online,
+.app-mode-desktop .side-label-mode-online{display:none !important}
+.app-mode-online .side-nav-desktop,
+.app-mode-online .side-label-mode-desktop{display:none !important}
+
+.desktop-download-hero{
+  background:linear-gradient(135deg,var(--slate) 0%,#2A2A38 100%);
+  color:#fff;border-radius:var(--radius-lg);padding:32px 36px;margin-bottom:28px;
+  position:relative;overflow:hidden;
+}
+.desktop-download-hero h2{color:#fff;font-size:1.55rem;margin-bottom:10px}
+.desktop-download-hero p{color:rgba(255,255,255,.78);font-size:.95rem;max-width:560px;margin-bottom:18px}
+.platform-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);
+  color:#fff;font-size:.78rem;font-weight:600;padding:6px 12px;border-radius:999px;
+  margin-bottom:16px;
+}
+.desktop-specs{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:20px;
+}
+.desktop-spec{
+  background:var(--white);border:1px solid var(--line);border-radius:var(--radius-sm);
+  padding:16px 18px;
+}
+.desktop-spec .k{font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-light);margin-bottom:6px}
+.desktop-spec .v{font-size:.92rem;color:var(--ink);font-weight:500}
+.desktop-steps{list-style:none;margin:0;padding:0}
+.desktop-steps li{
+  display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--line);
+  font-size:.92rem;color:var(--ink-mid);
+}
+.desktop-steps li:last-child{border-bottom:none}
+.desktop-steps .n{
+  width:28px;height:28px;border-radius:50%;background:var(--teal-soft);color:var(--teal);
+  font-weight:700;font-size:.82rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.desktop-download-meta{
+  margin-top:14px;font-size:.86rem;color:var(--ink-mid);
+}
+.desktop-download-meta.ok{color:var(--green)}
+
 .dash-header{
   display:flex;align-items:flex-start;justify-content:space-between;gap:20px;
   margin-bottom:28px;flex-wrap:wrap;
@@ -1105,6 +1159,7 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
         <a href="#what-we-do">What we do</a>
         <a href="#industries">Industries</a>
         <a href="#how-it-works">How it works</a>
+        <a href="#" class="js-open-signin-desktop">Desktop app</a>
       </nav>
       <div class="nav-right">
         <button type="button" class="theme-toggle theme-toggle-nav" data-theme-toggle aria-label="Switch to dark mode" title="Toggle light/dark mode">
@@ -1126,6 +1181,7 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
       <a href="#what-we-do">What we do</a>
       <a href="#industries">Industries</a>
       <a href="#how-it-works">How it works</a>
+      <a href="#" class="js-open-signin-desktop">Desktop app</a>
     </nav>
   </header>
 
@@ -1138,6 +1194,7 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
         <p class="hero-sub">We turn the repetitive, manual work inside your CA practice into simple, reliable automations, so your team spends time on real work, not busywork.</p>
         <div class="hero-ctas">
           <button class="btn btn-primary btn-lg js-open-signin">Sign in to your workspace</button>
+          <button class="btn btn-ghost btn-lg js-open-signin-desktop">Download for macOS</button>
           <a href="#how-it-works" class="btn btn-ghost btn-lg">See how it works</a>
         </div>
         <p class="trust-line">Built for Chartered Accountant practices across India</p>
@@ -1452,7 +1509,7 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
 
 <!-- ==================== DASHBOARD ==================== -->
 <div id="dashboard" hidden>
-  <div class="dash">
+  <div class="dash app-mode-online" id="dash-shell">
     <div class="dash-overlay" id="dash-overlay" hidden></div>
     <header class="dash-topbar" aria-label="Workspace navigation">
       <div class="dash-topbar-start">
@@ -1472,8 +1529,13 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
         <svg width="26" height="26" aria-hidden="true"><use href="#logo-mark"/></svg>
         Powerhouse
       </a>
-      <p class="side-label">Workspace</p>
-      <nav class="side-nav" aria-label="Dashboard tools">
+      <p class="side-label">Powerhouse</p>
+      <div class="app-mode-switch" role="tablist" aria-label="App mode">
+        <button type="button" class="app-mode-btn active" data-app-mode="online" role="tab" aria-selected="true">Online workspace</button>
+        <button type="button" class="app-mode-btn" data-app-mode="desktop" role="tab" aria-selected="false">Desktop app</button>
+      </div>
+      <p class="side-label side-label-mode-online">Workspace</p>
+      <nav class="side-nav side-nav-online" aria-label="Online workspace tools">
         <button class="active" data-tab="tab-home" title="Your practice overview">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V9.5z"/></svg>
           Overview
@@ -1489,6 +1551,13 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
         <button data-tab="tab-bank" title="Working papers and draft trial balance">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>
           Working Papers
+        </button>
+      </nav>
+      <p class="side-label side-label-mode-desktop">Desktop app</p>
+      <nav class="side-nav side-nav-desktop" aria-label="Desktop app">
+        <button data-tab="tab-desktop" title="Download NCE Converter for macOS">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download
         </button>
       </nav>
       <div class="side-user">
@@ -1618,6 +1687,14 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
                 <h3>Working Papers &amp; Trial Balance</h3>
                 <p>Classify client records into books of account and prepare a draft trial balance.</p>
                 <span class="tool-card-cta" id="home-tool-bank-cta">Coming soon</span>
+              </button>
+              <button type="button" class="tool-card" data-set-app-mode="desktop">
+                <div class="tool-card-icon" aria-hidden="true">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                </div>
+                <h3>Desktop NCE Converter</h3>
+                <p>Download the macOS app for offline trial balance → NCE conversion on your Mac.</p>
+                <span class="tool-card-cta">Download for macOS →</span>
               </button>
             </div>
           </div>
@@ -2096,6 +2173,90 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
         </div>
       </section>
 
+      <!-- TAB: DESKTOP APP DOWNLOAD -->
+      <section class="tab-section" id="tab-desktop">
+        <button type="button" class="tool-back" data-open-tab="tab-home" data-app-mode-back="online">← Back to online workspace</button>
+
+        <div class="desktop-download-hero">
+          <span class="platform-badge">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-3 6-6.91V8.5H2v5.59c0 3.85 3 6.91 6 6.91 1.25 0 2.5-1.06 4-1.06z"/><path d="M12 7.5V2"/><path d="M8 2h8"/></svg>
+            macOS only
+          </span>
+          <h2>Powerhouse NCE Converter</h2>
+          <p>
+            Install our desktop app on your Mac to convert trial balances into ICAI NCE financial statements offline.
+            Sign in with the same Google account you use for the online workspace — we log each download to your account.
+          </p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+            <button type="button" class="btn btn-white" id="desktop-download-btn">
+              ⬇ Download for macOS (.dmg)
+            </button>
+            <span class="platform-badge" style="margin:0;background:rgba(255,255,255,.08)">Requires macOS 12 or later</span>
+          </div>
+          <p class="desktop-download-meta" id="desktop-download-meta">Checking your download history…</p>
+        </div>
+
+        <div class="dcard">
+          <div class="dcard-head"><h3>System requirements</h3></div>
+          <div class="desktop-specs">
+            <div class="desktop-spec">
+              <div class="k">Platform</div>
+              <div class="v">Apple macOS only</div>
+            </div>
+            <div class="desktop-spec">
+              <div class="k">Minimum version</div>
+              <div class="v">macOS 12 (Monterey) or later</div>
+            </div>
+            <div class="desktop-spec">
+              <div class="k">Package</div>
+              <div class="v">Powerhouse-macOS.dmg (~42 MB)</div>
+            </div>
+            <div class="desktop-spec">
+              <div class="k">Windows / Linux</div>
+              <div class="v">Not available yet</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dcard">
+          <div class="dcard-head"><h3>Install &amp; run</h3></div>
+          <ol class="desktop-steps">
+            <li>
+              <span class="n">1</span>
+              <span>Download the <b>.dmg</b> file using the button above (requires Google sign-in).</span>
+            </li>
+            <li>
+              <span class="n">2</span>
+              <span>Open the disk image and drag <b>Powerhouse</b> into your Applications folder.</span>
+            </li>
+            <li>
+              <span class="n">3</span>
+              <span>Launch the app, add your Anthropic API key in Settings, and upload trial balance files.</span>
+            </li>
+          </ol>
+          <p class="sheet-note" style="margin-top:14px">
+            Need the browser-based tools instead?
+            <button type="button" class="sheet-change-btn" data-set-app-mode="online">Switch to online workspace</button>
+          </p>
+        </div>
+
+        <div class="dcard">
+          <div class="dcard-head"><h3>Online workspace vs desktop app</h3></div>
+          <div class="mini-steps">
+            <div class="mini-step">
+              <span class="n">☁</span>
+              <h4>Online workspace</h4>
+              <p>Financial statements, compliance reminders, and working papers — runs in your browser with no install.</p>
+            </div>
+            <div class="mini-step">
+              <span class="n">💻</span>
+              <h4>Desktop app</h4>
+              <p>Offline NCE conversion on your Mac with a native UI. Best for firms that prefer a local desktop workflow.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </main>
   </div>
 </div>
@@ -2302,6 +2463,7 @@ const TALLY_MAP_STATUS_API = `${SUPABASE_URL}/functions/v1/tally-map-status`;
 const BOOK_BUILD_START_API = `${SUPABASE_URL}/functions/v1/book-build-start`;
 const BOOK_BUILD_STATUS_API = `${SUPABASE_URL}/functions/v1/book-build-status`;
 const CREDITS_API = `${SUPABASE_URL}/functions/v1/user-credits`;
+const SOFTWARE_DOWNLOAD_API = `${SUPABASE_URL}/functions/v1/software-download`;
 const TEAM_CONTACT_EMAIL = 'aymaan.shahzad@powerhousetech.in';
 const TEMPLATE_MAP_URL = 'template_map.json';
 // ────────────────────────────────────────────────────────────────────────────
@@ -2346,17 +2508,32 @@ function initThemeToggles() {
 initThemeToggles();
 
 /* ==================== SIGN-IN OVERLAY ==================== */
-function openSignin(){
+let pendingAppMode = null;
+
+function openSignin(mode){
+  if (mode) pendingAppMode = mode;
   overlay.classList.add('show');
   document.body.classList.add('modal-open');
   mobileNav.classList.remove('open');
   hamburger.setAttribute('aria-expanded', 'false');
 }
+function openSigninForDesktop(){
+  if (currentUser?.uid) {
+    if (dashboard.hidden) enterDashboard(currentUser);
+    else setAppMode('desktop');
+    return;
+  }
+  pendingAppMode = 'desktop';
+  openSignin();
+}
 function closeSignin(){
   overlay.classList.remove('show');
   document.body.classList.remove('modal-open');
 }
-document.querySelectorAll('.js-open-signin').forEach(b => b.addEventListener('click', openSignin));
+document.querySelectorAll('.js-open-signin').forEach(b => b.addEventListener('click', () => openSignin()));
+document.querySelectorAll('.js-open-signin-desktop').forEach(b => {
+  b.addEventListener('click', (e) => { e.preventDefault(); openSigninForDesktop(); });
+});
 document.getElementById('signin-close').addEventListener('click', closeSignin);
 overlay.addEventListener('click', e => { if (e.target === overlay) closeSignin(); });
 document.addEventListener('keydown', e => {
@@ -2391,9 +2568,122 @@ function enterDashboard(user){
   window.scrollTo(0, 0);
   populateUser(user);
   refreshCredits();
-  switchDashboardTab('tab-home');
   initHomeDashboard();
+  const mode = pendingAppMode || getStoredAppMode();
+  pendingAppMode = null;
+  setAppMode(mode === 'desktop' ? 'desktop' : 'online');
 }
+
+const APP_MODE_STORAGE_KEY = 'ph_app_mode';
+
+function getStoredAppMode() {
+  try { return localStorage.getItem(APP_MODE_STORAGE_KEY) || 'online'; } catch { return 'online'; }
+}
+
+function setAppMode(mode) {
+  const next = mode === 'desktop' ? 'desktop' : 'online';
+  const shell = document.getElementById('dash-shell');
+  shell?.classList.toggle('app-mode-online', next === 'online');
+  shell?.classList.toggle('app-mode-desktop', next === 'desktop');
+  document.querySelectorAll('.app-mode-btn').forEach((btn) => {
+    const active = btn.dataset.appMode === next;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  try { localStorage.setItem(APP_MODE_STORAGE_KEY, next); } catch {}
+
+  if (next === 'desktop') {
+    switchDashboardTab('tab-desktop');
+    refreshDesktopDownloadStatus();
+    return;
+  }
+
+  const activeOnline = document.querySelector('.side-nav-online button.active');
+  if (!activeOnline) switchDashboardTab('tab-home');
+}
+
+function initAppModeSwitch() {
+  document.querySelectorAll('.app-mode-btn').forEach((btn) => {
+    btn.addEventListener('click', () => setAppMode(btn.dataset.appMode));
+  });
+  document.querySelectorAll('[data-set-app-mode]').forEach((el) => {
+    el.addEventListener('click', () => setAppMode(el.dataset.setAppMode));
+  });
+  document.querySelectorAll('[data-app-mode-back]').forEach((el) => {
+    el.addEventListener('click', () => setAppMode(el.dataset.appModeBack));
+  });
+}
+
+let desktopDownloadState = { loaded: false, downloaded_before: false, download_count: 0, last_download_at: null };
+
+async function refreshDesktopDownloadStatus() {
+  const meta = document.getElementById('desktop-download-meta');
+  if (!meta) return;
+  if (!currentUser?.uid) {
+    meta.className = 'desktop-download-meta';
+    meta.textContent = 'Sign in with Google to download.';
+    return;
+  }
+  meta.className = 'desktop-download-meta';
+  meta.textContent = 'Checking your download history…';
+  const headers = await getFirebaseAuthHeaders();
+  if (!headers.Authorization) {
+    meta.textContent = 'Sign in with Google to download.';
+    return;
+  }
+  try {
+    const res = await fetch(SOFTWARE_DOWNLOAD_API, { headers });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    desktopDownloadState = { loaded: true, ...data };
+    if (data.downloaded_before && data.last_download_at) {
+      const when = new Date(data.last_download_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+      meta.className = 'desktop-download-meta ok';
+      meta.textContent = `You downloaded ${data.download_count} time${data.download_count === 1 ? '' : 's'}. Last: ${when}.`;
+    } else {
+      meta.textContent = 'You have not downloaded this package yet.';
+    }
+  } catch (err) {
+    console.error('Desktop download status failed:', err);
+    meta.textContent = 'Could not load download history. You can still download below.';
+  }
+}
+
+async function triggerDesktopDownload() {
+  if (!currentUser?.uid) { openSigninForDesktop(); return; }
+  const btn = document.getElementById('desktop-download-btn');
+  btn.disabled = true;
+  btn.style.opacity = '0.7';
+  try {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(await getFirebaseAuthHeaders()),
+    };
+    if (!headers.Authorization) { openSigninForDesktop(); return; }
+    const res = await fetch(SOFTWARE_DOWNLOAD_API, {
+      method: 'POST',
+      headers,
+      body: '{}',
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const link = document.createElement('a');
+    link.href = data.url || '/dist/Powerhouse-macOS.dmg';
+    link.download = data.filename || 'Powerhouse-macOS.dmg';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    await refreshDesktopDownloadStatus();
+  } catch (err) {
+    alert('Download failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.style.opacity = '';
+  }
+}
+
+initAppModeSwitch();
+document.getElementById('desktop-download-btn')?.addEventListener('click', triggerDesktopDownload);
 
 function populateUser(user){
   const firstName = (user.name || 'there').split(' ')[0];
@@ -2585,6 +2875,7 @@ function initHomeDashboard() {
     document.querySelectorAll('[data-open-tab]').forEach((el) => {
     el.addEventListener('click', () => {
       const tab = el.dataset.openTab;
+      if (tab !== 'tab-desktop') setAppMode('online');
       if (tab === 'tab-bank' && !BOOK_BUILD_ENABLED) {
         switchDashboardTab('tab-bank');
         return;
@@ -3882,13 +4173,15 @@ document.querySelector('.mobile-nav .mobile-signin')?.addEventListener('click', 
 /* ==================== DASHBOARD TABS ==================== */
 document.querySelectorAll('.side-nav button').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.side-nav button').forEach(b => b.classList.remove('active'));
+    const nav = btn.closest('.side-nav');
+    nav.querySelectorAll('button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
     document.getElementById(btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'tab-financial') initTallyTemplatePreview();
     if (btn.dataset.tab === 'tab-reminders') collapseReminderClients();
     if (btn.dataset.tab === 'tab-home') updateHomeDashboard();
+    if (btn.dataset.tab === 'tab-desktop') refreshDesktopDownloadStatus();
     closeDashDrawer();
     document.querySelector('.dash-main').scrollTop = 0;
     window.scrollTo({ top: 0, behavior: 'smooth' });

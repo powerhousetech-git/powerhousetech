@@ -69,7 +69,9 @@ scripts/audit-nce-cell-report.py
 scripts/audit-run-mapper.ts
 node_modules/
 .next/
-dist/
+dist/*
+!dist/manifest.json
+!dist/*.dmg
 .cache/
 __pycache__/
 *.pyc

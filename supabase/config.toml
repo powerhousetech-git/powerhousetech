@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.book-build-status]
 verify_jwt = false
+
+[functions.software-download]
+verify_jwt = false
