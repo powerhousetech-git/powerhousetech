@@ -367,7 +367,7 @@ h3{font-size:1.1rem;font-weight:700;letter-spacing:-0.01em}
 .modal .modal-sub{font-size:.92rem;color:var(--ink-mid);margin-bottom:26px}
 .btn-google{
   width:100%;display:flex;align-items:center;justify-content:center;gap:12px;
-  background:#fff;border:1.5px solid var(--line);border-radius:var(--radius-sm);
+  background:var(--surface-raised);border:1.5px solid var(--line);border-radius:var(--radius-sm);
   padding:13px 20px;font-weight:600;font-size:.97rem;color:var(--ink);
   transition:border-color .2s ease,box-shadow .2s ease;
 }
@@ -669,12 +669,15 @@ table.preview th{
 table.preview td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
 table.preview tbody tr:nth-child(even){background:var(--ivory)}
 table.preview .amt{font-family:var(--font-mono);font-size:.82rem;white-space:nowrap}
+.negative{color:#9B3B26 !important}
+[data-theme="dark"] .negative{color:#F08070 !important}
 .chip{
   display:inline-block;font-size:.74rem;font-weight:600;
   padding:3px 11px;border-radius:999px;background:var(--teal-soft);color:var(--teal-dark);white-space:nowrap;
 }
 .chip.gray{background:var(--slate-light);color:var(--ink-mid)}
 .chip.green{background:#EAF7EE;color:var(--green)}
+.chip.warn{background:#FFF3CD;color:#856404}
 
 /* Tally converter */
 .tally-meta-grid {
@@ -691,7 +694,7 @@ table.preview .amt{font-family:var(--font-mono);font-size:.82rem;white-space:now
 .tally-input {
   padding: 10px 14px; border: 1.5px solid var(--line);
   border-radius: var(--radius-sm); font-family: inherit;
-  font-size: .92rem; color: var(--ink); background: var(--white);
+  font-size: .92rem; color: var(--ink); background: var(--surface-raised);
   outline: none; transition: border-color .15s;
 }
 .tally-input:focus { border-color: var(--teal); }
@@ -842,7 +845,7 @@ table.reminder-clients tr.expanded > td{background:var(--ivory)}
 .reminder-detail-card{background:var(--white);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px}
 .reminder-detail-card h4{font-size:.8rem;margin-bottom:10px;color:var(--ink)}
 .reminder-detail-card label{display:block;font-size:.72rem;color:var(--ink-light);margin-bottom:4px}
-.reminder-detail-card input[type="date"],.reminder-detail-card input[type="number"],.reminder-detail-card input[type="text"],.reminder-detail-card input[type="email"]{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:.84rem}
+.reminder-detail-card input[type="date"],.reminder-detail-card input[type="number"],.reminder-detail-card input[type="text"],.reminder-detail-card input[type="email"]{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:.84rem;color:var(--ink);background:var(--surface-raised)}
 .reminder-detail-card input:focus{border-color:var(--teal);outline:none}
 .reminder-detail-card .toggle-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:.82rem;font-weight:500}
 .reminder-actions{display:flex;gap:8px;flex-wrap:wrap}
@@ -850,7 +853,7 @@ table.reminder-clients tr.expanded > td{background:var(--ivory)}
 .reminder-icon-btn:hover{background:var(--teal-soft);color:var(--teal)}
 .reminder-icon-btn.danger:hover{background:#FCEFEA;color:#9B3B26}
 .reminder-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
-.reminder-toolbar input[type="search"]{flex:1;min-width:180px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:.86rem}
+.reminder-toolbar input[type="search"]{flex:1;min-width:180px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:.86rem;color:var(--ink);background:var(--surface-raised)}
 .reminder-toolbar input[type="search"]:focus{border-color:var(--teal);outline:none}
 .reminder-upload-warnings{margin-top:10px;padding:12px 14px;border-radius:var(--radius-sm);background:#FFF8E6;border:1px solid #E8D9A0;font-size:.82rem;color:#6B5A1E;line-height:1.5}
 .reminder-upload-warnings ul{margin:6px 0 0 18px}
@@ -861,7 +864,7 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
 .reminder-payload-preview pre{margin:0;padding:14px;font-size:.72rem;line-height:1.45;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .reminder-send-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .reminder-channel-label{font-size:.78rem;font-weight:600;color:var(--ink-light);margin:0}
-.reminder-channel-select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:.84rem;background:var(--white);min-width:148px}
+.reminder-channel-select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:.84rem;background:var(--surface-raised);color:var(--ink);min-width:148px}
 .reminder-issue-tag{display:inline-block;font-size:.7rem;font-weight:600;color:#9B3B26;margin-left:6px}
 .reminder-add-item-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center}
 .reminder-items-panel{grid-column:1/-1;padding:4px 0 8px}
@@ -884,7 +887,7 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
 .reminder-item-dates{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .reminder-item-dates label{display:block;font-size:.72rem;font-weight:600;color:var(--ink);margin-bottom:2px}
 .reminder-item-dates .field-hint{font-size:.7rem;color:var(--ink-light);margin-bottom:6px;line-height:1.35}
-.reminder-item-card input[type="text"],.reminder-item-card input[type="date"]{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:.84rem}
+.reminder-item-card input[type="text"],.reminder-item-card input[type="date"]{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:.84rem;color:var(--ink);background:var(--surface-raised)}
 .reminder-item-card input:focus{border-color:var(--teal);outline:none}
 .reminder-item-remove{width:36px;height:36px;border-radius:8px;background:var(--slate-light);color:var(--ink-mid);font-size:1.1rem;line-height:1}
 .reminder-item-remove:hover{background:#FCEFEA;color:#9B3B26}
@@ -903,9 +906,56 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
 [data-theme="dark"] .btn-ghost{border-color:var(--line);color:var(--ink)}
 [data-theme="dark"] .btn-ghost:hover{background:var(--slate-light)}
 [data-theme="dark"] .btn-google{background:var(--surface-raised);color:var(--ink)}
+[data-theme="dark"] .btn-white{background:var(--surface-raised);color:var(--ink)}
 [data-theme="dark"] .featured-card{background:#12121A}
 [data-theme="dark"] .home-hero{border-color:rgba(255,255,255,.1)}
 [data-theme="dark"] .theme-toggle{background:var(--surface-raised)}
+[data-theme="dark"] .theme-toggle-nav{background:var(--surface-raised)}
+[data-theme="dark"] .legal-top{background:rgba(14,14,19,.92)}
+[data-theme="dark"] .overlay{background:rgba(0,0,0,.65)}
+[data-theme="dark"] .mobile-cta{background:color-mix(in srgb, var(--ivory) 92%, transparent)}
+[data-theme="dark"] .sidebar{background:var(--surface-raised)}
+[data-theme="dark"] .dash-topbar{background:var(--surface-raised)}
+[data-theme="dark"] .app-mode-btn{background:var(--surface-raised);color:var(--ink-mid)}
+[data-theme="dark"] .app-mode-btn.active{background:var(--teal-soft);color:var(--teal)}
+[data-theme="dark"] .desktop-spec{background:var(--surface-raised)}
+[data-theme="dark"] .status-msg.processing{color:var(--teal)}
+[data-theme="dark"] .status-msg.done{background:rgba(61,187,110,.12);color:var(--green)}
+[data-theme="dark"] .credit-pill.exhausted{background:rgba(240,128,112,.12);color:#F08070}
+[data-theme="dark"] .chip.green{background:rgba(61,187,110,.14);color:var(--green)}
+[data-theme="dark"] .chip.warn{background:rgba(255,193,7,.16);color:#E8C547}
+[data-theme="dark"] .live-badge{background:rgba(61,187,110,.14);color:var(--green)}
+[data-theme="dark"] .wf-status.run{color:var(--teal)}
+[data-theme="dark"] .wf-status.err{color:#F08070}
+[data-theme="dark"] .rem-save-status.err{color:#F08070}
+[data-theme="dark"] .reminder-issue-tag{color:#F08070}
+[data-theme="dark"] .reminder-upload-warnings{background:rgba(232,217,160,.1);border-color:rgba(232,217,160,.28);color:#E8D4A0}
+[data-theme="dark"] .reminder-upload-warnings.ok{background:var(--teal-soft);border-color:rgba(107,122,232,.35);color:var(--teal)}
+[data-theme="dark"] table.reminder-clients tr.row-warn td{background:rgba(255,180,80,.08)}
+[data-theme="dark"] table.reminder-clients tr.row-error td{background:rgba(240,128,112,.1)}
+[data-theme="dark"] .reminder-saved-tag{background:rgba(61,187,110,.14)}
+[data-theme="dark"] .reminder-icon-btn.danger:hover{background:rgba(240,128,112,.12);color:#F08070}
+[data-theme="dark"] .reminder-item-remove:hover{background:rgba(240,128,112,.12);color:#F08070}
+[data-theme="dark"] table.tally-sheet-table td{border-color:var(--line)}
+[data-theme="dark"] .sheet-error{color:#F08070}
+[data-theme="dark"] .nav-soon-badge{background:var(--slate-light);color:var(--ink-light)}
+
+/* Semantic callouts (financial / book-build) */
+.callout-warn{border-color:#F0E2B6 !important;background:#FFFBF0 !important}
+.callout-error{border-color:#F5C6C6 !important;background:#FFF5F5 !important}
+.callout-info{border-color:#D8DCF5 !important;background:#F7F8FD !important}
+[data-theme="dark"] .callout-warn{border-color:rgba(255,193,7,.35) !important;background:rgba(255,193,7,.08) !important}
+[data-theme="dark"] .callout-error{border-color:rgba(240,128,112,.35) !important;background:rgba(240,128,112,.1) !important}
+[data-theme="dark"] .callout-info{border-color:rgba(107,122,232,.3) !important;background:rgba(107,122,232,.08) !important}
+
+/* Form fields — consistent across dashboard & reminders */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="range"]),
+select,
+textarea{
+  color:var(--ink);
+  background:var(--surface-raised);
+}
+input::placeholder,textarea::placeholder{color:var(--ink-light)}
 
 /* ============ THEME TOGGLE ============ */
 .theme-toggle{
@@ -921,6 +971,27 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
 [data-theme="dark"] .theme-toggle .icon-moon{display:block}
 .theme-toggle-modal{position:absolute;top:16px;left:16px;z-index:2}
 .theme-toggle-nav{background:var(--white)}
+.theme-toggle-fixed{
+  position:fixed;bottom:24px;right:24px;z-index:130;
+  box-shadow:var(--shadow-md);
+}
+body.landing-visible .theme-toggle-fixed{
+  bottom:calc(72px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width:768px){
+  body.landing-visible .theme-toggle-fixed{bottom:24px}
+  body.landing-visible .theme-toggle-fixed{display:none}
+}
+@media (min-width:1080px){
+  body:not(.landing-visible) .theme-toggle-fixed{display:none}
+}
+.legal-top-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.sidebar-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:0 24px;margin-bottom:24px;
+}
+.sidebar-head .brand{padding:0;margin-bottom:0;flex:1;min-width:0}
+.sidebar .theme-toggle-sidebar{flex-shrink:0}
 .home-hero .theme-toggle{
   background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.22);color:#E8EAFF;
 }
@@ -1002,7 +1073,7 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
 .home-field label{display:block;font-size:.8rem;font-weight:600;color:var(--ink-mid);margin-bottom:6px}
 .home-field input{
   width:100%;padding:11px 14px;border:1.5px solid var(--line);border-radius:var(--radius-sm);
-  font-size:.92rem;color:var(--ink);background:var(--white);outline:none;
+  font-size:.92rem;color:var(--ink);background:var(--surface-raised);outline:none;
 }
 .home-field input:focus{border-color:var(--teal)}
 .home-field-locked .home-locked-value{
@@ -1032,6 +1103,7 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
 .home-quick-add{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;margin-top:14px;align-items:end}
 .home-quick-add input{
   padding:10px 12px;border:1.5px solid var(--line);border-radius:var(--radius-sm);font-size:.86rem;
+  color:var(--ink);background:var(--surface-raised);
 }
 .home-quick-add input:focus{border-color:var(--teal);outline:none}
 .tool-back{
@@ -1065,7 +1137,6 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
   .steps-panel{grid-template-columns:1fr;gap:24px}
   .step-arrow{display:none}
   .dash-topbar{display:flex}
-  .home-hero .theme-toggle{display:none}
   .dash{flex-direction:column}
   .sidebar{
     position:fixed;left:0;top:0;bottom:0;width:280px;max-width:88vw;z-index:100;
@@ -1074,7 +1145,7 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
     box-shadow:var(--shadow-md);
   }
   .sidebar.open{transform:translateX(0)}
-  .sidebar .brand{padding:0 24px;margin-bottom:24px}
+  .sidebar-head{padding:0 24px;margin-bottom:20px}
   .side-label{display:block}
   .side-nav{flex-direction:column;overflow:visible}
   .side-nav button{
@@ -1525,10 +1596,16 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
       </button>
     </header>
     <aside class="sidebar" id="dash-sidebar">
-      <a href="#" class="brand" onclick="return false">
-        <svg width="26" height="26" aria-hidden="true"><use href="#logo-mark"/></svg>
-        Powerhouse
-      </a>
+      <div class="sidebar-head">
+        <a href="#" class="brand" onclick="return false">
+          <svg width="26" height="26" aria-hidden="true"><use href="#logo-mark"/></svg>
+          Powerhouse
+        </a>
+        <button type="button" class="theme-toggle theme-toggle-sidebar" data-theme-toggle aria-label="Switch to dark mode" title="Toggle light/dark mode">
+          <svg class="icon-sun" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg class="icon-moon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
       <p class="side-label">Powerhouse</p>
       <div class="app-mode-switch" role="tablist" aria-label="App mode">
         <button type="button" class="app-mode-btn active" data-app-mode="online" role="tab" aria-selected="true">Online workspace</button>
@@ -1891,11 +1968,11 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
             </div>
           </div>
 
-          <div id="tally-suspense-callout" class="fin-detected-meta" hidden style="margin-bottom:18px;border-color:#F0E2B6;background:#FFFBF0">
+          <div id="tally-suspense-callout" class="fin-detected-meta callout-warn" hidden style="margin-bottom:18px">
             <p class="fin-detected-copy" id="tally-suspense-copy"></p>
           </div>
 
-          <div id="tally-validation-callout" class="fin-detected-meta" hidden style="margin-bottom:18px;border-color:#F5C6C6;background:#FFF5F5">
+          <div id="tally-validation-callout" class="fin-detected-meta callout-error" hidden style="margin-bottom:18px">
             <p class="fin-detected-copy" id="tally-validation-copy"></p>
           </div>
 
@@ -2103,7 +2180,7 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
             </div>
           </div>
 
-          <div id="book-notes-wrap" class="fin-detected-meta" hidden style="margin:18px 0;border-color:#D8DCF5;background:#F7F8FD">
+          <div id="book-notes-wrap" class="fin-detected-meta callout-info" hidden style="margin:18px 0">
             <p class="fin-detected-copy" id="book-notes-copy"></p>
           </div>
 
@@ -2269,7 +2346,13 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
         <svg width="20" height="20" aria-hidden="true"><use href="#logo-mark"/></svg>
         <span id="legal-title">Legal</span>
       </span>
-      <button class="btn btn-ghost" id="legal-close" style="padding:8px 18px;font-size:.86rem">← Back to site</button>
+      <div class="legal-top-actions">
+        <button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch to dark mode" title="Toggle light/dark mode">
+          <svg class="icon-sun" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg class="icon-moon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <button class="btn btn-ghost" id="legal-close" style="padding:8px 18px;font-size:.86rem">← Back to site</button>
+      </div>
     </div>
   </div>
 
@@ -2407,6 +2490,11 @@ table.reminder-clients tr.row-error td{background:#FCEFEA}
   </article>
 </div>
 
+<button type="button" class="theme-toggle theme-toggle-fixed" data-theme-toggle aria-label="Switch to dark mode" title="Toggle light/dark mode">
+  <svg class="icon-sun" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+  <svg class="icon-moon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+</button>
+
 <script type="module">
 // ─── FIREBASE ───────────────────────────────────────────────────────────────
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
@@ -2455,6 +2543,8 @@ const TOOL_LABELS = {
 
 // Tool 3: enabled on localhost only until production QA is complete.
 const BOOK_BUILD_ENABLED = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+// NCE blank template preview/download: localhost only — production uses filled output only.
+const NCE_TEMPLATE_PREVIEW_ENABLED = BOOK_BUILD_ENABLED;
 
 // TB → NCE Template: Supabase Edge Functions (API key in Supabase secrets)
 const SUPABASE_URL = 'https://msratyvmnuvozuthgkmi.supabase.co';
@@ -2599,7 +2689,7 @@ function setAppMode(mode) {
   }
 
   const activeOnline = document.querySelector('.side-nav-online button.active');
-  if (!activeOnline) switchDashboardTab('tab-home');
+  switchDashboardTab(activeOnline?.dataset.tab || 'tab-home');
 }
 
 function initAppModeSwitch() {
@@ -4178,7 +4268,7 @@ document.querySelectorAll('.side-nav button').forEach(btn => {
     btn.classList.add('active');
     document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
     document.getElementById(btn.dataset.tab).classList.add('active');
-    if (btn.dataset.tab === 'tab-financial') initTallyTemplatePreview();
+    if (btn.dataset.tab === 'tab-financial' && NCE_TEMPLATE_PREVIEW_ENABLED) initTallyTemplatePreview();
     if (btn.dataset.tab === 'tab-reminders') collapseReminderClients();
     if (btn.dataset.tab === 'tab-home') updateHomeDashboard();
     if (btn.dataset.tab === 'tab-desktop') refreshDesktopDownloadStatus();
@@ -4229,6 +4319,12 @@ function initBookBuildGate() {
   }
 }
 initBookBuildGate();
+
+function initNceTemplatePreviewGate() {
+  if (NCE_TEMPLATE_PREVIEW_ENABLED) return;
+  document.getElementById('tally-template-card')?.setAttribute('hidden', '');
+}
+initNceTemplatePreviewGate();
 
 const bookDropzone = document.getElementById('book-dropzone');
 const bookInput    = document.getElementById('book-input');
@@ -4473,9 +4569,7 @@ function showBookBuildResult(result) {
     badge.className = 'chip green';
   } else {
     badge.textContent = 'Review suggested';
-    badge.className = 'chip';
-    badge.style.background = '#FFF3CD';
-    badge.style.color = '#856404';
+    badge.className = 'chip warn';
   }
 }
 
@@ -5149,6 +5243,7 @@ function showTallyTemplateSheet(wb, sheetName) {
 }
 
 async function initTallyTemplatePreview() {
+  if (!NCE_TEMPLATE_PREVIEW_ENABLED) return;
   if (tallyTemplatePreviewReady || tallyTemplatePreviewLoading) return;
   tallyTemplatePreviewLoading = true;
 
@@ -5648,7 +5743,7 @@ async function buildAndShowResult(result, entityName, fyEnd, prevFyEnd) {
   if (Number.isFinite(netProfit)) {
     netWrap.hidden = false;
     netEl.textContent = `₹ ${formatIndian(netProfit)}`;
-    netEl.style.color = netProfit < 0 ? '#9B3B26' : '';
+    netEl.classList.toggle('negative', netProfit < 0);
   } else {
     netWrap.hidden = true;
   }
@@ -5693,15 +5788,8 @@ async function buildAndShowResult(result, entityName, fyEnd, prevFyEnd) {
   const badge = document.getElementById('tally-result-badge');
   badge.textContent = 'Ready';
   badge.className = result.mapping_confidence === 'low'
-    ? 'chip'
+    ? 'chip warn'
     : 'chip green';
-  if (result.mapping_confidence === 'low') {
-    badge.style.background = '#FFF3CD';
-    badge.style.color = '#856404';
-  } else {
-    badge.style.background = '';
-    badge.style.color = '';
-  }
 
   let lastSection = '';
   (map.preview_rows || []).forEach(({ label, sheet, path }) => {
