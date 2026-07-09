@@ -1,4 +1,4 @@
-# Static Powerhouse site (index.html at repo root — no build step)
+# Static multi-page Powerhouse site
 [build]
   publish = "."
   command = ""
@@ -8,8 +8,44 @@
   publish = "."
   port = 8742
 
-# SPA fallback
+# Client workspace: optional clean URL
 [[redirects]]
-  from = "/*"
+  from = "/workspace"
   to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/app"
+  to = "/index.html"
+  status = 200
+
+# Marketing subpages — clean URLs (match local `serve` behavior)
+[[redirects]]
+  from = "/services"
+  to = "/services.html"
+  status = 200
+
+[[redirects]]
+  from = "/how-we-work"
+  to = "/how-we-work.html"
+  status = 200
+
+[[redirects]]
+  from = "/sample-automations"
+  to = "/sample-automations.html"
+  status = 200
+
+[[redirects]]
+  from = "/industries"
+  to = "/industries.html"
+  status = 200
+
+[[redirects]]
+  from = "/about"
+  to = "/about.html"
+  status = 200
+
+[[redirects]]
+  from = "/contact"
+  to = "/contact.html"
   status = 200
