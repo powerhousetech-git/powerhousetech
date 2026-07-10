@@ -1,0 +1,82 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+@page{size:A4;margin:18mm 16mm}
+*{box-sizing:border-box}
+body{font-family:Inter,Helvetica,Arial,sans-serif;color:#1a1c2e;font-size:11px;line-height:1.5}
+h1{font-family:Georgia,serif;font-size:26px;color:#424FD1;margin:0 0 2px}
+h2{font-family:Georgia,serif;font-size:16px;color:#424FD1;margin:22px 0 6px;border-bottom:2px solid #eef0fb;padding-bottom:4px}
+.sub{color:#5b5e78;font-size:12px;margin-bottom:6px}
+.mono{font-family:'JetBrains Mono',Consolas,monospace}
+.step{display:flex;gap:10px;margin:8px 0;page-break-inside:avoid}
+.num{flex:0 0 26px;height:26px;border-radius:8px;background:#424FD1;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:13px}
+.step b{color:#1a1c2e}
+.card{border:1px solid #e6e8f5;border-radius:12px;padding:12px 14px;margin:8px 0;background:#fbfbfe;page-break-inside:avoid}
+.kpi{display:flex;gap:10px;margin:6px 0}
+.kpi div{flex:1;border:1px solid #e6e8f5;border-radius:10px;padding:8px 10px;background:#fff}
+.kpi .n{font-family:Georgia,serif;font-size:18px;color:#424FD1}
+.kpi .l{font-size:9px;color:#5b5e78;text-transform:uppercase;letter-spacing:.5px}
+table{width:100%;border-collapse:collapse;font-size:10px;margin-top:4px}
+th{text-align:left;color:#5b5e78;font-weight:600;border-bottom:1px solid #e6e8f5;padding:4px 6px;font-size:9px;text-transform:uppercase}
+td{padding:5px 6px;border-bottom:1px solid #f0f1fa}
+.pill{display:inline-block;padding:1px 7px;border-radius:20px;font-size:9px;font-weight:600}
+.p-sent{background:#e5f6ec;color:#1a8a4a}.p-gate{background:#fdf1dd;color:#b5751a}.p-paid{background:#e8ecfd;color:#424FD1}.p-rev{background:#fdeaea;color:#c23b3b}
+.mock{border:1px solid #dfe2f4;border-radius:12px;overflow:hidden;margin:6px 0;page-break-inside:avoid}
+.mockbar{background:#424FD1;color:#fff;padding:7px 12px;font-size:11px;font-weight:600;display:flex;justify-content:space-between}
+.mockbody{padding:10px 12px;background:#fff}
+.chip{background:#eef0fb;color:#424FD1;border-radius:6px;padding:1px 6px;font-size:9px}
+ol,ul{margin:4px 0 4px 18px;padding:0}
+li{margin:2px 0}
+.note{background:#f5f6ff;border-left:3px solid #424FD1;padding:8px 10px;border-radius:0 8px 8px 0;font-size:10px;margin:8px 0}
+.foot{margin-top:16px;color:#8a8da5;font-size:9px;border-top:1px solid #eef0fb;padding-top:6px}
+</style></head><body>
+
+<h1>Invoice Radar — Setup &amp; Ship Guide</h1>
+<div class="sub">Powerhouse Tech · per-client deployment · what to do and how it looks to users</div>
+
+<h2>1. What you're shipping</h2>
+<p>One self-running engine per client, living inside <b>their own Google account</b>. It watches the inbox, reads every invoice with AI, chases politely over WhatsApp/email, and stops the moment a bill is paid. No server to host — Google runs it on a schedule.</p>
+<div class="kpi">
+<div><div class="n mono">₹13,360</div><div class="l">Outstanding</div></div>
+<div><div class="n mono">₹11,350</div><div class="l">Overdue · 3 invoices</div></div>
+<div><div class="n mono">₹4,600</div><div class="l">Payable (AP)</div></div>
+</div>
+
+<h2>2. The workflow (what happens automatically)</h2>
+<div class="step"><div class="num">1</div><div><b>Capture</b> — invoice arrives via email, photo (Drive), or manual entry. A scan runs every 2 hours.</div></div>
+<div class="step"><div class="num">2</div><div><b>Read</b> — Claude extracts amount, due date &amp; party with a confidence score. Anything unsure lands in a <span class="pill p-rev">Needs review</span> queue.</div></div>
+<div class="step"><div class="num">3</div><div><b>Chase</b> — Stage 1 (friendly, ≤7d) sends automatically. Stage 2 &amp; Final wait behind an approval gate.</div></div>
+<div class="step"><div class="num">4</div><div><b>Approve</b> — you tap Approve / Snooze / Skip on the firmer nudges. Nothing harsh goes out without you.</div></div>
+<div class="step"><div class="num">5</div><div><b>Reconcile</b> — client clicks the pay link → invoice flips <span class="pill p-paid">PAID</span>, chasing stops, KPI updates.</div></div>
+
+<h2>3. How it looks to the user</h2>
+<div class="mock">
+<div class="mockbar"><span>Invoice Radar · Receivables</span><span class="mono">10 Jul 2026</span></div>
+<div class="mockbody">
+<table>
+<tr><th>Party</th><th>Amount</th><th>Due</th><th>Stage</th></tr>
+<tr><td>Mehta Traders</td><td class="mono">₹6,200</td><td>+2d</td><td><span class="pill p-gate">Approval needed</span></td></tr>
+<tr><td>Kiran Textiles</td><td class="mono">₹3,150</td><td>3d ago</td><td><span class="pill p-sent">R1 sent</span></td></tr>
+<tr><td>Rao &amp; Co</td><td class="mono">₹2,000</td><td>—</td><td><span class="pill p-paid">Paid</span></td></tr>
+</table>
+</div></div>
+<div class="card"><b>Approval card (WhatsApp preview)</b><br>
+<span class="mono" style="font-size:10px">"Hi Mehta ji, gentle reminder — ₹6,200 for INV-1048 is due. Pay here: pay.phtech.in/1048 🙏"</span><br>
+<span class="chip">Approve</span> <span class="chip">Snooze 5d</span> <span class="chip">Skip</span></div>
+
+<h2>4. Steps to ship (per client)</h2>
+<ol>
+<li>In the client's Google account: create a Sheet → <b>Extensions → Apps Script</b>.</li>
+<li>Paste in the engine <span class="mono">.gs</span> files + set the manifest from <span class="mono">appsscript.json</span>.</li>
+<li><b>Project Settings → Script properties</b> → add secrets: <span class="mono">ANTHROPIC_API_KEY</span>, <span class="mono">WHATSAPP_TOKEN</span>, <span class="mono">WHATSAPP_PHONE_ID</span> (optional <span class="mono">DRIVE_INBOX_FOLDER_ID</span>).</li>
+<li>Run <span class="mono">initialize()</span> once — builds every tab.</li>
+<li>Run <span class="mono">installTriggers()</span> — wires daily chase (16:00) + 2-hour inbox scan.</li>
+<li><b>Deploy → New deployment → Web app</b> (execute as you, access "Anyone") → use that URL for pay links; point <span class="mono">pay.phtech.in</span> at it.</li>
+<li>In Gmail, label incoming invoices <span class="mono">invoices-inbox</span> (or share a Drive folder for photos).</li>
+</ol>
+<div class="note"><b>You do steps 1–7 yourself.</b> Signing into Google, entering API keys, and granting OAuth consent are actions I can't perform on your behalf — they need a human at the keyboard.</div>
+
+<h2>5. Make it repeatable</h2>
+<p>Build the engine once as a <b>Google Sheet template</b>, then "Make a copy" per client and swap only the 3 Script Properties. New client onboarding drops from ~1 hour to ~5 minutes.</p>
+<div class="card"><b>Not auto-wired (on purpose):</b> SMS (needs India DLT registration) and Zoho/Tally two-way sync (stubbed hook — enable per client).</div>
+
+<div class="foot">Powerhouse Tech · Invoice Radar setup guide · generated 10 Jul 2026</div>
+</body></html>
