@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.software-download]
 verify_jwt = false
+
+[functions.invoice-radar-proxy]
+verify_jwt = false

@@ -19,6 +19,11 @@
   to = "/index.html"
   status = 200
 
+[[redirects]]
+  from = "/app/invoice-radar"
+  to = "/app/invoice-radar.html"
+  status = 200
+
 # Marketing subpages — clean URLs (match local `serve` behavior)
 [[redirects]]
   from = "/solutions"

@@ -20,6 +20,7 @@ FUNCTIONS=(
   book-build-start
   book-build-status
   software-download
+  invoice-radar-proxy
 )
 
 echo "Deploying: ${FUNCTIONS[*]}"

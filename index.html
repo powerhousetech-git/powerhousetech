@@ -552,6 +552,15 @@ h3{font-size:1.1rem;font-weight:700;letter-spacing:-0.01em}
   background:var(--teal-soft);color:var(--teal);border-left-color:var(--teal);font-weight:600;
 }
 .side-nav button svg{flex-shrink:0}
+.side-nav-external{
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:10px 12px;border-radius:var(--radius-sm);border:none;background:transparent;
+  color:var(--ink-mid);font:inherit;font-size:.88rem;font-weight:500;text-decoration:none;
+  cursor:pointer;transition:background .15s ease,color .15s ease;
+}
+.side-nav-external:hover{background:var(--slate-light);color:var(--ink)}
+.side-nav-external:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.side-nav-external svg{flex-shrink:0}
 
 .app-mode-switch{
   display:flex;gap:6px;padding:0 16px 14px;margin-bottom:4px;
@@ -1191,6 +1200,7 @@ body.landing-visible .theme-toggle-fixed{
   padding:22px 20px 20px;box-shadow:var(--shadow-sm);
   transition:transform .18s ease,box-shadow .18s ease,border-color .18s;
   cursor:pointer;display:flex;flex-direction:column;gap:10px;min-height:168px;
+  text-decoration:none;color:inherit;font:inherit;
 }
 .tool-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:rgba(66,79,209,.35)}
 .tool-card:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
@@ -1831,6 +1841,10 @@ body.landing-visible .theme-toggle-fixed{
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>
           Working Papers
         </button>
+        <a href="/app/invoice-radar" id="nav-invoice-radar" class="side-nav-external" hidden title="Invoice Radar receivables dashboard">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          Invoice Radar
+        </a>
       </nav>
       <p class="side-label side-label-mode-desktop">Desktop app</p>
       <nav class="side-nav side-nav-desktop" aria-label="Desktop app">
@@ -1959,6 +1973,14 @@ body.landing-visible .theme-toggle-fixed{
                 <p>Send GST, ITR, TDS and other filing reminders to clients by email or WhatsApp.</p>
                 <span class="tool-card-cta">Open tool →</span>
               </button>
+              <a href="/app/invoice-radar" class="tool-card" id="home-tool-invoice-radar" hidden>
+                <div class="tool-card-icon" aria-hidden="true">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                </div>
+                <h3>Invoice Radar</h3>
+                <p>Capture invoices, chase receivables, and approve firm reminders from your live sheet.</p>
+                <span class="tool-card-cta">Open dashboard →</span>
+              </a>
               <button type="button" class="tool-card soon" data-open-tab="tab-bank" id="home-tool-bank">
                 <div class="tool-card-icon" aria-hidden="true">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="22" x2="21" y2="22"/><polygon points="12 2 20 7 4 7"/></svg>
@@ -2756,6 +2778,7 @@ const BOOK_BUILD_START_API = `${SUPABASE_URL}/functions/v1/book-build-start`;
 const BOOK_BUILD_STATUS_API = `${SUPABASE_URL}/functions/v1/book-build-status`;
 const CREDITS_API = `${SUPABASE_URL}/functions/v1/user-credits`;
 const SOFTWARE_DOWNLOAD_API = `${SUPABASE_URL}/functions/v1/software-download`;
+const INVOICE_RADAR_API = `${SUPABASE_URL}/functions/v1/invoice-radar-proxy`;
 const TEAM_CONTACT_EMAIL = 'aymaan.shahzad@powerhousetech.in';
 const TEMPLATE_MAP_URL = 'template_map.json';
 // ────────────────────────────────────────────────────────────────────────────
@@ -2860,6 +2883,7 @@ function enterDashboard(user){
   window.scrollTo(0, 0);
   populateUser(user);
   refreshCredits();
+  refreshInvoiceRadarEntitlement();
   initHomeDashboard();
   const mode = pendingAppMode || getStoredAppMode();
   pendingAppMode = null;
@@ -3263,6 +3287,28 @@ async function refreshCredits(){
     creditState = { loaded: true, can_run: false, runs_remaining: 0, runs_used: 0 };
   }
   updateCreditsUI();
+}
+
+async function refreshInvoiceRadarEntitlement() {
+  const nav = document.getElementById('nav-invoice-radar');
+  const card = document.getElementById('home-tool-invoice-radar');
+  if (nav) nav.hidden = true;
+  if (card) card.hidden = true;
+
+  const headers = await getFirebaseAuthHeaders();
+  if (!headers.Authorization) return;
+
+  try {
+    const res = await fetch(INVOICE_RADAR_API, { headers });
+    if (res.status === 403 || !res.ok) return;
+    const data = await res.json();
+    if (data.enabled || data.services?.invoiceRadar?.enabled) {
+      if (nav) nav.hidden = false;
+      if (card) card.hidden = false;
+    }
+  } catch (err) {
+    console.error('Invoice Radar entitlement check failed:', err);
+  }
 }
 
 async function consumeRunCredit(tool){

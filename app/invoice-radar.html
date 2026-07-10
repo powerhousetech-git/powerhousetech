@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Invoice Radar dashboard — manage receivables, approvals, and capture.">
+<title>Invoice Radar — Powerhouse</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/invoice-radar-app.css">
+</head>
+<body>
+<div id="ir-gate" class="ir-gate">
+  <div class="ir-gate-card">
+    <h2 id="ir-gate-title">Sign in to Invoice Radar</h2>
+    <p id="ir-gate-msg">Use your Google account to open your receivables dashboard.</p>
+    <button type="button" class="ir-btn ir-btn-primary" id="ir-gate-signin">Sign in with Google</button>
+    <div id="ir-gate-upsell" class="ir-hidden">
+      <a href="/invoice-radar" class="ir-btn ir-btn-sm" style="margin-right:8px">Learn about Invoice Radar</a>
+      <a href="/contact.html#book" class="ir-btn ir-btn-primary ir-btn-sm">Book a call</a>
+    </div>
+  </div>
+</div>
+
+<div id="ir-loading" class="ir-loading ir-hidden" aria-live="polite">Loading your dashboard…</div>
+
+<div id="ir-app-shell" class="ir-hidden">
+  <nav class="ir-mobile-tabs" aria-label="Invoice Radar sections">
+    <button type="button" data-view="overview" class="is-active" aria-selected="true">Dashboard</button>
+    <button type="button" data-view="receivables" aria-selected="false">Receivables</button>
+    <button type="button" data-view="approvals" aria-selected="false">Approvals</button>
+    <button type="button" data-view="reminders" aria-selected="false">Follow-ups</button>
+    <button type="button" data-view="payables" aria-selected="false">Payables</button>
+    <button type="button" data-view="capture" aria-selected="false">Capture</button>
+    <button type="button" data-view="integrations" aria-selected="false">Integrations</button>
+  </nav>
+
+  <div class="ir-app">
+    <aside class="ir-side" aria-label="Invoice Radar navigation">
+      <div class="ir-brand">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><line x1="8" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="40" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="24" y1="21.5" x2="24" y2="40" stroke="#fff" stroke-width="3"/><circle cx="8" cy="9.5" r="5.2" fill="#fff"/><circle cx="40" cy="9.5" r="5.2" fill="#fff"/><circle cx="24" cy="40" r="5" fill="#fff"/><circle cx="24" cy="21.5" r="6.3" fill="#424FD1"/></svg>
+        <div><div class="name">Invoice Radar</div><div class="sub">by Powerhouse</div></div>
+      </div>
+      <div class="ir-nav-sec">Overview</div>
+      <button type="button" class="ir-nav-item is-active" data-view="overview" aria-selected="true"><span class="dot" aria-hidden="true">▦</span> Dashboard</button>
+      <div class="ir-nav-sec">Money in</div>
+      <button type="button" class="ir-nav-item" data-view="receivables" aria-selected="false"><span class="dot" aria-hidden="true">↙</span> Receivables</button>
+      <button type="button" class="ir-nav-item" data-view="approvals" aria-selected="false"><span class="dot" aria-hidden="true">✓</span> Approvals <span class="cnt" id="nav-appr" style="display:none">0</span></button>
+      <button type="button" class="ir-nav-item" data-view="reminders" aria-selected="false"><span class="dot" aria-hidden="true">✉</span> Follow-ups</button>
+      <div class="ir-nav-sec">Money out</div>
+      <button type="button" class="ir-nav-item" data-view="payables" aria-selected="false"><span class="dot" aria-hidden="true">↗</span> Payables</button>
+      <div class="ir-nav-sec">Data &amp; setup</div>
+      <button type="button" class="ir-nav-item" data-view="capture" aria-selected="false"><span class="dot" aria-hidden="true">＋</span> Capture <span class="cnt" id="nav-rev" style="display:none;background:#C77700">0</span></button>
+      <button type="button" class="ir-nav-item" data-view="integrations" aria-selected="false"><span class="dot" aria-hidden="true">⚙</span> Integrations</button>
+      <div class="ir-side-user">
+        <div class="ir-avatar" id="user-avatar" aria-hidden="true">U</div>
+        <div><div class="ir-user-name" id="user-name">User</div><div class="ir-user-email" id="user-email"></div></div>
+      </div>
+      <div class="ir-side-foot">Live data from your Google Sheet</div>
+    </aside>
+
+    <main class="ir-main">
+      <div class="ir-topbar">
+        <div>
+          <h1 id="view-title">Dashboard</h1>
+          <div class="sub" id="view-sub">Everything owed to you and by you, in one place.</div>
+        </div>
+        <div class="ir-top-actions">
+          <span class="ir-chip">Approve-to-send</span>
+          <button type="button" class="ir-btn ir-btn-sm" id="btn-refresh" aria-label="Refresh dashboard">Refresh</button>
+          <button type="button" class="ir-btn ir-btn-primary" data-view="capture">+ Capture</button>
+        </div>
+      </div>
+
+      <section id="view-overview" class="ir-view">
+        <div id="appr-banner"></div>
+        <div class="ir-kpis" id="kpi-overview"></div>
+        <div class="ir-card">
+          <div class="ir-card-head"><div><h3>Needs attention</h3><p class="hint">Overdue receivables picked by the radar.</p></div></div>
+          <div id="attention"></div>
+        </div>
+        <div class="ir-card">
+          <div class="ir-card-head"><div><h3>Recent activity</h3><p class="hint">Latest events from your sheet log.</p></div></div>
+          <div id="activity-list"></div>
+        </div>
+      </section>
+
+      <section id="view-receivables" class="ir-view ir-hidden">
+        <div class="ir-kpis" id="kpi-ar"></div>
+        <div class="ir-card">
+          <div class="ir-card-head"><div><h3>Outstanding invoices</h3><p class="hint">Click a row to mark paid and stop chasing.</p></div></div>
+          <div class="ir-table-wrap">
+            <table class="ir-table"><thead><tr><th scope="col">Invoice</th><th scope="col">Customer</th><th scope="col">Source</th><th scope="col">Amount</th><th scope="col">Due</th><th scope="col">Status</th><th scope="col">Next step</th></tr></thead>
+            <tbody id="ar-rows"></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-approvals" class="ir-view ir-hidden">
+        <div class="ir-card">
+          <div class="ir-card-head">
+            <div><h3>Reminders waiting for your OK</h3><p class="hint">Nothing firm sends until you approve.</p></div>
+            <button type="button" class="ir-btn ir-btn-green ir-btn-sm" id="btn-approve-all">Approve all</button>
+          </div>
+          <div id="appr-list"></div>
+        </div>
+      </section>
+
+      <section id="view-reminders" class="ir-view ir-hidden">
+        <div class="ir-card">
+          <div class="ir-card-head"><div><h3>Reminder sequences</h3><p class="hint">Friendly first nudge auto-sends; firmer reminders wait for approval.</p></div></div>
+          <div class="ir-table-wrap">
+            <table class="ir-table"><thead><tr><th scope="col">Invoice</th><th scope="col">Customer</th><th scope="col">Overdue</th><th scope="col">Stage</th><th scope="col">Mode</th><th scope="col">Channel</th></tr></thead>
+            <tbody id="fu-rows"></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-payables" class="ir-view ir-hidden">
+        <div class="ir-kpis" id="kpi-ap"></div>
+        <div class="ir-card">
+          <div class="ir-card-head"><div><h3>Bills to pay</h3><p class="hint">Captured automatically from email, photos, or manual entry.</p></div></div>
+          <div class="ir-table-wrap">
+            <table class="ir-table"><thead><tr><th scope="col">Bill</th><th scope="col">Vendor</th><th scope="col">Source</th><th scope="col">Amount</th><th scope="col">Due</th><th scope="col">Status</th><th scope="col">Reminder</th></tr></thead>
+            <tbody id="ap-rows"></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-capture" class="ir-view ir-hidden">
+        <div id="review-card" class="ir-card ir-hidden">
+          <div class="ir-card-head"><div><h3>Needs your review</h3><p class="hint">Confirm extracted fields before they enter the database.</p></div></div>
+          <div id="review-list"></div>
+        </div>
+        <div class="ir-card">
+          <div class="ir-card-head"><div><h3>Recently captured</h3><p class="hint">Newest at top. Capture runs via Gmail, Drive photos, or manual entry in your sheet.</p></div></div>
+          <div class="ir-table-wrap">
+            <table class="ir-table"><thead><tr><th scope="col">Ref</th><th scope="col">Party</th><th scope="col">Type</th><th scope="col">Source</th><th scope="col">Amount</th><th scope="col">Captured</th></tr></thead>
+            <tbody id="cap-rows"></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-integrations" class="ir-view ir-hidden">
+        <div class="ir-card">
+          <div class="ir-card-head"><div><h3>Connections</h3><p class="hint">Configured in your Google Apps Script deployment.</p></div></div>
+          <div class="ir-empty" style="text-align:left;padding:20px 0">
+            <p><strong>Gmail</strong> — read-only inbox scan for invoices.</p>
+            <p style="margin-top:12px"><strong>WhatsApp / Email</strong> — reminder channels with approval gate.</p>
+            <p style="margin-top:12px"><strong>Google Sheet</strong> — source of truth for all invoice data.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div class="ir-toast" id="ir-toast" role="status" aria-live="polite"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
+
+const firebaseConfig = {
+  apiKey: 'AIzaSyD9fHOILnFLauZqd-C2AZwm-vrkpQk-sV4',
+  authDomain: 'powerhouse-tech-f6da1.firebaseapp.com',
+  projectId: 'powerhouse-tech-f6da1',
+  storageBucket: 'powerhouse-tech-f6da1.firebasestorage.app',
+  messagingSenderId: '946732625664',
+  appId: '1:946732625664:web:627677c716fcf7c16b0de5',
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
+window.phFirebaseAuth = { auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged };
+window.dispatchEvent(new CustomEvent('ph-firebase-ready'));
+</script>
+<script src="/js/invoice-radar-app.js" defer></script>
+</body>
+</html>

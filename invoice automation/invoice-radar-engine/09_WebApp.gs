@@ -23,10 +23,27 @@ function routePayRequest_(params) {
 }
 
 function doGet(e) {
-  var r = routePayRequest_(e && e.parameter ? e.parameter : {});
+  var params = e && e.parameter ? e.parameter : {};
+
+  if (String(params.action || '') === 'snapshot') {
+    if (!portalCheckKey_(params.key)) return portalUnauthorized_();
+    return portalJson_(portalSnapshot_());
+  }
+
+  var r = routePayRequest_(params);
   var html = payPageHtml_(r);
   // eslint-disable-next-line no-undef
   return HtmlService.createHtmlOutput(html).setTitle('Invoice Radar');
+}
+
+function doPost(e) {
+  var body = {};
+  try {
+    body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+  } catch (err) {
+    return portalJson_({ ok: false, error: 'invalid_json' });
+  }
+  return portalJson_(portalHandlePost_(body));
 }
 
 function payPageHtml_(r) {

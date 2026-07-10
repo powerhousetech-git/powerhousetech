@@ -18,8 +18,9 @@ This is a working backend, not a mock. Every flow below is covered by an automat
 | `06_Capture.gs` | The three doors: Gmail scan, Drive photos, manual; `routeCapture_`, `confirmReview_` |
 | `07_Send.gs` | WhatsApp Business API + email, with graceful WA→email fallback |
 | `08_Approvals.gs` | Approval gate, snooze/skip, reconciliation (`markPaid_`), rollover at the cap |
-| `09_WebApp.gs` | The payment-link web app (`doGet`) — hitting the link marks paid & stops the chase |
+| `09_WebApp.gs` | Payment-link web app (`doGet`) + portal snapshot/write API |
 | `10_Setup.gs` | `initialize()`, custom menu, time-driven triggers |
+| `11_PortalApi.gs` | Portal snapshot JSON + write actions for the authenticated dashboard |
 | `tests/` | Fake GAS runtime + the end-to-end harness |
 
 ## How the engine decides (the ladder)
@@ -42,6 +43,7 @@ Firm/final reminders land in the Approvals gate. The operator verifies, edits th
 3. In **Project Settings → Script properties**, set:
    - `ANTHROPIC_API_KEY`
    - `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID` (WhatsApp Business API)
+   - `PORTAL_CLIENT_KEY` (shared secret for the web dashboard proxy — must match Supabase `invoice_radar_client_key`)
    - optional `DRIVE_INBOX_FOLDER_ID` (photo drop folder), `MASTER_SHEET_ID` (if unbound)
 4. Run `initialize()` once — builds every tab with headers.
 5. Run `installTriggers()` — daily chase run + inbox scan every 2 hours.
