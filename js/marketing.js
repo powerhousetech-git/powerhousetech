@@ -40,7 +40,7 @@
 
   var PAGES = [
     { href: '/', label: 'Home', match: /^\/(index\.html)?$/ },
-    { href: '/services.html', label: 'Services', match: /services/ },
+    { href: '/services.html', label: 'Services', match: /services|ai-sales-outreach/ },
     { href: '/how-we-work.html', label: 'How we work', match: /how-we-work/ },
     { href: '/sample-automations.html', label: 'Demos', match: /sample-automations/ },
     { href: '/industries.html', label: 'Industries', match: /industries/ },
@@ -56,6 +56,7 @@
   function isActive(page) {
     var path = currentPath();
     if (page.href === '/') return path === '' || path === '/' || path.endsWith('/index.html');
+    if (page.href === '/services.html' && /ai-sales-outreach/.test(path)) return true;
     var bare = page.href.replace(/\.html$/, '');
     return path === page.href || path === bare || path.endsWith(bare);
   }

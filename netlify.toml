@@ -21,6 +21,16 @@
 
 # Marketing subpages — clean URLs (match local `serve` behavior)
 [[redirects]]
+  from = "/solutions"
+  to = "/services.html"
+  status = 301
+
+[[redirects]]
+  from = "/ai-sales-outreach"
+  to = "/ai-sales-outreach.html"
+  status = 200
+
+[[redirects]]
   from = "/services"
   to = "/services.html"
   status = 200
