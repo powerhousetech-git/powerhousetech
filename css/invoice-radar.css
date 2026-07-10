@@ -11,6 +11,11 @@
   display: flex;
   align-items: center;
 }
+.ir-hero > .container {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+}
 .ir-hero-copy {
   position: relative;
   z-index: 2;
@@ -30,46 +35,59 @@
   font-size: 1.05rem;
   line-height: 1.7;
   max-width: 480px;
+  margin-bottom: 0;
 }
 .ir-back-light { color: rgba(246, 246, 249, 0.55); }
 .ir-back-light:hover { color: #fff; }
 
 .ir-hero-pills {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 8px;
   margin-top: 28px;
+  line-height: 1;
 }
 .ir-hero-pills > span:not(.ir-arrow) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  box-sizing: border-box;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 7px 12px;
+  padding: 0 12px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: rgba(255, 255, 255, 0.7);
-  animation: ir-pill-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ir-pill-in 0.45s ease both;
+  transform: none;
 }
-.ir-hero-pills > span:nth-child(1) { animation-delay: 0.1s; }
-.ir-hero-pills > span:nth-child(3) { animation-delay: 0.2s; }
-.ir-hero-pills > span:nth-child(5) { animation-delay: 0.3s; }
-.ir-hero-pills > span:nth-child(7) { animation-delay: 0.4s; }
-.ir-hero-pills > span:nth-child(9) { animation-delay: 0.5s; }
+.ir-hero-pills > span:nth-child(1) { animation-delay: 0.05s; }
+.ir-hero-pills > span:nth-child(3) { animation-delay: 0.1s; }
+.ir-hero-pills > span:nth-child(5) { animation-delay: 0.15s; }
+.ir-hero-pills > span:nth-child(7) { animation-delay: 0.2s; }
+.ir-hero-pills > span:nth-child(9) { animation-delay: 0.25s; }
 .ir-hero-pills .is-end {
   background: rgba(30, 158, 85, 0.25);
   border-color: rgba(110, 231, 183, 0.4);
   color: #6ee7b7;
 }
 .ir-arrow {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
   color: rgba(255, 255, 255, 0.25);
   font-size: 0.85rem;
+  line-height: 1;
+  flex-shrink: 0;
 }
 @keyframes ir-pill-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .ir-hero-bg {
