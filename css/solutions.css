@@ -301,7 +301,8 @@
   grid-template-columns: 1fr 1.3fr;
   gap: 48px;
   align-items: start;
-  background: var(--ink);
+  /* Brand ink — never use var(--ink); that token flips to light text in dark mode */
+  background: #16161A;
   color: #fff;
   border-radius: var(--radius-lg);
   padding: 48px 44px;
@@ -354,7 +355,10 @@
   .impact-panel { grid-template-columns: 1fr; gap: 28px; padding: 36px 28px; }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 767px) {
+  .solution-grid[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
   .vs-stage { padding: 20px 16px 24px; }
   .vs-hint { text-align: left; max-width: none; }
   .vs-flow { grid-template-columns: 1fr; }

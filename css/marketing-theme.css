@@ -84,7 +84,8 @@ body.landing-visible {
 }
 #landing .btn-white,
 .marketing-site .btn-white {
-  color: var(--ink);
+  /* Always brand ink on white — var(--ink) flips light in dark mode */
+  color: #16161A;
   font-weight: 700;
 }
 
@@ -181,7 +182,8 @@ body.landing-visible {
 
 #landing .cta-band,
 .marketing-site .cta-band {
-  background: var(--ink);
+  /* Brand ink surface — var(--ink) flips to light text color in dark mode */
+  background: #16161A;
   border-radius: var(--radius-lg);
   padding: 52px 48px;
 }
@@ -292,7 +294,7 @@ body.landing-visible {
 }
 
 .marketing-site .why-panel {
-  background: var(--ink);
+  background: #16161A;
   border-radius: var(--radius-lg);
 }
 

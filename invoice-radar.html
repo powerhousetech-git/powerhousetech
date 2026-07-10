@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Invoice Radar — capture invoices, extract with AI, chase politely, and stop the moment they're paid.">
+<title>Invoice Radar — Powerhouse</title>
+<script>(function(){try{if(localStorage.getItem('ph_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/marketing.css">
+<link rel="stylesheet" href="/css/marketing-extras.css">
+<link rel="stylesheet" href="/css/marketing-theme.css">
+<link rel="stylesheet" href="/css/marketing-motion.css">
+<link rel="stylesheet" href="/css/solutions.css">
+<link rel="stylesheet" href="/css/invoice-radar.css">
+</head>
+<body class="marketing-site">
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none"><symbol id="logo-mark" viewBox="0 0 48 48"><line x1="8" y1="9.5" x2="24" y2="21.5" stroke="currentColor" stroke-width="3"/><line x1="40" y1="9.5" x2="24" y2="21.5" stroke="currentColor" stroke-width="3"/><line x1="24" y1="21.5" x2="24" y2="40" stroke="currentColor" stroke-width="3"/><circle cx="8" cy="9.5" r="5.2" fill="currentColor"/><circle cx="40" cy="9.5" r="5.2" fill="currentColor"/><circle cx="24" cy="40" r="5" fill="currentColor"/><circle cx="24" cy="21.5" r="6.3" fill="#424FD1"/></symbol></svg>
+<div id="ph-nav"></div>
+<main>
+  <!-- CINEMATIC HERO -->
+  <section class="ir-hero">
+    <div class="ir-hero-bg" aria-hidden="true">
+      <div class="ir-radar">
+        <span class="ir-radar-ring"></span>
+        <span class="ir-radar-ring ir-radar-ring--2"></span>
+        <span class="ir-radar-ring ir-radar-ring--3"></span>
+        <span class="ir-radar-sweep"></span>
+        <span class="ir-radar-blip" style="--a:28deg;--d:1.1s"></span>
+        <span class="ir-radar-blip" style="--a:140deg;--d:2.4s"></span>
+        <span class="ir-radar-blip" style="--a:220deg;--d:3.6s"></span>
+      </div>
+      <div class="ir-float-card ir-float-card--1">
+        <span class="ir-fc-tag">PDF</span>
+        <strong>INV-2041</strong>
+        <em>₹4,800 · overdue</em>
+      </div>
+      <div class="ir-float-card ir-float-card--2">
+        <span class="ir-fc-tag">Email</span>
+        <strong>Mehta Traders</strong>
+        <em>inbox · unread</em>
+      </div>
+      <div class="ir-float-card ir-float-card--3">
+        <span class="ir-fc-tag ir-fc-tag--ok">Paid</span>
+        <strong>Orbit Labs</strong>
+        <em>chase stopped</em>
+      </div>
+    </div>
+    <div class="container ir-hero-copy">
+      <a href="/services.html" class="solution-back ir-back-light">← Services</a>
+      <p class="kicker" style="color:#C9CEF5">Finance · Services</p>
+      <h1>Invoice Radar</h1>
+      <p class="lead">Watches your inbox, reads every invoice, chases politely, and stops the moment it’s paid. You only approve the firm nudges.</p>
+      <div class="ir-hero-pills" aria-hidden="true">
+        <span>Capture</span><span class="ir-arrow">→</span>
+        <span>Read</span><span class="ir-arrow">→</span>
+        <span>Chase</span><span class="ir-arrow">→</span>
+        <span>Approve</span><span class="ir-arrow">→</span>
+        <span class="is-end">Paid</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- EARLIER vs NOW -->
+  <section class="section vs-section" aria-label="Earlier versus now">
+    <div class="container">
+      <div class="vs-stage" id="ir-vs-stage" data-state="earlier">
+        <div class="vs-header">
+          <div class="vs-tabs" role="tablist" aria-label="Compare modes">
+            <button type="button" class="vs-tab is-active" data-vs="earlier" role="tab" aria-selected="true">Earlier</button>
+            <button type="button" class="vs-tab" data-vs="now" role="tab" aria-selected="false">Now</button>
+          </div>
+          <p class="vs-hint" id="ir-vs-hint">Scattered inboxes, manual chases, paid invoices still getting nudged</p>
+        </div>
+        <div class="vs-panels">
+          <div class="vs-panel vs-panel--earlier" data-panel="earlier">
+            <ul class="vs-flow vs-flow--manual">
+              <li style="--i:0"><span class="vs-icon">📥</span><span>Hunt invoices in email</span></li>
+              <li style="--i:1"><span class="vs-icon">⌨️</span><span>Type amounts by hand</span></li>
+              <li style="--i:2"><span class="vs-icon">📅</span><span>Remember who to chase</span></li>
+              <li style="--i:3"><span class="vs-icon">💬</span><span>Write every reminder</span></li>
+              <li style="--i:4"><span class="vs-icon">😬</span><span>Nudge after they’ve paid</span></li>
+              <li style="--i:5"><span class="vs-icon">📊</span><span>Rebuild overdue reports</span></li>
+            </ul>
+            <p class="vs-verdict vs-verdict--bad">Slow · awkward · money sits unpaid</p>
+          </div>
+          <div class="vs-panel vs-panel--now" data-panel="now" hidden>
+            <ul class="vs-flow vs-flow--auto">
+              <li style="--i:0"><span class="vs-check">✓</span><span>Inbox &amp; photos captured</span></li>
+              <li style="--i:1"><span class="vs-check">✓</span><span>AI reads every invoice</span></li>
+              <li style="--i:2"><span class="vs-check">✓</span><span>Friendly chase on autopilot</span></li>
+              <li style="--i:3"><span class="vs-check">✓</span><span>You approve firm nudges</span></li>
+              <li style="--i:4"><span class="vs-check">✓</span><span>Pay link ends the chase</span></li>
+              <li style="--i:5"><span class="vs-check">✓</span><span>Live outstanding board</span></li>
+            </ul>
+            <p class="vs-verdict vs-verdict--good">Hands-off · polite · paid means done</p>
+          </div>
+        </div>
+        <div class="vs-morph" aria-hidden="true"><div class="vs-morph-bar"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="section tint ir-how" id="ir-how" aria-label="How Invoice Radar works">
+    <div class="container">
+      <div class="ir-how-head reveal">
+        <p class="kicker">How it works</p>
+        <h2>From invoice to paid — on autopilot</h2>
+        <p>Watch the dashboard move through the workflow. Tap a step anytime — or let it play.</p>
+      </div>
+
+      <div class="ir-progress reveal" aria-hidden="true">
+        <div class="ir-progress-track">
+          <div class="ir-progress-fill" id="ir-progress-fill"></div>
+        </div>
+        <div class="ir-progress-dots" id="ir-progress-dots">
+          <span class="is-on"></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+
+      <div class="ir-layout reveal reveal-delay-1">
+        <div class="ir-steps" role="tablist" aria-label="Workflow steps">
+          <button type="button" class="ir-step is-active" role="tab" aria-selected="true" data-step="0">
+            <span class="ir-step-num">01</span>
+            <span class="ir-step-body"><strong>Capture</strong><span>Email, photo, or manual</span></span>
+          </button>
+          <button type="button" class="ir-step" role="tab" aria-selected="false" data-step="1">
+            <span class="ir-step-num">02</span>
+            <span class="ir-step-body"><strong>Read</strong><span>AI fills the fields</span></span>
+          </button>
+          <button type="button" class="ir-step" role="tab" aria-selected="false" data-step="2">
+            <span class="ir-step-num">03</span>
+            <span class="ir-step-body"><strong>Chase</strong><span>Friendly auto, firm gated</span></span>
+          </button>
+          <button type="button" class="ir-step" role="tab" aria-selected="false" data-step="3">
+            <span class="ir-step-num">04</span>
+            <span class="ir-step-body"><strong>Approve</strong><span>You green-light firm nudges</span></span>
+          </button>
+          <button type="button" class="ir-step" role="tab" aria-selected="false" data-step="4">
+            <span class="ir-step-num">05</span>
+            <span class="ir-step-body"><strong>Reconcile</strong><span>Paid → chase stops</span></span>
+          </button>
+        </div>
+
+        <div>
+          <div class="ir-dash" id="ir-dash" data-phase="capture" aria-live="polite" aria-label="Invoice Radar dashboard preview">
+            <div class="ir-mail" id="ir-mail" aria-hidden="true">✉</div>
+            <div class="ir-burst" id="ir-burst" aria-hidden="true"></div>
+            <div class="ir-dash-inner">
+              <aside class="ir-side" aria-hidden="true">
+                <span class="ir-side-dot is-on"></span>
+                <span class="ir-side-dot"></span>
+                <span class="ir-side-dot"></span>
+                <span class="ir-side-dot"></span>
+              </aside>
+              <div class="ir-main">
+                <div class="ir-kpis">
+                  <div class="ir-kpi">
+                    <div class="lab">Outstanding</div>
+                    <div class="val" id="ir-kpi-out">₹13,360</div>
+                  </div>
+                  <div class="ir-kpi">
+                    <div class="lab">Overdue</div>
+                    <div class="val is-bad" id="ir-kpi-over">₹11,350</div>
+                  </div>
+                  <div class="ir-kpi">
+                    <div class="lab">Open invoices</div>
+                    <div class="val" id="ir-kpi-count">3</div>
+                  </div>
+                </div>
+
+                <div class="ir-table-wrap">
+                  <table class="ir-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Party</th>
+                        <th scope="col">Amount</th>
+                        <th scope="col">Due</th>
+                        <th scope="col">Stage</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr class="ir-row is-focus" id="ir-row-focus">
+                        <td class="party" id="ir-cell-party"><span class="shimmer" aria-hidden="true"></span></td>
+                        <td class="amt" id="ir-cell-amt"><span class="shimmer" aria-hidden="true"></span></td>
+                        <td id="ir-cell-due"><span class="shimmer" aria-hidden="true"></span></td>
+                        <td id="ir-cell-stage"><span class="ir-pill ir-pill--extract">Extracting…</span></td>
+                      </tr>
+                      <tr class="ir-row">
+                        <td class="party">Sharma &amp; Co</td>
+                        <td class="amt">₹6,550</td>
+                        <td>28 May</td>
+                        <td><span class="ir-pill ir-pill--overdue">Stage 2 · Firm</span></td>
+                      </tr>
+                      <tr class="ir-row">
+                        <td class="party">Orbit Labs</td>
+                        <td class="amt">₹2,010</td>
+                        <td>3 Jun</td>
+                        <td><span class="ir-pill ir-pill--sent">Stage 1 · Sent</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="ir-overlay" id="ir-overlay">
+                  <div class="ir-overlay-panel is-active" data-overlay="capture">
+                    <div class="ir-capture-stream" aria-hidden="true">
+                      <span class="ir-chip">Gmail</span>
+                      <span class="ir-chip">Photo</span>
+                      <span class="ir-chip">Manual</span>
+                    </div>
+                    <div class="ir-fields">
+                      <div class="ir-field"><div class="k">Source</div><div class="v">Gmail · invoices-inbox</div></div>
+                      <div class="ir-field"><div class="k">Status</div><div class="v ir-pulse-text">Capturing…</div></div>
+                      <div class="ir-field"><div class="k">Confidence</div><div class="v">—</div></div>
+                    </div>
+                  </div>
+                  <div class="ir-overlay-panel" data-overlay="read">
+                    <div class="ir-fields">
+                      <div class="ir-field ir-field-pop" style="--d:0s"><div class="k">Amount</div><div class="v">₹4,800</div></div>
+                      <div class="ir-field ir-field-pop" style="--d:.12s"><div class="k">Due date</div><div class="v">12 Jun</div></div>
+                      <div class="ir-field is-review ir-field-pop" style="--d:.24s"><div class="k">Party</div><div class="v">Mehta Traders · Needs review</div></div>
+                    </div>
+                  </div>
+                  <div class="ir-overlay-panel" data-overlay="chase">
+                    <div class="ir-ladder">
+                      <div class="ir-ladder-step is-done"><span class="dot"></span><strong>Stage 1</strong><em>Friendly · Sent</em></div>
+                      <div class="ir-ladder-step is-wait"><span class="dot"></span><strong>Stage 2</strong><em>Firm · Waiting</em></div>
+                      <div class="ir-ladder-step is-wait"><span class="dot"></span><strong>Stage 3</strong><em>Final · Waiting</em></div>
+                    </div>
+                  </div>
+                  <div class="ir-overlay-panel" data-overlay="approve">
+                    <div class="ir-wa">
+                      <div class="ir-wa-bubble">
+                        <strong>Hi Mehta Traders —</strong> invoice for ₹4,800 was due 12 Jun. Here’s a pay link when you’re ready. Reply if anything’s off.
+                      </div>
+                      <div class="ir-wa-actions" aria-label="Approval actions">
+                        <button type="button" class="approve" id="ir-approve-demo">Approve</button>
+                        <button type="button">Snooze</button>
+                        <button type="button">Skip</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="ir-caption" id="ir-caption">An invoice lands — from email, a photo, or a quick manual entry. Radar picks it up and starts reading.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="capabilities">
+    <div class="container">
+      <div class="section-head reveal">
+        <p class="kicker">Capabilities</p>
+        <h2>What it actually does.</h2>
+      </div>
+      <div class="cap-grid ir-cap-grid">
+        <article class="cap-card ir-cap reveal"><span class="ir-cap-ico" aria-hidden="true">①</span><h3>Three ways in</h3><p>Gmail label, photo drop, or manual entry — every invoice lands in one queue.</p></article>
+        <article class="cap-card ir-cap reveal reveal-delay-1"><span class="ir-cap-ico" aria-hidden="true">②</span><h3>AI that knows when to ask</h3><p>High-confidence fields go straight through. Uncertain ones get a review chip before chase starts.</p></article>
+        <article class="cap-card ir-cap reveal reveal-delay-1"><span class="ir-cap-ico" aria-hidden="true">③</span><h3>Polite, then firm</h3><p>Friendly reminders auto-send. Firmer stages wait for your approval — nothing harsh without a green light.</p></article>
+        <article class="cap-card ir-cap reveal reveal-delay-2"><span class="ir-cap-ico" aria-hidden="true">④</span><h3>Approve from a preview</h3><p>See the WhatsApp or email draft, edit if needed, then Approve, Snooze, or Skip.</p></article>
+        <article class="cap-card ir-cap reveal reveal-delay-2"><span class="ir-cap-ico" aria-hidden="true">⑤</span><h3>Pay link ends the chase</h3><p>When they pay, the row flips to Paid and reminders stop — no manual cleanup.</p></article>
+        <article class="cap-card ir-cap reveal reveal-delay-3"><span class="ir-cap-ico" aria-hidden="true">⑥</span><h3>One live board</h3><p>Outstanding, overdue, and every stage — visible in one place your team can trust.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section tint" id="impact">
+    <div class="container">
+      <div class="impact-panel reveal">
+        <div>
+          <p class="kicker">Impact</p>
+          <h2>What changes for finance.</h2>
+        </div>
+        <ul class="impact-list">
+          <li>Invoices stop living in inboxes and spreadsheets — they have a stage.</li>
+          <li>Friendly follow-ups happen without someone remembering to chase.</li>
+          <li>Firm language stays under your control.</li>
+          <li>Paid means done — the system stops, so clients aren’t nudged after they’ve settled.</li>
+          <li>You see what’s outstanding and overdue without rebuilding a report.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="cta-band-wrap">
+    <div class="container">
+      <div class="cta-band reveal">
+        <h2>Want Invoice Radar watching your receivables?</h2>
+        <p>A short call is enough to see if this fits how you collect.</p>
+        <div class="actions">
+          <a href="/contact.html#book" class="btn btn-white btn-lg">Book a call</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+<div id="ph-footer"></div>
+<script src="/js/site-config.js"></script>
+<script src="/js/marketing.js"></script>
+<script>
+(function(){
+  // Reuse earlier/now morph on this page's stage
+  var stage = document.getElementById('ir-vs-stage');
+  if (!stage || !window) return;
+  // solution-vs.js looks for #vs-stage — bind a lightweight twin
+  var hint = document.getElementById('ir-vs-hint');
+  var tabs = stage.querySelectorAll('.vs-tab');
+  var panels = { earlier: stage.querySelector('[data-panel="earlier"]'), now: stage.querySelector('[data-panel="now"]') };
+  var hints = {
+    earlier: 'Scattered inboxes, manual chases, paid invoices still getting nudged',
+    now: 'Hands-off collection — warm pay links, firm nudges only when you approve'
+  };
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function setState(state) {
+    stage.setAttribute('data-state', state);
+    tabs.forEach(function(t){ var on=t.getAttribute('data-vs')===state; t.classList.toggle('is-active',on); t.setAttribute('aria-selected',on?'true':'false'); });
+    Object.keys(panels).forEach(function(k){ if(!panels[k])return; panels[k].hidden=k!==state; if(k===state){ panels[k].classList.remove('is-animating'); void panels[k].offsetWidth; panels[k].classList.add('is-animating'); }});
+    if (hint) hint.textContent = hints[state];
+  }
+  tabs.forEach(function(t){ t.addEventListener('click', function(){ stage.classList.remove('is-transitioning'); setState(t.getAttribute('data-vs')); }); });
+  setState('earlier');
+  if (!reduce) {
+    window.setTimeout(function(){ stage.classList.add('is-transitioning'); window.setTimeout(function(){ setState('now'); window.setTimeout(function(){ stage.classList.remove('is-transitioning'); }, 400); }, 1100); }, 1400);
+  } else setState('now');
+})();
+</script>
+<script src="/js/invoice-radar.js"></script>
+</body>
+</html>
