@@ -9,8 +9,8 @@
     now: stage.querySelector('[data-panel="now"]')
   };
   var hints = {
-    earlier: 'Manual outreach — slow, inconsistent, things fall through',
-    now: 'Hands-off outreach — warm leads surface in your inbox'
+    earlier: stage.getAttribute('data-hint-earlier') || 'Manual outreach — slow, inconsistent, things fall through',
+    now: stage.getAttribute('data-hint-now') || 'Hands-off outreach — warm leads surface in your inbox'
   };
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var autoPlayed = false;
