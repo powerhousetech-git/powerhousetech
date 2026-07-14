@@ -257,6 +257,18 @@ body.landing-visible {
   border-bottom-color: rgba(255, 255, 255, 0.06);
 }
 
+/* Logo: keep brand indigo, stay readable on dark surfaces */
+[data-theme="dark"] #landing .brand svg,
+[data-theme="dark"] .marketing-site .brand svg,
+[data-theme="dark"] .brand svg {
+  color: #6B7AE8;
+  filter: drop-shadow(0 0 8px rgba(66, 79, 209, 0.55));
+}
+[data-theme="dark"] #landing .brand,
+[data-theme="dark"] .marketing-site .brand {
+  color: #F6F6F9;
+}
+
 [data-theme="dark"] #landing .service-card,
 [data-theme="dark"] #landing .step-card,
 [data-theme="dark"] #landing .card,

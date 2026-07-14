@@ -41,7 +41,6 @@
   var PAGES = [
     { href: '/', label: 'Home', match: /^\/(index\.html)?$/ },
     { href: '/services.html', label: 'Services', match: /services|ai-sales-outreach|invoice-radar|exhibition-leads/ },
-    { href: '/how-we-work.html', label: 'How we work', match: /how-we-work/ },
     { href: '/sample-automations.html', label: 'Demos', match: /sample-automations/ },
     { href: '/industries.html', label: 'Industries', match: /industries/ },
     { href: '/about.html', label: 'About', match: /about/ },
@@ -100,7 +99,7 @@
       '<div class="footer-brand"><a href="/" class="brand" style="font-size:.95rem"><svg width="22" height="22"><use href="#logo-mark"/></svg> Powerhouse</a>' +
       '<p>An automation studio for global teams. We design, build and run the workflows behind your business.</p></div>' +
       '<nav class="footer-col"><h4>Company</h4><ul>' +
-      '<li><a href="/services.html">Services</a></li><li><a href="/how-we-work.html">How we work</a></li>' +
+      '<li><a href="/services.html">Services</a></li>' +
       '<li><a href="/about.html">About</a></li></ul></nav>' +
       '<nav class="footer-col"><h4>Contact</h4><ul>' +
       '<li><a href="mailto:shreyas@powerhousetech.in">shreyas@powerhousetech.in</a></li>' +

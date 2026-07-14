@@ -152,6 +152,10 @@ h3{font-size:1.1rem;font-weight:700;letter-spacing:-0.01em}
 }
 .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.08rem;letter-spacing:-0.02em;color:var(--ink)}
 .brand svg{color:var(--ink)}
+[data-theme="dark"] .brand svg{
+  color:#6B7AE8;
+  filter:drop-shadow(0 0 8px rgba(66,79,209,.55));
+}
 .nav-links{display:flex;gap:30px;align-items:center}
 .nav-links a{font-size:.92rem;font-weight:500;color:var(--ink-mid);transition:color .15s}
 .nav-links a:hover{color:var(--teal)}
@@ -1435,7 +1439,6 @@ body.landing-visible .theme-toggle-fixed{
       </a>
       <nav class="nav-links" aria-label="Primary">
         <a href="/services.html">Services</a>
-        <a href="/how-we-work.html">How we work</a>
         <a href="/sample-automations.html">Demos</a>
         <a href="/industries.html">Industries</a>
         <a href="/about.html">About</a>
@@ -1452,7 +1455,6 @@ body.landing-visible .theme-toggle-fixed{
     </div>
     <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile">
       <a href="/services.html">Services</a>
-      <a href="/how-we-work.html">How we work</a>
       <a href="/sample-automations.html">Demos</a>
       <a href="/industries.html">Industries</a>
       <a href="/about.html">About</a>
@@ -1663,7 +1665,6 @@ body.landing-visible .theme-toggle-fixed{
           <p class="kicker">How we work</p>
           <h2>A four-step engagement.</h2>
         </div>
-        <a href="/how-we-work.html" class="section-link">See the full process →</a>
       </div>
       <div class="steps-4 reveal reveal-delay-1">
         <article class="step-card">
@@ -1729,9 +1730,9 @@ body.landing-visible .theme-toggle-fixed{
       <div class="section-head-row reveal">
         <div class="section-head">
           <p class="kicker">Industries</p>
-          <h2>Where custom problems show up most.</h2>
+          <h2>Who we’re helping now.</h2>
           <p style="font-size:1rem;color:var(--ink-mid);max-width:560px;margin-top:12px;line-height:1.65">
-            Same promise everywhere: workflows shaped to your process — not a generic product forcing yours to fit.
+            These are the teams we work with most today — and we’re open to any business drowning in repetitive operational work.
           </p>
         </div>
         <a href="/industries.html" class="section-link">View industries →</a>
@@ -1760,7 +1761,6 @@ body.landing-visible .theme-toggle-fixed{
           <h4>Company</h4>
           <ul>
             <li><a href="/services.html">Services</a></li>
-            <li><a href="/how-we-work.html">How we work</a></li>
             <li><a href="/about.html">About</a></li>
           </ul>
         </nav>

@@ -52,8 +52,13 @@
 
 [[redirects]]
   from = "/how-we-work"
-  to = "/how-we-work.html"
-  status = 200
+  to = "/#how-it-works"
+  status = 301
+
+[[redirects]]
+  from = "/how-we-work.html"
+  to = "/#how-it-works"
+  status = 301
 
 [[redirects]]
   from = "/sample-automations"

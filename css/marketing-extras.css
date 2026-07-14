@@ -52,6 +52,12 @@
 [data-theme="dark"] .btn-ghost{border-color:var(--line);color:var(--ink)}
 [data-theme="dark"] .industry-card,
 [data-theme="dark"] .featured-card{background:#12121A}
+[data-theme="dark"] .practice-square,
+[data-theme="dark"] .ready-card{background:var(--surface-raised,#18181f);border-color:var(--line)}
+[data-theme="dark"] .custom-lead{
+  background:linear-gradient(145deg,#101018 0%,#171722 55%,#14141c 100%);
+  border-color:rgba(66,79,209,.4);
+}
 [data-theme="dark"] .loom-card{background:var(--surface-raised)}
 [data-theme="dark"] .contact-card{background:var(--surface-raised)}
 [data-theme="dark"] .calendly-wrap{background:var(--surface-raised)}
@@ -60,13 +66,14 @@
 [data-theme="dark"] .calendly-placeholder{background:var(--surface-raised);border-color:var(--line)}
 [data-theme="dark"] .steps-panel{background:var(--surface-raised);border-color:var(--line)}
 [data-theme="dark"] .mini-card.soon{background:transparent;border-color:var(--line)}
-@media(max-width:1079px){.hero-inner{grid-template-columns:1fr}.cards-4,.steps-4{grid-template-columns:repeat(2,1fr)}.why-panel{grid-template-columns:1fr;padding:40px 32px}.industries-grid,.industry-grid{grid-template-columns:1fr 1fr}.systems-grid{grid-template-columns:1fr !important}.metrics-band{grid-template-columns:1fr}.practice-block ul{grid-template-columns:1fr}}
+@media(max-width:1079px){.hero-inner{grid-template-columns:1fr}.cards-4,.steps-4{grid-template-columns:repeat(2,1fr)}.why-panel{grid-template-columns:1fr;padding:40px 32px}.industries-grid,.industry-grid{grid-template-columns:1fr 1fr}.systems-grid,.ready-systems{grid-template-columns:1fr}.practice-squares{grid-template-columns:1fr}.practice-square{aspect-ratio:auto;min-height:0}.metrics-band{grid-template-columns:1fr}.practice-block ul{grid-template-columns:1fr}}
 @media(max-width:900px){
   .nav-links{display:none}
   .nav-right .nav-cta{display:none}
   .hamburger{display:block}
   .nav-right{gap:10px}
   .mobile-nav.open{display:flex}
+  .custom-lead{padding:28px 22px}
 }
 @media(max-width:767px){
   .hero{padding:72px 0 0}
@@ -82,6 +89,7 @@
   .page-hero{padding:72px 0 40px}
   .cap-grid{grid-template-columns:1fr}
   .home-systems-note{font-size:.88rem}
+  .ready-card{min-height:0}
 }
 @media(max-width:480px){
   .nav-inner{padding:0 16px}
