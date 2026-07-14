@@ -28,8 +28,6 @@
 
 .el-hero-copy .lead { max-width: 520px; }
 
-.el-hero-cta { margin-top: 22px; }
-
 .el-hero-in {
   opacity: 0;
   transform: translateY(18px);
