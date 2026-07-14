@@ -44,7 +44,7 @@
 .theme-toggle{flex-shrink:0;width:40px;height:40px;border-radius:10px;border:1.5px solid var(--line);background:var(--white);color:var(--ink-mid);display:inline-flex;align-items:center;justify-content:center}
 .theme-toggle-nav{background:var(--white)}
 .theme-toggle:hover{background:var(--slate-light);color:var(--ink)}
-.theme-toggle svg{width:18px;height:18px}
+.theme-toggle svg{width:18px;height:18px;display:block}
 .theme-toggle .icon-moon{display:none}
 [data-theme="dark"] .theme-toggle .icon-sun{display:none}
 [data-theme="dark"] .theme-toggle .icon-moon{display:block}
@@ -60,4 +60,28 @@
 [data-theme="dark"] .steps-panel{background:var(--surface-raised);border-color:var(--line)}
 [data-theme="dark"] .mini-card.soon{background:transparent;border-color:var(--line)}
 @media(max-width:1079px){.hero-inner{grid-template-columns:1fr}.cards-4,.steps-4{grid-template-columns:repeat(2,1fr)}.why-panel{grid-template-columns:1fr;padding:40px 32px}.industries-grid{grid-template-columns:1fr}.metrics-band{grid-template-columns:1fr}.practice-block ul{grid-template-columns:1fr}}
-@media(max-width:767px){.nav-links{display:none}.nav-right .nav-cta{display:none}.hamburger{display:block;margin-left:auto}.mobile-nav.open{display:flex}.hero{padding:72px 0 0}.hero--brand .trust-band{margin-top:48px}.cards-4,.steps-4,.cards-3{grid-template-columns:1fr}.mini-grid{grid-template-columns:1fr}.section{padding:64px 0}.cta-band{padding:48px 24px}.mobile-cta{display:block}.contact-grid{grid-template-columns:1fr}body{padding-bottom:72px}.footer-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:900px){
+  .nav-links{display:none}
+  .nav-right .nav-cta{display:none}
+  .hamburger{display:block}
+  .nav-right{gap:10px}
+  .mobile-nav.open{display:flex}
+}
+@media(max-width:767px){
+  .hero{padding:72px 0 0}
+  .hero--brand .trust-band{margin-top:48px}
+  .cards-4,.steps-4,.cards-3{grid-template-columns:1fr}
+  .mini-grid{grid-template-columns:1fr}
+  .section{padding:64px 0}
+  .cta-band{padding:48px 24px}
+  .mobile-cta{display:block}
+  .contact-grid{grid-template-columns:1fr}
+  body{padding-bottom:72px}
+  .footer-grid{grid-template-columns:1fr}
+  .page-hero{padding:72px 0 40px}
+  .cap-grid{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+  .nav-inner{padding:0 16px}
+  .container{padding-left:16px;padding-right:16px}
+}

@@ -1157,16 +1157,14 @@ input::placeholder,textarea::placeholder{color:var(--ink-light)}
 .theme-toggle-fixed{
   position:fixed;bottom:24px;right:24px;z-index:130;
   box-shadow:var(--shadow-md);
+  /* Nav / topbar already expose a theme control — never stack a second FAB on phones */
+  display:none !important;
 }
 body.landing-visible .theme-toggle-fixed{
   bottom:calc(72px + env(safe-area-inset-bottom, 0px));
 }
 @media (min-width:768px){
   body.landing-visible .theme-toggle-fixed{bottom:24px}
-  body.landing-visible .theme-toggle-fixed{display:none}
-}
-@media (min-width:1080px){
-  body:not(.landing-visible) .theme-toggle-fixed{display:none}
 }
 .legal-top-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .sidebar-head{
@@ -1179,6 +1177,11 @@ body.landing-visible .theme-toggle-fixed{
   background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.22);color:#E8EAFF;
 }
 .home-hero .theme-toggle:hover{background:rgba(255,255,255,.18);color:#fff}
+@media (max-width:900px){
+  /* One theme control on phones: topbar only (hide hero + sidebar duplicates) */
+  .home-hero-theme,
+  .theme-toggle-sidebar{display:none !important}
+}
 
 /* ============ WORKSPACE HOME ============ */
 .home-hero{
@@ -1359,15 +1362,19 @@ body.landing-visible .theme-toggle-fixed{
   .home-hero-bar{padding:22px 20px 20px}
   .home-quick-add{grid-template-columns:1fr}
 }
-@media (max-width:767px){
+@media (max-width:900px){
   .nav-links{display:none}
   .nav-right .nav-cta{display:none}
-  .hamburger{display:block;flex-shrink:0;margin-left:auto}
+  .hamburger{display:block;flex-shrink:0}
+  .nav-right{gap:10px}
   .nav-inner{gap:12px}
+  .mobile-nav.open{display:flex}
   .mobile-nav a.mobile-signin{
     display:block;width:100%;text-align:left;padding:14px 0;
     font-weight:600;color:var(--teal);border-bottom:1px solid var(--line);
   }
+}
+@media (max-width:767px){
   .hero{padding:72px 0 0}
   .hero--brand .trust-band{margin-top:48px}
   .cards-3,.cards-4{grid-template-columns:1fr}

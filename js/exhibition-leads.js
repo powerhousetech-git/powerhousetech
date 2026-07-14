@@ -19,6 +19,10 @@
       });
     }
 
+    function isCompactHero() {
+      return window.matchMedia('(max-width: 900px)').matches;
+    }
+
     function setStep(i) {
       nodes.forEach(function (n, j) {
         n.classList.toggle('is-on', j === i);
@@ -27,10 +31,13 @@
       wires.forEach(function (w, j) {
         w.classList.toggle('is-lit', j < i);
       });
-      if (packet && !reduceMotion) {
+      if (packet && !reduceMotion && !isCompactHero()) {
         var xs = positions();
         packet.classList.add('is-on');
         packet.style.left = (xs[i] || 0) + 'px';
+        packet.style.top = '34px';
+      } else if (packet) {
+        packet.classList.remove('is-on');
       }
     }
 

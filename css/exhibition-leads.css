@@ -656,6 +656,15 @@
   100% { opacity: 0.35; transform: translateY(210px) rotate(var(--rot, 4deg)) scale(0.85); }
 }
 
+@media (max-width: 900px) {
+  @keyframes el-rain-fall {
+    0% { opacity: 0; transform: translateY(-16px) rotate(-6deg) scale(0.92); }
+    20% { opacity: 1; }
+    75% { opacity: 1; transform: translateY(100px) rotate(var(--rot, 4deg)) scale(1); }
+    100% { opacity: 0.4; transform: translateY(120px) rotate(var(--rot, 4deg)) scale(0.9); }
+  }
+}
+
 .el-media--1 { --rot: -8deg; }
 .el-media--2 { --rot: 5deg; }
 .el-media--3 { --rot: -3deg; }
@@ -1829,30 +1838,178 @@
 [data-theme="dark"] .el-hopper { background: #1a1a24; }
 
 @media (max-width: 900px) {
-  .el-hero-grid { grid-template-columns: 1fr; gap: 28px; }
-  .el-hero-pipeline { min-height: 120px; }
-  .el-hp-node { width: 56px; }
-  .el-hp-node em { font-size: 0.6rem; }
+  .el-hero {
+    padding-bottom: 36px;
+  }
+  .el-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .el-hero-stage {
+    padding: 20px 16px 14px;
+    overflow: visible;
+  }
+  .el-hero-pipeline {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    min-height: 0;
+  }
+  .el-hp-node {
+    flex-direction: row;
+    width: 100%;
+    justify-content: flex-start;
+    gap: 14px;
+    padding: 8px 2px;
+    transform: none;
+  }
+  .el-hp-node.is-on,
+  .el-hp-node.is-done {
+    transform: none;
+  }
+  .el-hp-node em {
+    font-size: 0.78rem;
+    text-align: left;
+  }
+  .el-hp-wire {
+    width: 2px;
+    height: 14px;
+    min-width: 0;
+    margin: 0 0 0 25px;
+    flex: 0 0 auto;
+    align-self: flex-start;
+  }
+  .el-hp-wire.is-lit {
+    background: linear-gradient(180deg, #424fd1, #6b7ae8);
+  }
+  .el-hp-packet {
+    display: none;
+  }
+  .el-hero-stage-caption {
+    margin-top: 12px;
+    font-size: 0.72rem;
+    line-height: 1.4;
+  }
+
   .el-layout { grid-template-columns: 1fr; }
   .el-steps {
     position: static;
     flex-direction: row;
     overflow-x: auto;
     gap: 8px;
+    padding-bottom: 4px;
+    padding-right: 24px;
+    scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
+    mask-image: linear-gradient(90deg, #000 85%, transparent);
   }
-  .el-step { flex: 0 0 auto; min-width: 140px; }
+  .el-step {
+    flex: 0 0 auto;
+    min-width: 128px;
+    scroll-snap-align: start;
+  }
   .el-step.is-active { transform: none; }
   .el-step-body span { display: none; }
+
+  .el-stage {
+    min-height: 0;
+    overflow: hidden;
+  }
+  .el-stage-inner {
+    padding: 14px;
+    min-height: 0;
+  }
+  .el-panel {
+    inset: 14px;
+  }
+  .el-panel.is-active {
+    inset: auto;
+  }
+
   .el-capture-board--v2,
   .el-read-board--v2,
   .el-db-board,
   .el-fu--v2 { grid-template-columns: 1fr; }
+
   .el-phone { display: none; }
-  .el-rain { inset: 0 0 88px 0; }
-  .el-hopper { left: 16px; }
+  .el-intake {
+    min-height: 220px;
+  }
+  .el-rain { inset: 8px 8px 80px; }
+  .el-media {
+    width: 64px;
+  }
+  .el-media--5,
+  .el-media--6 {
+    display: none;
+  }
+  .el-hopper { left: 12px; right: 12px; }
   .el-orbit { display: none; }
-  .el-stage { min-height: 420px; }
+
+  .el-db {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .el-db table {
+    min-width: 420px;
+  }
+  .el-db-stats {
+    grid-template-columns: 1fr;
+  }
+  .el-stat {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .el-stat:last-child { border-bottom: 0; }
+
+  .el-funnel {
+    min-height: 220px;
+  }
+  .el-mail-board--v2 {
+    min-height: 0;
+    overflow: hidden;
+  }
+  .el-flyouts { display: none; }
+  .el-industry-rail {
+    gap: 6px;
+  }
+  .el-ind {
+    padding: 6px 10px;
+    font-size: 0.68rem;
+  }
+  .el-caption {
+    font-size: 0.88rem;
+    min-height: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .el-hero-copy .lead {
+    font-size: 0.98rem;
+  }
+  .el-hp-phone {
+    width: 36px;
+    height: 56px;
+  }
+  .el-hp-scan,
+  .el-hp-vault,
+  .el-hp-zero {
+    width: 44px;
+    height: 44px;
+  }
+  .el-hp-envelope {
+    width: 44px;
+    height: 34px;
+  }
+  .el-hp-wire {
+    margin-left: 21px;
+  }
+  .el-how-head h2 {
+    font-size: 1.55rem;
+  }
+  .el-bulk-meter .sub {
+    font-size: 0.78rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
