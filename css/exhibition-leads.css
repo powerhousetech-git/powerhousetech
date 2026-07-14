@@ -1,5 +1,330 @@
 /* Exhibition leads — booth-to-mailbox cinematic stage */
 
+/* ========== Hero opening ========== */
+.el-hero {
+  position: relative;
+  overflow: hidden;
+  padding-bottom: 48px;
+}
+
+.el-hero-wash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(90% 70% at 85% 20%, rgba(66, 79, 209, 0.14), transparent 55%),
+    radial-gradient(70% 60% at 10% 90%, rgba(30, 158, 85, 0.08), transparent 50%),
+    linear-gradient(180deg, transparent 60%, rgba(66, 79, 209, 0.03));
+}
+
+.el-hero-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 36px;
+  align-items: center;
+  z-index: 1;
+}
+
+.el-hero-copy .lead { max-width: 520px; }
+
+.el-hero-cta { margin-top: 22px; }
+
+.el-hero-in {
+  opacity: 0;
+  transform: translateY(18px);
+  animation: el-hero-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--hi, 0) * 0.09s + 0.05s);
+}
+
+@keyframes el-hero-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.el-hero-stage {
+  position: relative;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.85), rgba(245, 246, 250, 0.92));
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 28px 22px 18px;
+  box-shadow: var(--shadow-md);
+  min-height: 220px;
+  overflow: hidden;
+}
+
+.el-hero-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(66, 79, 209, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(66, 79, 209, 0.04) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse at 50% 40%, #000 40%, transparent 80%);
+  pointer-events: none;
+}
+
+.el-hero-pipeline {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0;
+  min-height: 140px;
+  z-index: 1;
+}
+
+.el-hp-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  width: 72px;
+  opacity: 0.4;
+  transition: opacity 0.35s, transform 0.35s;
+  transform: scale(0.94);
+}
+
+.el-hp-node.is-on {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.el-hp-node.is-done {
+  opacity: 0.85;
+}
+
+.el-hp-node em {
+  font-style: normal;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink-mid);
+  text-align: center;
+  line-height: 1.25;
+}
+
+.el-hp-node.is-on em { color: var(--ink); }
+
+.el-hp-wire {
+  flex: 1 1 auto;
+  height: 2px;
+  min-width: 12px;
+  margin: 0 2px 28px;
+  background: #d8dbe8;
+  position: relative;
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+.el-hp-wire.is-lit {
+  background: linear-gradient(90deg, #424fd1, #6b7ae8);
+}
+
+.el-hp-wire.is-lit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.75), transparent);
+  animation: el-hp-shimmer 0.9s ease;
+}
+
+@keyframes el-hp-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+.el-hp-phone {
+  width: 44px;
+  height: 68px;
+  background: #1a1a22;
+  border-radius: 8px;
+  position: relative;
+  padding: 6px 5px;
+  box-shadow: 0 8px 20px rgba(22, 22, 26, 0.2);
+}
+
+.el-hp-card {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #eaecfa, #fff);
+}
+
+.el-hp-flash {
+  position: absolute;
+  inset: -30%;
+  background: radial-gradient(circle, #fff, transparent 55%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.el-hp-node--snap.is-on .el-hp-flash {
+  animation: el-hp-flash 1.8s ease-out infinite;
+}
+
+.el-hp-node--snap.is-on .el-hp-phone {
+  animation: el-hp-bob 1.8s ease-in-out infinite;
+}
+
+@keyframes el-hp-flash {
+  0%, 25%, 100% { opacity: 0; }
+  28% { opacity: 0.9; }
+  38% { opacity: 0; }
+}
+
+@keyframes el-hp-bob {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(-2deg) translateY(-2px); }
+}
+
+.el-hp-scan {
+  width: 52px;
+  height: 68px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  position: relative;
+  overflow: hidden;
+}
+
+.el-hp-scan::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 14px;
+  height: 4px;
+  border-radius: 2px;
+  background: #e4e6ef;
+  box-shadow: 0 10px 0 #e4e6ef, 0 20px 0 #e4e6ef, 0 30px 0 #e4e6ef;
+}
+
+.el-hp-scan i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #424fd1;
+  box-shadow: 0 0 10px rgba(66, 79, 209, 0.5);
+  top: 10%;
+  opacity: 0;
+}
+
+.el-hp-node--read.is-on .el-hp-scan i {
+  opacity: 1;
+  animation: el-hp-scan 1.4s ease-in-out infinite;
+}
+
+@keyframes el-hp-scan {
+  from { top: 10%; }
+  to { top: 85%; }
+}
+
+.el-hp-vault {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: linear-gradient(160deg, #1a1a22, #2a2a38);
+  color: #c9cbe0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(22, 22, 26, 0.22);
+}
+
+.el-hp-node--db.is-on .el-hp-vault {
+  animation: el-hp-vault-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes el-hp-vault-pulse {
+  0%, 100% { box-shadow: 0 8px 20px rgba(22, 22, 26, 0.22); }
+  50% { box-shadow: 0 8px 20px rgba(66, 79, 209, 0.35), 0 0 0 4px rgba(66, 79, 209, 0.12); }
+}
+
+.el-hp-envelope {
+  width: 52px;
+  height: 40px;
+  border-radius: 8px;
+  background: #424fd1;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  box-shadow: 0 8px 20px rgba(66, 79, 209, 0.3);
+}
+
+.el-hp-node--mail.is-on .el-hp-envelope {
+  animation: el-hp-mail 1.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@keyframes el-hp-mail {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  40% { transform: translateY(-6px) rotate(-6deg); }
+  70% { transform: translateY(-2px) rotate(3deg); }
+}
+
+.el-hp-zero {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid rgba(30, 158, 85, 0.45);
+  background: rgba(30, 158, 85, 0.08);
+  color: #1e9e55;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.el-hp-node--fu.is-on .el-hp-zero {
+  animation: el-hp-zero 1.6s ease-in-out infinite;
+}
+
+@keyframes el-hp-zero {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(30, 158, 85, 0.25); }
+  50% { box-shadow: 0 0 0 8px rgba(30, 158, 85, 0); }
+}
+
+.el-hp-packet {
+  position: absolute;
+  top: 34px;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #424fd1;
+  box-shadow: 0 0 0 4px rgba(66, 79, 209, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 3;
+  transition: left 0.55s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s;
+}
+
+.el-hp-packet.is-on { opacity: 1; }
+
+.el-hero-stage-caption {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink-light);
+  letter-spacing: 0.01em;
+  position: relative;
+  z-index: 1;
+}
+
+.el-how--top {
+  padding-top: 40px;
+}
+
 .el-how {
   padding: 72px 0 88px;
 }
@@ -1475,6 +1800,11 @@
 }
 
 /* Dark */
+[data-theme="dark"] .el-hero-stage {
+  background: linear-gradient(160deg, #18181f, #14141c);
+  border-color: var(--line);
+}
+[data-theme="dark"] .el-hp-scan { background: #1c1c26; }
 [data-theme="dark"] .el-stage {
   background:
     radial-gradient(120% 80% at 10% 0%, rgba(66, 79, 209, 0.14), transparent 45%),
@@ -1501,6 +1831,10 @@
 [data-theme="dark"] .el-hopper { background: #1a1a24; }
 
 @media (max-width: 900px) {
+  .el-hero-grid { grid-template-columns: 1fr; gap: 28px; }
+  .el-hero-pipeline { min-height: 120px; }
+  .el-hp-node { width: 56px; }
+  .el-hp-node em { font-size: 0.6rem; }
   .el-layout { grid-template-columns: 1fr; }
   .el-steps {
     position: static;
@@ -1524,6 +1858,19 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .el-hero-in,
+  .el-hp-flash,
+  .el-hp-phone,
+  .el-hp-scan i,
+  .el-hp-vault,
+  .el-hp-envelope,
+  .el-hp-zero,
+  .el-hp-wire.is-lit::after,
+  .el-hp-packet {
+    animation: none !important;
+    transition: none !important;
+  }
+  .el-hero-in { opacity: 1; transform: none; }
   .el-media,
   .el-flash,
   .el-phone,

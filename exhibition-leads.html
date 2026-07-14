@@ -19,97 +19,53 @@
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none"><symbol id="logo-mark" viewBox="0 0 48 48"><line x1="8" y1="9.5" x2="24" y2="21.5" stroke="currentColor" stroke-width="3"/><line x1="40" y1="9.5" x2="24" y2="21.5" stroke="currentColor" stroke-width="3"/><line x1="24" y1="21.5" x2="24" y2="40" stroke="currentColor" stroke-width="3"/><circle cx="8" cy="9.5" r="5.2" fill="currentColor"/><circle cx="40" cy="9.5" r="5.2" fill="currentColor"/><circle cx="24" cy="40" r="5" fill="currentColor"/><circle cx="24" cy="21.5" r="6.3" fill="#424FD1"/></symbol></svg>
 <div id="ph-nav"></div>
 <main>
-  <section class="page-hero solution-hero">
-    <div class="container">
-      <a href="/services.html" class="solution-back">← Services</a>
-      <p class="kicker">Sales · Trade shows</p>
-      <h1>Card Capture &amp; Follow-Up Engine</h1>
-      <p class="lead">Snap a business card at the booth — it lands as a clean lead in your database. The moment it does, a personalized follow-up sequence starts from your own mailbox. From “met them at a show” to “started a real conversation” without anyone typing or chasing.</p>
-    </div>
-  </section>
-
-  <section class="section vs-section" id="earlier-vs-now" aria-label="Earlier versus now">
-    <div class="container">
-      <div class="vs-stage" id="vs-stage" data-state="earlier"
-        data-hint-earlier="Cards in a drawer · leads gone cold · follow-up forgotten"
-        data-hint-now="No typing · no cold leads · outreach that runs itself">
-        <div class="vs-header">
-          <div class="vs-tabs" role="tablist" aria-label="Compare modes">
-            <button type="button" class="vs-tab is-active" data-vs="earlier" role="tab" aria-selected="true">Earlier</button>
-            <button type="button" class="vs-tab" data-vs="now" role="tab" aria-selected="false">Now</button>
+  <section class="page-hero solution-hero el-hero" id="el-hero">
+    <div class="el-hero-wash" aria-hidden="true"></div>
+    <div class="container el-hero-grid">
+      <div class="el-hero-copy">
+        <a href="/services.html" class="solution-back el-hero-in" style="--hi:0">← Services</a>
+        <p class="kicker el-hero-in" style="--hi:1">Sales · Trade shows</p>
+        <h1 class="el-hero-in" style="--hi:2">Card Capture &amp; Follow-Up Engine</h1>
+        <p class="lead el-hero-in" style="--hi:3">Snap a business card at the booth — it lands as a clean lead in your database. The moment it does, a personalized follow-up sequence starts from your own mailbox. From “met them at a show” to “started a real conversation” without anyone typing or chasing.</p>
+        <p class="el-hero-cta el-hero-in" style="--hi:4"><a href="#el-how" class="btn btn-primary">Watch it run</a></p>
+      </div>
+      <div class="el-hero-stage el-hero-in" style="--hi:3" aria-hidden="true">
+        <div class="el-hero-pipeline" id="el-hero-pipeline">
+          <div class="el-hp-node el-hp-node--snap is-on" data-hp="0">
+            <div class="el-hp-phone">
+              <span class="el-hp-flash"></span>
+              <div class="el-hp-card"></div>
+            </div>
+            <em>Snap</em>
           </div>
-          <p class="vs-hint" id="vs-hint">Cards in a drawer · leads gone cold · follow-up forgotten</p>
-        </div>
-
-        <div class="vs-panels">
-          <div class="vs-panel vs-panel--earlier" data-panel="earlier">
-            <ul class="vs-flow vs-flow--manual">
-              <li style="--i:0"><span class="vs-icon">🗂</span><span>Stacks of cards in a pocket</span></li>
-              <li style="--i:1"><span class="vs-icon">⌨️</span><span>Type them up days later</span></li>
-              <li style="--i:2"><span class="vs-icon">❌</span><span>Typos, duplicates, missing fields</span></li>
-              <li style="--i:3"><span class="vs-icon">⏳</span><span>Follow-up waits until “someone has time”</span></li>
-              <li style="--i:4"><span class="vs-icon">❄️</span><span>Warm introductions go cold</span></li>
-              <li style="--i:5"><span class="vs-icon">❓</span><span>No record of who was messaged</span></li>
-            </ul>
-            <p class="vs-verdict vs-verdict--bad">Manual · delayed · leads freeze</p>
+          <span class="el-hp-wire" data-w="0"></span>
+          <div class="el-hp-node el-hp-node--read" data-hp="1">
+            <div class="el-hp-scan"><i></i></div>
+            <em>Read</em>
           </div>
-
-          <div class="vs-panel vs-panel--now" data-panel="now" hidden>
-            <ul class="vs-flow vs-flow--auto">
-              <li style="--i:0"><span class="vs-check">✓</span><span>Photo a card — name, title, company, email, phone, web extracted</span></li>
-              <li style="--i:1"><span class="vs-check">✓</span><span>Data cleaned &amp; de-duplicated against your database</span></li>
-              <li style="--i:2"><span class="vs-check">✓</span><span>Structured lead written in seconds</span></li>
-              <li style="--i:3"><span class="vs-check">✓</span><span>Industry-tailored intro fires from your mailbox</span></li>
-              <li style="--i:4"><span class="vs-check">✓</span><span>Timed nudges run on their own</span></li>
-              <li style="--i:5"><span class="vs-check">✓</span><span>Already-contacted people are skipped</span></li>
-            </ul>
-            <p class="vs-verdict vs-verdict--good">No typing · no cold leads · outreach that runs itself</p>
+          <span class="el-hp-wire" data-w="1"></span>
+          <div class="el-hp-node el-hp-node--db" data-hp="2">
+            <div class="el-hp-vault">DB</div>
+            <em>Database</em>
           </div>
+          <span class="el-hp-wire" data-w="2"></span>
+          <div class="el-hp-node el-hp-node--mail" data-hp="3">
+            <div class="el-hp-envelope">✉</div>
+            <em>Mail</em>
+          </div>
+          <span class="el-hp-wire" data-w="3"></span>
+          <div class="el-hp-node el-hp-node--fu" data-hp="4">
+            <div class="el-hp-zero">0</div>
+            <em>No lead lost</em>
+          </div>
+          <div class="el-hp-packet" id="el-hp-packet"></div>
         </div>
-
-        <div class="vs-morph" aria-hidden="true">
-          <div class="vs-morph-bar"></div>
-        </div>
+        <p class="el-hero-stage-caption">Photo &amp; PDF → database in seconds → customized follow-ups</p>
       </div>
     </div>
   </section>
 
-  <section class="section tint" id="capabilities">
-    <div class="container">
-      <div class="section-head reveal">
-        <p class="kicker">Two workflows · one system</p>
-        <h2>What we actually delivered.</h2>
-      </div>
-      <div class="cap-grid">
-        <article class="cap-card reveal" id="card-capture">
-          <h3>Card Capture</h3>
-          <p>Snap a photo of a business card. Name, title, company, email, phone, and website are read, cleaned, checked for duplicates, and written into your central database — no manual typing.</p>
-        </article>
-        <article class="cap-card reveal reveal-delay-1" id="follow-up-engine">
-          <h3>Follow-Up Engine</h3>
-          <p>When a lead lands — from a scanned card or your lead-scraping workflows — a personalized sequence starts from your own mailbox: an industry-aware intro, then timed nudges.</p>
-        </article>
-        <article class="cap-card reveal reveal-delay-1">
-          <h3>No duplicate mess</h3>
-          <p>New cards are matched against existing contacts before anything is saved, so the same person doesn’t appear twice in the system.</p>
-        </article>
-        <article class="cap-card reveal reveal-delay-2">
-          <h3>No double-messaging</h3>
-          <p>The follow-up engine tracks who has already been contacted. Nobody gets the same intro twice.</p>
-        </article>
-        <article class="cap-card reveal reveal-delay-2">
-          <h3>Built for exhibition floors</h3>
-          <p>Designed for exporters and manufacturers who live on trade shows — electronics, auto components, textiles, pharma, handicrafts — where cards pile up faster than teams can type.</p>
-        </article>
-        <article class="cap-card reveal reveal-delay-3">
-          <h3>End-to-end handoff</h3>
-          <p>Card Capture fills the database. The Follow-Up Engine works those leads. Together they close the gap between the booth handshake and a real conversation.</p>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <section class="section tint el-how" id="el-how" aria-label="How Card Capture and Follow-Up Engine work">
+  <section class="section tint el-how el-how--top" id="el-how" aria-label="How Card Capture and Follow-Up Engine work">
     <div class="container">
       <div class="el-how-head reveal">
         <p class="kicker">Watch it run</p>
@@ -353,6 +309,87 @@
           </div>
           <p class="el-caption" id="el-caption">Photos and PDFs drop in together — single cards or a bulk stack after a long show day.</p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section vs-section" id="earlier-vs-now" aria-label="Earlier versus now">
+    <div class="container">
+      <div class="vs-stage" id="vs-stage" data-state="earlier"
+        data-hint-earlier="Cards in a drawer · leads gone cold · follow-up forgotten"
+        data-hint-now="No typing · no cold leads · outreach that runs itself">
+        <div class="vs-header">
+          <div class="vs-tabs" role="tablist" aria-label="Compare modes">
+            <button type="button" class="vs-tab is-active" data-vs="earlier" role="tab" aria-selected="true">Earlier</button>
+            <button type="button" class="vs-tab" data-vs="now" role="tab" aria-selected="false">Now</button>
+          </div>
+          <p class="vs-hint" id="vs-hint">Cards in a drawer · leads gone cold · follow-up forgotten</p>
+        </div>
+
+        <div class="vs-panels">
+          <div class="vs-panel vs-panel--earlier" data-panel="earlier">
+            <ul class="vs-flow vs-flow--manual">
+              <li style="--i:0"><span class="vs-icon">🗂</span><span>Stacks of cards in a pocket</span></li>
+              <li style="--i:1"><span class="vs-icon">⌨️</span><span>Type them up days later</span></li>
+              <li style="--i:2"><span class="vs-icon">❌</span><span>Typos, duplicates, missing fields</span></li>
+              <li style="--i:3"><span class="vs-icon">⏳</span><span>Follow-up waits until “someone has time”</span></li>
+              <li style="--i:4"><span class="vs-icon">❄️</span><span>Warm introductions go cold</span></li>
+              <li style="--i:5"><span class="vs-icon">❓</span><span>No record of who was messaged</span></li>
+            </ul>
+            <p class="vs-verdict vs-verdict--bad">Manual · delayed · leads freeze</p>
+          </div>
+
+          <div class="vs-panel vs-panel--now" data-panel="now" hidden>
+            <ul class="vs-flow vs-flow--auto">
+              <li style="--i:0"><span class="vs-check">✓</span><span>Photo a card — name, title, company, email, phone, web extracted</span></li>
+              <li style="--i:1"><span class="vs-check">✓</span><span>Data cleaned &amp; de-duplicated against your database</span></li>
+              <li style="--i:2"><span class="vs-check">✓</span><span>Structured lead written in seconds</span></li>
+              <li style="--i:3"><span class="vs-check">✓</span><span>Industry-tailored intro fires from your mailbox</span></li>
+              <li style="--i:4"><span class="vs-check">✓</span><span>Timed nudges run on their own</span></li>
+              <li style="--i:5"><span class="vs-check">✓</span><span>Already-contacted people are skipped</span></li>
+            </ul>
+            <p class="vs-verdict vs-verdict--good">No typing · no cold leads · outreach that runs itself</p>
+          </div>
+        </div>
+
+        <div class="vs-morph" aria-hidden="true">
+          <div class="vs-morph-bar"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section tint" id="capabilities">
+    <div class="container">
+      <div class="section-head reveal">
+        <p class="kicker">Two workflows · one system</p>
+        <h2>What we actually delivered.</h2>
+      </div>
+      <div class="cap-grid">
+        <article class="cap-card reveal" id="card-capture">
+          <h3>Card Capture</h3>
+          <p>Snap a photo of a business card. Name, title, company, email, phone, and website are read, cleaned, checked for duplicates, and written into your central database — no manual typing.</p>
+        </article>
+        <article class="cap-card reveal reveal-delay-1" id="follow-up-engine">
+          <h3>Follow-Up Engine</h3>
+          <p>When a lead lands — from a scanned card or your lead-scraping workflows — a personalized sequence starts from your own mailbox: an industry-aware intro, then timed nudges.</p>
+        </article>
+        <article class="cap-card reveal reveal-delay-1">
+          <h3>No duplicate mess</h3>
+          <p>New cards are matched against existing contacts before anything is saved, so the same person doesn’t appear twice in the system.</p>
+        </article>
+        <article class="cap-card reveal reveal-delay-2">
+          <h3>No double-messaging</h3>
+          <p>The follow-up engine tracks who has already been contacted. Nobody gets the same intro twice.</p>
+        </article>
+        <article class="cap-card reveal reveal-delay-2">
+          <h3>Built for exhibition floors</h3>
+          <p>Designed for exporters and manufacturers who live on trade shows — electronics, auto components, textiles, pharma, handicrafts — where cards pile up faster than teams can type.</p>
+        </article>
+        <article class="cap-card reveal reveal-delay-3">
+          <h3>End-to-end handoff</h3>
+          <p>Card Capture fills the database. The Follow-Up Engine works those leads. Together they close the gap between the booth handshake and a real conversation.</p>
+        </article>
       </div>
     </div>
   </section>

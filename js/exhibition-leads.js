@@ -1,8 +1,69 @@
 (function () {
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* —— Hero opening pipeline —— */
+  (function initHeroPipeline() {
+    var pipe = document.getElementById('el-hero-pipeline');
+    if (!pipe) return;
+    var nodes = Array.prototype.slice.call(pipe.querySelectorAll('.el-hp-node'));
+    var wires = Array.prototype.slice.call(pipe.querySelectorAll('.el-hp-wire'));
+    var packet = document.getElementById('el-hp-packet');
+    var idx = 0;
+    var timer = null;
+
+    function positions() {
+      return nodes.map(function (n) {
+        var r = n.getBoundingClientRect();
+        var pr = pipe.getBoundingClientRect();
+        return r.left - pr.left + r.width / 2 - 5;
+      });
+    }
+
+    function setStep(i) {
+      nodes.forEach(function (n, j) {
+        n.classList.toggle('is-on', j === i);
+        n.classList.toggle('is-done', j < i);
+      });
+      wires.forEach(function (w, j) {
+        w.classList.toggle('is-lit', j < i);
+      });
+      if (packet && !reduceMotion) {
+        var xs = positions();
+        packet.classList.add('is-on');
+        packet.style.left = (xs[i] || 0) + 'px';
+      }
+    }
+
+    function tick() {
+      setStep(idx);
+      idx = (idx + 1) % nodes.length;
+      if (idx === 0) {
+        wires.forEach(function (w) { w.classList.remove('is-lit'); });
+        nodes.forEach(function (n) { n.classList.remove('is-done'); });
+      }
+    }
+
+    if (reduceMotion) {
+      nodes.forEach(function (n) { n.classList.add('is-on', 'is-done'); });
+      wires.forEach(function (w) { w.classList.add('is-lit'); });
+      return;
+    }
+
+    tick();
+    timer = window.setInterval(tick, 1100);
+
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        if (timer) { window.clearInterval(timer); timer = null; }
+      } else if (!timer) {
+        timer = window.setInterval(tick, 1100);
+      }
+    });
+  })();
+
   var root = document.getElementById('el-how');
   if (!root) return;
 
-  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var steps = Array.prototype.slice.call(root.querySelectorAll('.el-step'));
   var panels = Array.prototype.slice.call(root.querySelectorAll('.el-panel'));
   var caption = document.getElementById('el-caption');
@@ -471,16 +532,29 @@
 
   applyState(0);
 
+  function startAutoplay() {
+    if (reduceMotion) return;
+    auto = true;
+    scheduleNext();
+  }
+
   if (!reduceMotion && 'IntersectionObserver' in window) {
     var seen = false;
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         if (!entry.isIntersecting || seen) return;
         seen = true;
-        auto = true;
-        scheduleNext();
+        startAutoplay();
       });
-    }, { threshold: 0.35 });
+    }, { threshold: 0.2 });
     io.observe(root);
+    // Above the fold after reorder — kick off soon if already visible
+    window.requestAnimationFrame(function () {
+      var rect = root.getBoundingClientRect();
+      if (!seen && rect.top < window.innerHeight * 0.85 && rect.bottom > 80) {
+        seen = true;
+        startAutoplay();
+      }
+    });
   }
 })();
