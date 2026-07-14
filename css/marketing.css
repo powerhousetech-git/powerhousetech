@@ -108,6 +108,12 @@ h3{font-size:1.1rem;font-weight:700;letter-spacing:-0.01em}
 }
 .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.08rem;letter-spacing:-0.02em;color:var(--ink)}
 .brand svg{color:var(--ink)}
+[data-theme="dark"] .brand{
+  background:#FAFAF8;color:#16161A;
+  padding:6px 12px 6px 8px;border-radius:10px;
+  box-shadow:0 1px 0 rgba(255,255,255,.06),0 8px 20px rgba(0,0,0,.25);
+}
+[data-theme="dark"] .brand svg{color:#16161A;filter:none}
 .nav-links{display:flex;gap:30px;align-items:center}
 .nav-links a{font-size:.92rem;font-weight:500;color:var(--ink-mid);transition:color .15s}
 .nav-links a:hover{color:var(--teal)}
@@ -385,9 +391,42 @@ h3{font-size:1.1rem;font-weight:700;letter-spacing:-0.01em}
 }
 .practice-square{
   background:var(--white);border:1px solid var(--line);border-radius:var(--radius-md);
-  padding:26px 22px;aspect-ratio:1 / 1;min-height:180px;
-  display:flex;flex-direction:column;justify-content:flex-end;gap:8px;
+  padding:26px 22px;min-height:140px;
+  display:flex;flex-direction:column;justify-content:flex-start;gap:8px;
   box-shadow:var(--shadow-sm);
+}
+.home-custom-lead{
+  margin-bottom:18px;padding:32px 32px 28px;
+}
+.home-custom-lead h2{font-size:clamp(1.5rem,2.6vw,1.9rem);margin-bottom:10px}
+.home-custom-lead p{margin-bottom:0;max-width:560px}
+.page-hero--tight{padding-bottom:28px}
+.section--tight-top{padding-top:40px}
+
+/* 4-step engagement motion */
+.steps-track{position:relative}
+.steps-progress{
+  display:none;height:3px;background:var(--line);border-radius:2px;margin:0 12px 22px;overflow:hidden;
+}
+@media(min-width:900px){
+  .steps-progress{display:block}
+}
+.steps-progress > span{
+  display:block;height:100%;width:0%;background:linear-gradient(90deg,#424fd1,#6b7ae8);
+  border-radius:2px;transition:width .55s cubic-bezier(0.22,1,0.36,1);
+}
+.steps-4 .step-card{
+  transition:opacity .35s ease, transform .35s cubic-bezier(0.22,1,0.36,1), border-color .35s, box-shadow .35s;
+}
+.steps-track.is-playing .step-card{opacity:.42;transform:translateY(4px)}
+.steps-track.is-playing .step-card.is-done{opacity:.85;transform:none}
+.steps-track.is-playing .step-card.is-live{
+  opacity:1;transform:translateY(0);
+  border-color:rgba(66,79,209,.4);
+  box-shadow:0 10px 28px rgba(66,79,209,.12);
+}
+.steps-track.is-playing .step-card.is-live .step-num{
+  color:var(--teal);transform:scale(1.06);
 }
 .practice-square h3{font-size:1.05rem;margin:0}
 .practice-square p{font-size:.88rem;color:var(--ink-mid);line-height:1.5;margin:0}

@@ -257,16 +257,21 @@ body.landing-visible {
   border-bottom-color: rgba(255, 255, 255, 0.06);
 }
 
-/* Logo: keep brand indigo, stay readable on dark surfaces */
+/* Logo: exact light-mode colors on a light plate in dark mode */
+[data-theme="dark"] #landing .brand,
+[data-theme="dark"] .marketing-site .brand,
+[data-theme="dark"] .brand {
+  background: #FAFAF8;
+  color: #16161A;
+  padding: 6px 12px 6px 8px;
+  border-radius: 10px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 20px rgba(0, 0, 0, 0.25);
+}
 [data-theme="dark"] #landing .brand svg,
 [data-theme="dark"] .marketing-site .brand svg,
 [data-theme="dark"] .brand svg {
-  color: #6B7AE8;
-  filter: drop-shadow(0 0 8px rgba(66, 79, 209, 0.55));
-}
-[data-theme="dark"] #landing .brand,
-[data-theme="dark"] .marketing-site .brand {
-  color: #F6F6F9;
+  color: #16161A;
+  filter: none;
 }
 
 [data-theme="dark"] #landing .service-card,
