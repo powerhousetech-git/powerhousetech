@@ -77,7 +77,7 @@
       '<header class="nav">' +
       '<div class="nav-inner">' +
       '<a href="/" class="brand" aria-label="Powerhouse home">' +
-      '<svg width="28" height="28" aria-hidden="true"><use href="#logo-mark"/></svg>Powerhouse</a>' +
+      '<span class="brand-mark" aria-hidden="true"><svg width="22" height="22"><use href="#logo-mark"/></svg></span>Powerhouse</a>' +
       '<nav class="nav-links" aria-label="Primary">' + desktop + '</nav>' +
       '<div class="nav-right">' +
       THEME_TOGGLE_HTML +
@@ -96,7 +96,7 @@
     el.innerHTML =
       '<footer class="footer"><div class="container">' +
       '<div class="footer-grid">' +
-      '<div class="footer-brand"><a href="/" class="brand" style="font-size:.95rem"><svg width="22" height="22"><use href="#logo-mark"/></svg> Powerhouse</a>' +
+      '<div class="footer-brand"><a href="/" class="brand" style="font-size:.95rem"><span class="brand-mark" aria-hidden="true"><svg width="18" height="18"><use href="#logo-mark"/></svg></span>Powerhouse</a>' +
       '<p>An automation studio for global teams. We design, build and run the workflows behind your business.</p></div>' +
       '<nav class="footer-col"><h4>Company</h4><ul>' +
       '<li><a href="/services.html">Services</a></li>' +
