@@ -50,6 +50,7 @@
 [data-theme="dark"] .theme-toggle .icon-moon{display:block}
 [data-theme="dark"] .theme-toggle{background:var(--surface-raised)}
 [data-theme="dark"] .btn-ghost{border-color:var(--line);color:var(--ink)}
+[data-theme="dark"] .industry-card,
 [data-theme="dark"] .featured-card{background:#12121A}
 [data-theme="dark"] .loom-card{background:var(--surface-raised)}
 [data-theme="dark"] .contact-card{background:var(--surface-raised)}
@@ -59,7 +60,7 @@
 [data-theme="dark"] .calendly-placeholder{background:var(--surface-raised);border-color:var(--line)}
 [data-theme="dark"] .steps-panel{background:var(--surface-raised);border-color:var(--line)}
 [data-theme="dark"] .mini-card.soon{background:transparent;border-color:var(--line)}
-@media(max-width:1079px){.hero-inner{grid-template-columns:1fr}.cards-4,.steps-4{grid-template-columns:repeat(2,1fr)}.why-panel{grid-template-columns:1fr;padding:40px 32px}.industries-grid{grid-template-columns:1fr}.metrics-band{grid-template-columns:1fr}.practice-block ul{grid-template-columns:1fr}}
+@media(max-width:1079px){.hero-inner{grid-template-columns:1fr}.cards-4,.steps-4{grid-template-columns:repeat(2,1fr)}.why-panel{grid-template-columns:1fr;padding:40px 32px}.industries-grid,.industry-grid{grid-template-columns:1fr 1fr}.systems-grid{grid-template-columns:1fr !important}.metrics-band{grid-template-columns:1fr}.practice-block ul{grid-template-columns:1fr}}
 @media(max-width:900px){
   .nav-links{display:none}
   .nav-right .nav-cta{display:none}
@@ -70,8 +71,8 @@
 @media(max-width:767px){
   .hero{padding:72px 0 0}
   .hero--brand .trust-band{margin-top:48px}
-  .cards-4,.steps-4,.cards-3{grid-template-columns:1fr}
-  .mini-grid{grid-template-columns:1fr}
+  .cards-4,.steps-4,.cards-3,.industry-grid,.mini-grid,.home-industries{grid-template-columns:1fr}
+  .mini-grid{grid-template-rows:none}
   .section{padding:64px 0}
   .cta-band{padding:48px 24px}
   .mobile-cta{display:block}
@@ -80,6 +81,7 @@
   .footer-grid{grid-template-columns:1fr}
   .page-hero{padding:72px 0 40px}
   .cap-grid{grid-template-columns:1fr}
+  .home-systems-note{font-size:.88rem}
 }
 @media(max-width:480px){
   .nav-inner{padding:0 16px}

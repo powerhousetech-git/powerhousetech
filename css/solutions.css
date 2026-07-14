@@ -6,6 +6,11 @@
   gap: 24px;
   max-width: 640px;
 }
+.systems-grid {
+  max-width: none;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
 .solution-card {
   display: block;
   background: var(--white);
@@ -353,6 +358,7 @@
   .pipeline li { grid-template-columns: 44px 1fr; }
   .pipeline li > span:last-child { grid-column: 2; }
   .impact-panel { grid-template-columns: 1fr; gap: 28px; padding: 36px 28px; }
+  .systems-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 767px) {
