@@ -53,6 +53,12 @@
 [data-theme="dark"] .practice-square,
 [data-theme="dark"] .ready-card,
 [data-theme="dark"] .step-card{background:var(--surface-raised,#18181f);border-color:var(--line)}
+[data-theme="dark"] .ready-card--lift{
+  background:#FAFAF8;border-color:transparent;color:#16161A;
+}
+[data-theme="dark"] .ready-card--lift h2,
+[data-theme="dark"] .ready-card--lift li{color:#16161A}
+[data-theme="dark"] .ready-card--lift > p{color:#5c5c66}
 [data-theme="dark"] .custom-lead{
   background:linear-gradient(145deg,#101018 0%,#171722 55%,#14141c 100%);
   border-color:rgba(66,79,209,.4);

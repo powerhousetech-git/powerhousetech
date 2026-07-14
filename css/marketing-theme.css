@@ -49,6 +49,19 @@ body.landing-visible {
 .marketing-site .brand {
   font-weight: 700;
   font-size: 1.02rem;
+  /* Identical lockup in light + dark — no theme-dependent padding */
+  color: #16161A;
+  background: #FAFAF8;
+  padding: 6px 12px 6px 8px;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(22, 22, 26, 0.06);
+  line-height: 1;
+}
+#landing .brand svg,
+.marketing-site .brand svg {
+  color: #16161A;
+  display: block;
+  flex-shrink: 0;
 }
 #landing .nav-cta.btn-primary,
 .marketing-site .nav-cta.btn-primary {
@@ -257,15 +270,13 @@ body.landing-visible {
   border-bottom-color: rgba(255, 255, 255, 0.06);
 }
 
-/* Logo: exact light-mode colors on a light plate in dark mode */
+/* Logo lockup is theme-stable — do not retint or resize in dark mode */
 [data-theme="dark"] #landing .brand,
 [data-theme="dark"] .marketing-site .brand,
 [data-theme="dark"] .brand {
   background: #FAFAF8;
   color: #16161A;
-  padding: 6px 12px 6px 8px;
-  border-radius: 10px;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 2px rgba(22, 22, 26, 0.06), 0 6px 18px rgba(0, 0, 0, 0.28);
 }
 [data-theme="dark"] #landing .brand svg,
 [data-theme="dark"] .marketing-site .brand svg,

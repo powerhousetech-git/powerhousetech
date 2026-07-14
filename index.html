@@ -150,17 +150,8 @@ h3{font-size:1.1rem;font-weight:700;letter-spacing:-0.01em}
   max-width:1160px;margin:0 auto;padding:0 24px;height:68px;
   display:flex;align-items:center;justify-content:space-between;gap:24px;
 }
-.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.08rem;letter-spacing:-0.02em;color:var(--ink)}
-.brand svg{color:var(--ink)}
-/* Dark mode: keep exact light-mode logo colors on a light plate */
-[data-theme="dark"] .brand{
-  background:#FAFAF8;color:#16161A;
-  padding:6px 12px 6px 8px;border-radius:10px;
-  box-shadow:0 1px 0 rgba(255,255,255,.06),0 8px 20px rgba(0,0,0,.25);
-}
-[data-theme="dark"] .brand svg{
-  color:#16161A;filter:none;
-}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.08rem;letter-spacing:-0.02em;color:#16161A;background:#FAFAF8;padding:6px 12px 6px 8px;border-radius:10px;box-shadow:0 1px 2px rgba(22,22,26,.06);line-height:1}
+.brand svg{color:#16161A;display:block;flex-shrink:0}
 .nav-links{display:flex;gap:30px;align-items:center}
 .nav-links a{font-size:.92rem;font-weight:500;color:var(--ink-mid);transition:color .15s}
 .nav-links a:hover{color:var(--teal)}
@@ -1661,9 +1652,6 @@ body.landing-visible .theme-toggle-fixed{
         <div class="section-head">
           <p class="kicker">What we do</p>
           <h2>Custom workflows for custom problems.</h2>
-          <p style="font-size:1rem;color:var(--ink-mid);max-width:620px;margin-top:12px;line-height:1.65">
-            Your ops aren’t off-the-shelf — neither are the automations. We design around how your team actually works, then run them with you.
-          </p>
         </div>
         <a href="/services.html" class="section-link">All services →</a>
       </div>
