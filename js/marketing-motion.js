@@ -8,7 +8,7 @@
   function initEngagementSteps() {
     var track = document.getElementById('steps-track');
     if (!track) return;
-    var section = document.getElementById('how-it-works') || track;
+    var cardsRow = document.getElementById('engagement-steps') || track;
     var cards = Array.prototype.slice.call(track.querySelectorAll('.step-card'));
     var fill = document.getElementById('steps-progress-fill');
     if (!cards.length) return;
@@ -26,7 +26,7 @@
 
     function paint(progress) {
       var p = Math.min(1, Math.max(0, progress));
-      if (Math.abs(p - lastP) < 0.004) return;
+      if (Math.abs(p - lastP) < 0.003) return;
       lastP = p;
 
       track.classList.add('is-scrolled');
@@ -41,14 +41,31 @@
     }
 
     function measure() {
-      var rect = section.getBoundingClientRect();
+      var rect = track.getBoundingClientRect();
       var vh = window.innerHeight || 1;
-      // Fill while the full step row is still on screen:
-      // starts as the section settles into view, finishes before it exits.
-      var start = vh * 0.72;
-      var end = vh * 0.22;
-      var raw = (start - rect.top) / (start - end);
-      paint(raw);
+      var h = Math.max(rect.height, cardsRow.getBoundingClientRect().height || 0);
+      // Keep the progress scrub inside the window where the full
+      // progress line + all four cards can sit on screen together.
+      var margin = Math.min(88, Math.max(48, vh * 0.1));
+      var topWhenFullyIn = vh - margin - h;
+      var topWhenLeaving = margin;
+      var start;
+      var end;
+
+      if (topWhenFullyIn > topWhenLeaving + 48) {
+        // Start once the whole row is visible; finish with cards
+        // still well inside the viewport (not at the clip edge).
+        var span = topWhenFullyIn - topWhenLeaving;
+        start = topWhenFullyIn - span * 0.08;
+        end = topWhenLeaving + span * 0.38;
+      } else {
+        // Short viewports: scrub while the row is centered.
+        start = Math.min(vh * 0.62, vh - h * 0.35);
+        end = Math.max(vh * 0.28, margin);
+        if (start <= end) start = end + Math.min(160, vh * 0.2);
+      }
+
+      paint((start - rect.top) / (start - end));
       ticking = false;
     }
 
