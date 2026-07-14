@@ -22,21 +22,24 @@
     }
 
     var lastP = -1;
+    var lastIdx = -1;
     var ticking = false;
 
     function paint(progress) {
       var p = Math.min(1, Math.max(0, progress));
-      if (Math.abs(p - lastP) < 0.003) return;
+      var max = cards.length - 1;
+      // Match highlight to bar quarters: 01→25%, 02→50%, 03→75%, 04→100%.
+      var idx = p >= 0.999 ? max : Math.min(max, Math.floor(p * cards.length));
+      if (Math.abs(p - lastP) < 0.002 && idx === lastIdx) return;
       lastP = p;
+      lastIdx = idx;
 
       track.classList.add('is-scrolled');
       if (fill) fill.style.width = (p * 100) + '%';
 
-      var max = cards.length - 1;
-      var idx = Math.min(max, Math.round(p * max));
       cards.forEach(function (c, n) {
         c.classList.toggle('is-live', n === idx);
-        c.classList.toggle('is-done', n < idx || p >= 0.98);
+        c.classList.toggle('is-done', n < idx || (p >= 0.999 && n === idx));
       });
     }
 

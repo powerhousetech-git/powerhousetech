@@ -355,17 +355,25 @@ h3{font-size:1.1rem;font-weight:700;letter-spacing:-0.01em}
   border-radius:2px;will-change:width;
 }
 .steps-4 .step-card{
-  transition:border-color .35s ease, box-shadow .35s ease, transform .35s cubic-bezier(0.22,1,0.36,1);
+  transition:opacity .35s ease, border-color .35s ease, box-shadow .35s ease, transform .35s cubic-bezier(0.22,1,0.36,1);
 }
-/* Keep all four readable — only lift the active step */
-.steps-track.is-scrolled .step-card{opacity:1;transform:none}
+/* All four stay readable; active step clearly follows the bar */
+.steps-track.is-scrolled .step-card{
+  opacity:.58;transform:none;
+  border-color:var(--line);box-shadow:none;
+}
+.steps-track.is-scrolled .step-card.is-done{
+  opacity:.88;
+}
+.steps-track.is-scrolled .step-card.is-done .step-num{color:var(--teal)}
 .steps-track.is-scrolled .step-card.is-live{
-  border-color:rgba(66,79,209,.45);
-  box-shadow:0 12px 28px rgba(66,79,209,.14);
-  transform:translateY(-2px);
+  opacity:1;
+  border-color:rgba(66,79,209,.55);
+  box-shadow:0 14px 34px rgba(66,79,209,.22);
+  transform:translateY(-5px);
 }
 .steps-track.is-scrolled .step-card.is-live .step-num{color:var(--teal)}
-.steps-track.is-scrolled .step-card.is-done .step-num{color:var(--teal)}
+.steps-track.is-scrolled .step-card.is-live h3{color:var(--teal-dark,#424fd1)}
 
 .metrics-band{
   display:grid;grid-template-columns:repeat(3,1fr);gap:24px;
