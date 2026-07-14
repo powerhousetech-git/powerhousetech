@@ -8,65 +8,59 @@
   function initEngagementSteps() {
     var track = document.getElementById('steps-track');
     if (!track) return;
+    var section = document.getElementById('how-it-works') || track;
     var cards = Array.prototype.slice.call(track.querySelectorAll('.step-card'));
     var fill = document.getElementById('steps-progress-fill');
     if (!cards.length) return;
 
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduce) {
-      cards.forEach(function (c) { c.classList.add('is-done'); });
+      cards.forEach(function (c) { c.classList.add('is-done', 'is-live'); });
       if (fill) fill.style.width = '100%';
+      track.classList.add('is-scrolled');
       return;
     }
 
-    var idx = 0;
-    var timer = null;
-    var started = false;
+    var lastP = -1;
+    var ticking = false;
 
-    function paint(i) {
+    function paint(progress) {
+      var p = Math.min(1, Math.max(0, progress));
+      if (Math.abs(p - lastP) < 0.004) return;
+      lastP = p;
+
+      track.classList.add('is-scrolled');
+      if (fill) fill.style.width = (p * 100) + '%';
+
+      var max = cards.length - 1;
+      var idx = Math.min(max, Math.round(p * max));
       cards.forEach(function (c, n) {
-        c.classList.toggle('is-live', n === i);
-        c.classList.toggle('is-done', n < i);
+        c.classList.toggle('is-live', n === idx);
+        c.classList.toggle('is-done', n < idx || p >= 0.98);
       });
-      if (fill) {
-        fill.style.width = ((i / Math.max(1, cards.length - 1)) * 100) + '%';
-      }
     }
 
-    function tick() {
-      paint(idx);
-      idx = (idx + 1) % cards.length;
+    function measure() {
+      var rect = section.getBoundingClientRect();
+      var vh = window.innerHeight || 1;
+      // Fill while the full step row is still on screen:
+      // starts as the section settles into view, finishes before it exits.
+      var start = vh * 0.72;
+      var end = vh * 0.22;
+      var raw = (start - rect.top) / (start - end);
+      paint(raw);
+      ticking = false;
     }
 
-    function start() {
-      if (started) return;
-      started = true;
-      track.classList.add('is-playing');
-      tick();
-      timer = window.setInterval(tick, 1600);
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(measure);
     }
 
-    if ('IntersectionObserver' in window) {
-      var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (e) {
-          if (e.isIntersecting) {
-            start();
-            io.disconnect();
-          }
-        });
-      }, { threshold: 0.35 });
-      io.observe(track);
-    } else {
-      start();
-    }
-
-    document.addEventListener('visibilitychange', function () {
-      if (document.hidden) {
-        if (timer) { window.clearInterval(timer); timer = null; }
-      } else if (started && !timer) {
-        timer = window.setInterval(tick, 1600);
-      }
-    });
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    measure();
   }
 
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
