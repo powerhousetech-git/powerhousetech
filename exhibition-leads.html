@@ -150,24 +150,50 @@
 
         <div>
           <div class="el-stage" aria-live="polite">
+            <div class="el-stage-atmosphere" aria-hidden="true"></div>
             <div class="el-stage-inner">
-              <!-- CAPTURE -->
+              <!-- CAPTURE: phone snap + rain into hopper + conveyor -->
               <div class="el-panel is-active" data-phase="capture">
-                <div class="el-capture-board">
-                  <div class="el-dropzone" aria-hidden="true">
-                    <div class="el-dropzone-label">Booth intake</div>
-                    <div class="el-media el-media--1"><div class="el-card-face"></div></div>
-                    <div class="el-media el-media--2"><div class="el-pdf-face">PDF</div></div>
-                    <div class="el-media el-media--3"><div class="el-card-face"></div></div>
-                    <div class="el-media el-media--4"><div class="el-card-face"></div></div>
-                    <div class="el-media el-media--5"><div class="el-pdf-face">PDF</div></div>
+                <div class="el-capture-board el-capture-board--v2">
+                  <div class="el-intake" aria-hidden="true">
+                    <div class="el-phone">
+                      <div class="el-phone-notch"></div>
+                      <div class="el-phone-screen">
+                        <div class="el-phone-viewfinder">
+                          <div class="el-vf-card"></div>
+                          <span class="el-vf-corner el-vf-corner--tl"></span>
+                          <span class="el-vf-corner el-vf-corner--tr"></span>
+                          <span class="el-vf-corner el-vf-corner--bl"></span>
+                          <span class="el-vf-corner el-vf-corner--br"></span>
+                        </div>
+                        <div class="el-shutter"></div>
+                      </div>
+                      <div class="el-flash"></div>
+                    </div>
+                    <div class="el-rain" id="el-rain">
+                      <div class="el-media el-media--1" style="--i:0"><div class="el-card-face"></div><span>PHOTO</span></div>
+                      <div class="el-media el-media--2" style="--i:1"><div class="el-pdf-face">PDF</div><span>SCAN</span></div>
+                      <div class="el-media el-media--3" style="--i:2"><div class="el-card-face"></div><span>PHOTO</span></div>
+                      <div class="el-media el-media--4" style="--i:3"><div class="el-pdf-face">PDF</div><span>BULK</span></div>
+                      <div class="el-media el-media--5" style="--i:4"><div class="el-card-face"></div><span>PHOTO</span></div>
+                      <div class="el-media el-media--6" style="--i:5"><div class="el-pdf-face">PDF</div><span>ZIP</span></div>
+                    </div>
+                    <div class="el-hopper">
+                      <div class="el-hopper-lid">Bulk intake</div>
+                      <div class="el-belt">
+                        <div class="el-belt-track"></div>
+                        <div class="el-belt-item el-belt-item--1"></div>
+                        <div class="el-belt-item el-belt-item--2"></div>
+                        <div class="el-belt-item el-belt-item--3"></div>
+                      </div>
+                    </div>
                   </div>
                   <div class="el-bulk-meter">
-                    <div>
+                    <div class="el-meter-ring" aria-hidden="true">
+                      <svg viewBox="0 0 80 80"><circle class="el-ring-bg" cx="40" cy="40" r="34"/><circle class="el-ring-fg" cx="40" cy="40" r="34" id="el-ring-fg"/></svg>
                       <div class="big"><span id="el-bulk-count">0</span></div>
-                      <div class="sub">cards &amp; PDFs queued from today’s show — single snaps or bulk upload, both handled.</div>
                     </div>
-                    <div class="el-bulk-bar" aria-hidden="true"><span></span></div>
+                    <div class="sub">cards &amp; PDFs queued — single snaps or a post-show bulk dump. All managed.</div>
                     <div class="el-chip-row">
                       <span class="el-chip">Photo</span>
                       <span class="el-chip el-chip--pdf">PDF</span>
@@ -177,92 +203,149 @@
                 </div>
               </div>
 
-              <!-- READ -->
+              <!-- READ: OCR beam + floating glyphs + field extract -->
               <div class="el-panel" data-phase="read">
-                <div class="el-read-board">
-                  <div class="el-scan-card" aria-hidden="true">
-                    <div class="el-dropzone-label">Reading card</div>
-                    <div class="el-scan-beam"></div>
-                    <div class="el-scan-lines">
-                      <div class="el-scan-line is-found" style="--w:78%"></div>
-                      <div class="el-scan-line is-found" style="--w:62%"></div>
-                      <div class="el-scan-line is-found" style="--w:84%"></div>
-                      <div class="el-scan-line is-found" style="--w:54%"></div>
-                      <div class="el-scan-line is-found" style="--w:70%"></div>
+                <div class="el-read-board el-read-board--v2">
+                  <div class="el-ocr" aria-hidden="true">
+                    <div class="el-ocr-label">Reading · OCR</div>
+                    <div class="el-ocr-stack">
+                      <div class="el-ocr-card el-ocr-card--back"></div>
+                      <div class="el-ocr-card el-ocr-card--mid"></div>
+                      <div class="el-ocr-card el-ocr-card--front">
+                        <div class="el-ocr-text">
+                          <span>PRIYA MENON</span>
+                          <span>Procurement Lead</span>
+                          <span>Orbit PCB Exports</span>
+                          <span>priya@orbitpcb.com</span>
+                        </div>
+                        <div class="el-scan-beam"></div>
+                        <div class="el-ocr-grid"></div>
+                      </div>
+                    </div>
+                    <div class="el-ocr-particles" id="el-ocr-particles">
+                      <i style="--x:18%;--y:30%;--d:0s"></i>
+                      <i style="--x:42%;--y:22%;--d:.2s"></i>
+                      <i style="--x:68%;--y:38%;--d:.4s"></i>
+                      <i style="--x:28%;--y:58%;--d:.15s"></i>
+                      <i style="--x:55%;--y:62%;--d:.35s"></i>
+                      <i style="--x:78%;--y:52%;--d:.5s"></i>
                     </div>
                   </div>
-                  <div class="el-fields">
-                    <div class="el-field" style="--d:.1s"><div class="k">Name</div><div class="v">Priya Menon</div></div>
-                    <div class="el-field" style="--d:.22s"><div class="k">Title</div><div class="v">Procurement Lead</div></div>
-                    <div class="el-field" style="--d:.34s"><div class="k">Company</div><div class="v">Orbit PCB Exports</div></div>
-                    <div class="el-field" style="--d:.46s"><div class="k">Email · Phone</div><div class="v">priya@orbitpcb.com · +91…</div></div>
-                    <div class="el-field" style="--d:.58s"><div class="k">Website</div><div class="v">orbitpcb.com</div></div>
+                  <div class="el-fields" id="el-fields">
+                    <div class="el-field" data-field="0"><div class="k">Name</div><div class="v" data-type></div></div>
+                    <div class="el-field" data-field="1"><div class="k">Title</div><div class="v" data-type></div></div>
+                    <div class="el-field" data-field="2"><div class="k">Company</div><div class="v" data-type></div></div>
+                    <div class="el-field" data-field="3"><div class="k">Email · Phone</div><div class="v" data-type></div></div>
+                    <div class="el-field" data-field="4"><div class="k">Website</div><div class="v" data-type></div></div>
                   </div>
                 </div>
               </div>
 
-              <!-- DATABASE -->
+              <!-- DATABASE: funnel nodes into vault + seconds -->
               <div class="el-panel" data-phase="database">
-                <div class="el-db">
-                  <div class="el-db-head">
-                    <strong>Lead database</strong>
-                    <span class="tick">Synced in &lt; <span id="el-db-seconds">0</span>s</span>
-                  </div>
-                  <table>
-                    <thead>
-                      <tr><th scope="col">Contact</th><th scope="col">Company</th><th scope="col">Source</th><th scope="col">Status</th></tr>
-                    </thead>
-                    <tbody id="el-db-rows">
-                      <tr><td>Priya Menon</td><td>Orbit PCB</td><td>Photo</td><td><span class="el-pill el-pill--new">New</span></td></tr>
-                      <tr><td>James Okonkwo</td><td>Aether Auto</td><td>PDF</td><td><span class="el-pill el-pill--new">New</span></td></tr>
-                      <tr><td>Neha Kapoor</td><td>Loom Textiles</td><td>Bulk</td><td><span class="el-pill el-pill--ok">De-duped</span></td></tr>
-                      <tr><td>Marco Silva</td><td>PharmaVista</td><td>Photo</td><td><span class="el-pill el-pill--new">New</span></td></tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div class="el-db-stats">
-                  <div class="el-stat"><div class="lab">In database</div><div class="val" id="el-db-count">0</div></div>
-                  <div class="el-stat"><div class="lab">Duplicates skipped</div><div class="val">3</div></div>
-                  <div class="el-stat"><div class="lab">Leads lost</div><div class="val is-green" id="el-db-lost">0</div></div>
-                </div>
-              </div>
-
-              <!-- MAIL -->
-              <div class="el-panel" data-phase="mail">
-                <div class="el-mail-board">
-                  <div class="el-send-flash" aria-hidden="true"></div>
-                  <div class="el-mail-compose">
-                    <div class="from">From your mailbox · customized per client</div>
-                    <div class="to">Priya Menon · Orbit PCB Exports</div>
-                    <div class="subject">Great meeting you at Electronica — PCB supply</div>
-                    <div class="body">Hi Priya — following up from our booth conversation on your electronics line. Happy to share the spec sheet we mentioned…</div>
-                    <div class="el-custom-tags" aria-hidden="true">
-                      <span style="--d:.1s">Electronics / PCB</span>
-                      <span style="--d:.25s">Auto components</span>
-                      <span style="--d:.4s">Textiles</span>
-                      <span style="--d:.55s">Pharma</span>
+                <div class="el-db-board">
+                  <div class="el-funnel" aria-hidden="true">
+                    <div class="el-node el-node--1">P</div>
+                    <div class="el-node el-node--2">J</div>
+                    <div class="el-node el-node--3">N</div>
+                    <div class="el-node el-node--4">M</div>
+                    <div class="el-node el-node--5">A</div>
+                    <svg class="el-funnel-paths" viewBox="0 0 200 160" preserveAspectRatio="none">
+                      <path d="M30 20 C30 80, 100 90, 100 140"/>
+                      <path d="M70 10 C70 70, 100 90, 100 140"/>
+                      <path d="M100 5 C100 70, 100 90, 100 140"/>
+                      <path d="M130 12 C130 70, 100 90, 100 140"/>
+                      <path d="M170 22 C170 80, 100 90, 100 140"/>
+                    </svg>
+                    <div class="el-vault">
+                      <div class="el-vault-lid"></div>
+                      <div class="el-vault-body">
+                        <span class="el-vault-pulse"></span>
+                        DB
+                      </div>
+                    </div>
+                    <div class="el-seconds-badge">
+                      <span id="el-db-seconds">0</span><small>sec</small>
                     </div>
                   </div>
-                  <div class="el-envelope el-envelope--1" aria-hidden="true">✉</div>
-                  <div class="el-envelope el-envelope--2" aria-hidden="true">✉</div>
-                  <div class="el-envelope el-envelope--3" aria-hidden="true">✉</div>
+                  <div class="el-db">
+                    <div class="el-db-head">
+                      <strong>Lead database</strong>
+                      <span class="tick" id="el-db-tick">Writing…</span>
+                    </div>
+                    <table>
+                      <thead>
+                        <tr><th scope="col">Contact</th><th scope="col">Company</th><th scope="col">Source</th><th scope="col">Status</th></tr>
+                      </thead>
+                      <tbody id="el-db-rows">
+                        <tr><td>Priya Menon</td><td>Orbit PCB</td><td>Photo</td><td><span class="el-pill el-pill--new">New</span></td></tr>
+                        <tr><td>James Okonkwo</td><td>Aether Auto</td><td>PDF</td><td><span class="el-pill el-pill--new">New</span></td></tr>
+                        <tr><td>Neha Kapoor</td><td>Loom Textiles</td><td>Bulk</td><td><span class="el-pill el-pill--ok">De-duped</span></td></tr>
+                        <tr><td>Marco Silva</td><td>PharmaVista</td><td>Photo</td><td><span class="el-pill el-pill--new">New</span></td></tr>
+                      </tbody>
+                    </table>
+                    <div class="el-db-stats">
+                      <div class="el-stat"><div class="lab">In database</div><div class="val" id="el-db-count">0</div></div>
+                      <div class="el-stat"><div class="lab">Duplicates skipped</div><div class="val" id="el-db-dedupe">0</div></div>
+                      <div class="el-stat"><div class="lab">Leads lost</div><div class="val is-green" id="el-db-lost">—</div></div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <!-- FOLLOW -->
+              <!-- MAIL: industry morph + flyouts -->
+              <div class="el-panel" data-phase="mail">
+                <div class="el-mail-board el-mail-board--v2">
+                  <div class="el-industry-rail" aria-hidden="true" id="el-industry-rail">
+                    <button type="button" class="el-ind is-on" data-ind="0">Electronics</button>
+                    <button type="button" class="el-ind" data-ind="1">Auto</button>
+                    <button type="button" class="el-ind" data-ind="2">Textiles</button>
+                    <button type="button" class="el-ind" data-ind="3">Pharma</button>
+                  </div>
+                  <div class="el-mail-compose" id="el-mail-compose">
+                    <div class="from">From your mailbox · tailored to their industry</div>
+                    <div class="to" id="el-mail-to">Priya Menon · Orbit PCB Exports</div>
+                    <div class="subject" id="el-mail-subject">Great meeting you at Electronica — PCB supply</div>
+                    <div class="body" id="el-mail-body">Hi Priya — following up from our booth conversation on your electronics line. Happy to share the spec sheet we mentioned…<span class="el-caret"></span></div>
+                    <div class="el-send-row">
+                      <span class="el-send-btn" id="el-send-btn">Send</span>
+                      <span class="el-sent-count"><span id="el-sent-n">0</span> customized · fired</span>
+                    </div>
+                  </div>
+                  <div class="el-flyouts" id="el-flyouts" aria-hidden="true"></div>
+                </div>
+              </div>
+
+              <!-- FOLLOW: timeline pulse + shield zero lost -->
               <div class="el-panel" data-phase="follow">
-                <div class="el-fu">
-                  <div class="el-ladder" aria-label="Follow-up sequence">
-                    <div class="el-ladder-step"><span class="dot"></span><div><strong>Day 0 · Intro</strong><em>Industry-tailored first note</em></div><em>Sent</em></div>
-                    <div class="el-ladder-step"><span class="dot"></span><div><strong>Day 3 · Nudge</strong><em>Soft reminder with value</em></div><em>Queued</em></div>
-                    <div class="el-ladder-step"><span class="dot"></span><div><strong>Day 7 · Check-in</strong><em>Still interested?</em></div><em>Queued</em></div>
-                    <div class="el-ladder-step"><span class="dot"></span><div><strong>Skip if contacted</strong><em>No duplicate messaging</em></div><em>Guarded</em></div>
+                <div class="el-fu el-fu--v2">
+                  <div class="el-timeline" aria-label="Follow-up sequence">
+                    <div class="el-tl-track">
+                      <div class="el-tl-fill" id="el-tl-fill"></div>
+                      <div class="el-tl-pulse" id="el-tl-pulse"></div>
+                    </div>
+                    <div class="el-ladder" id="el-ladder">
+                      <div class="el-ladder-step" data-day="0"><span class="dot"></span><div><strong>Day 0 · Intro</strong><em>Industry-tailored first note</em></div><em class="st">Pending</em></div>
+                      <div class="el-ladder-step" data-day="3"><span class="dot"></span><div><strong>Day 3 · Nudge</strong><em>Soft reminder with value</em></div><em class="st">Queued</em></div>
+                      <div class="el-ladder-step" data-day="7"><span class="dot"></span><div><strong>Day 7 · Check-in</strong><em>Still interested?</em></div><em class="st">Queued</em></div>
+                      <div class="el-ladder-step" data-day="x"><span class="dot"></span><div><strong>Skip if contacted</strong><em>No duplicate messaging</em></div><em class="st">Guarded</em></div>
+                    </div>
+                    <div class="el-orbit" aria-hidden="true">
+                      <span class="el-orbit-lead" style="--a:0deg">P</span>
+                      <span class="el-orbit-lead" style="--a:72deg">J</span>
+                      <span class="el-orbit-lead" style="--a:144deg">N</span>
+                      <span class="el-orbit-lead" style="--a:216deg">M</span>
+                      <span class="el-orbit-lead" style="--a:288deg">A</span>
+                    </div>
                   </div>
                   <div class="el-safe">
-                    <div class="el-safe-ring" aria-hidden="true">✓</div>
-                    <div class="zero">0</div>
+                    <div class="el-shield" aria-hidden="true">
+                      <svg viewBox="0 0 64 72"><path class="el-shield-shape" d="M32 4 L56 14 V34 C56 52 44 64 32 68 C20 64 8 52 8 34 V14 Z"/></svg>
+                      <span class="el-shield-check">✓</span>
+                    </div>
+                    <div class="zero" id="el-zero">0</div>
                     <div class="label">leads lost in the process</div>
-                    <div class="hint">Continuous follow-ups keep every booth conversation warm until it converts or it’s time to stop.</div>
+                    <div class="hint">Continuous follow-ups keep every booth conversation warm — nothing falls through.</div>
                   </div>
                 </div>
               </div>
