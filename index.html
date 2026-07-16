@@ -1565,10 +1565,35 @@ body.landing-visible .theme-toggle-fixed{
       <!-- Ops load → production orchestration visual -->
       <div class="transform-visual reveal reveal-delay-1" aria-hidden="true">
         <div class="transform-stage ops-stage">
+          <div class="ops-grid" aria-hidden="true"></div>
+          <div class="ops-scan" aria-hidden="true"></div>
+          <div class="ops-particles" aria-hidden="true">
+            <i style="--p:0"></i><i style="--p:1"></i><i style="--p:2"></i>
+            <i style="--p:3"></i><i style="--p:4"></i><i style="--p:5"></i>
+          </div>
+
           <div class="transform-labels">
             <span class="lbl-before">Manual ops load</span>
             <span class="lbl-after">In production</span>
           </div>
+
+          <div class="ops-chips" aria-hidden="true">
+            <span class="ops-chip" style="--c:0">ERP</span>
+            <span class="ops-chip" style="--c:1">Bank</span>
+            <span class="ops-chip" style="--c:2">CRM</span>
+            <span class="ops-chip" style="--c:3">Inbox</span>
+            <span class="ops-chip" style="--c:4">Sheets</span>
+            <span class="ops-chip" style="--c:5">Slack</span>
+          </div>
+
+          <svg class="ops-conduits" viewBox="0 0 520 220" preserveAspectRatio="none" aria-hidden="true">
+            <path class="ops-path ops-path--in" d="M120 40 C 180 40, 210 110, 260 110" />
+            <path class="ops-path ops-path--in" d="M110 110 C 170 110, 210 110, 260 110" />
+            <path class="ops-path ops-path--in" d="M120 180 C 180 180, 210 110, 260 110" />
+            <path class="ops-path ops-path--out" d="M260 110 C 310 110, 350 40, 410 40" />
+            <path class="ops-path ops-path--out" d="M260 110 C 310 110, 350 110, 420 110" />
+            <path class="ops-path ops-path--out" d="M260 110 C 310 110, 350 180, 410 180" />
+          </svg>
 
           <div class="ops-flow">
             <div class="ops-lane ops-lane--before">
@@ -1576,24 +1601,28 @@ body.landing-visible .theme-toggle-fixed{
                 <span class="ops-domain">Finance</span>
                 <h3>Month-end close across 3 ledgers</h3>
                 <p>ERP · bank · sheets reconciled by specialists every close.</p>
+                <div class="ops-meter" style="--fill:86%"><span></span></div>
                 <span class="ops-load">~14 hrs / cycle</span>
               </article>
               <article class="ops-scene" style="--s:1">
                 <span class="ops-domain">Accounts receivable</span>
                 <h3>Multi-currency invoice chase</h3>
                 <p>40+ overdue invoices — extract, chase, log, escalate by hand.</p>
+                <div class="ops-meter" style="--fill:72%"><span></span></div>
                 <span class="ops-load">Weekly AR drag</span>
               </article>
               <article class="ops-scene" style="--s:2">
                 <span class="ops-domain">Sales ops</span>
                 <h3>Trade-show backlog to pipeline</h3>
                 <p>Cards &amp; PDFs typed in, enriched, then follow-ups written one by one.</p>
+                <div class="ops-meter" style="--fill:91%"><span></span></div>
                 <span class="ops-load">Same-day risk</span>
               </article>
             </div>
 
             <div class="transform-engine ops-engine">
-              <div class="ops-beam ops-beam--in" aria-hidden="true"></div>
+              <div class="engine-halo"></div>
+              <div class="engine-ring engine-ring--outer"></div>
               <div class="engine-ring">
                 <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
                   <line x1="8" y1="9.5" x2="24" y2="21.5" stroke="currentColor" stroke-width="3"/>
@@ -1602,36 +1631,35 @@ body.landing-visible .theme-toggle-fixed{
                   <circle cx="24" cy="21.5" r="5" fill="#fff"/>
                 </svg>
               </div>
-              <div class="ops-beam ops-beam--out" aria-hidden="true"></div>
               <span class="ops-engine-label">Orchestrate</span>
             </div>
 
             <div class="ops-lane ops-lane--after">
               <article class="ops-scene ops-scene--out" style="--s:0">
-                <span class="ops-domain ops-domain--ok">Live</span>
+                <span class="ops-domain ops-domain--ok"><i class="ops-live-dot"></i> Live</span>
                 <h3>Books closed · variances flagged</h3>
                 <ul class="ops-ticks">
-                  <li>Systems reconciled</li>
-                  <li>Close pack ready</li>
-                  <li>Exceptions only</li>
+                  <li style="--t:0">Systems reconciled</li>
+                  <li style="--t:1">Close pack ready</li>
+                  <li style="--t:2">Exceptions only</li>
                 </ul>
               </article>
               <article class="ops-scene ops-scene--out" style="--s:1">
-                <span class="ops-domain ops-domain--ok">Live</span>
+                <span class="ops-domain ops-domain--ok"><i class="ops-live-dot"></i> Live</span>
                 <h3>Chase sequence · paid stops auto</h3>
                 <ul class="ops-ticks">
-                  <li>Invoices read</li>
-                  <li>Polite nudges sent</li>
-                  <li>Paid flagged</li>
+                  <li style="--t:0">Invoices read</li>
+                  <li style="--t:1">Polite nudges sent</li>
+                  <li style="--t:2">Paid flagged</li>
                 </ul>
               </article>
               <article class="ops-scene ops-scene--out" style="--s:2">
-                <span class="ops-domain ops-domain--ok">Live</span>
+                <span class="ops-domain ops-domain--ok"><i class="ops-live-dot"></i> Live</span>
                 <h3>Leads enriched · sequences firing</h3>
                 <ul class="ops-ticks">
-                  <li>Cards captured</li>
-                  <li>CRM updated</li>
-                  <li>Follow-ups from your mailbox</li>
+                  <li style="--t:0">Cards captured</li>
+                  <li style="--t:1">CRM updated</li>
+                  <li style="--t:2">Follow-ups from your mailbox</li>
                 </ul>
               </article>
             </div>
