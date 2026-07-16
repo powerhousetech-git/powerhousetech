@@ -465,16 +465,20 @@
   z-index: 4;
 }
 .ops-engine-label {
-  font-size: 0.58rem;
+  position: relative;
+  z-index: 5;
+  margin-top: 2px;
+  font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(199, 210, 254, 0.95);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.65);
   animation: ops-engine-label 15s ease-in-out infinite;
 }
 @keyframes ops-engine-label {
-  0%, 16%, 33%, 49%, 66%, 82%, 100% { opacity: 0.4; letter-spacing: 0.14em; }
-  19%, 52%, 85% { opacity: 1; letter-spacing: 0.2em; color: rgba(167, 176, 255, 0.95); }
+  0%, 16%, 33%, 49%, 66%, 82%, 100% { opacity: 0.85; letter-spacing: 0.14em; }
+  19%, 52%, 85% { opacity: 1; letter-spacing: 0.18em; color: #e0e7ff; }
 }
 .engine-halo {
   position: absolute;
@@ -612,7 +616,7 @@
   .ops-meter span,
   .ops-ticks li,
   .ops-ticks li::before,
-  .ops-chips .ops-chip,
+  .ops-systems,
   .ops-particles i,
   .ops-grid,
   .ops-scan,
@@ -638,7 +642,7 @@
     opacity: 1 !important;
     transform: none !important;
   }
-  .ops-chips,
+  .ops-systems,
   .ops-particles,
   .ops-scan,
   .ops-conduits { display: none !important; }
@@ -1191,7 +1195,7 @@
     padding: 4px 0;
   }
   .ops-conduits,
-  .ops-chips { display: none; }
+  .ops-systems { display: none; }
   .ops-particles i { animation-duration: 2.8s; }
   .ops-scene,
   .ops-scene--out {
