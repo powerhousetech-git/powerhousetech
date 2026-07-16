@@ -1695,48 +1695,102 @@ body.landing-visible .theme-toggle-fixed{
     <div class="container transform-story-inner">
       <div class="reveal">
         <p class="kicker">What we actually do</p>
-        <h2>We take the heavy operational load — and leave judgment to your team.</h2>
-        <p>Every engagement starts the same way: find the cross-system work your specialists still own because nothing connects the stack. Then we orchestrate it end-to-end.</p>
+        <h2>We understand your custom problems — then solve several at once.</h2>
+        <p>We don’t start with a template. We scan how your team actually works, identify the friction that burns specialist hours, and orchestrate the fixes in parallel.</p>
         <div class="transform-steps">
           <div class="transform-step">
             <span class="num">1</span>
-            <div><h3>Map the real load</h3><p>Month-end close, AR chase, lead backlog — the multi-system work that burns specialist hours.</p></div>
+            <div><h3>Scan the real work</h3><p>Hand-offs, chase loops, close packs — the custom load no off-the-shelf tool fits.</p></div>
           </div>
           <div class="transform-step">
             <span class="num">2</span>
-            <div><h3>Design the pipeline</h3><p>Triggers, rules, integrations, guardrails — encoded once, in tools you already trust.</p></div>
+            <div><h3>Identify what to automate</h3><p>We rank problems by hours, risk, and systems touched — then design around your stack.</p></div>
           </div>
           <div class="transform-step">
             <span class="num">3</span>
-            <div><h3>Ship &amp; monitor</h3><p>Production-grade from day one. We watch it run so your team only handles exceptions.</p></div>
+            <div><h3>Solve in parallel</h3><p>Multiple pipelines ship together. Your team keeps judgment; we run the rest.</p></div>
           </div>
         </div>
       </div>
-      <div class="conveyor-visual reveal reveal-delay-2" aria-hidden="true">
-        <p style="font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:8px">Live workflow</p>
-        <div class="conveyor-nodes">
-          <div class="conveyor-node conveyor-node--manual">Month-end<br>close pack</div>
-          <div class="conveyor-node conveyor-node--engine">
-            <svg width="28" height="28" viewBox="0 0 48 48" fill="none"><line x1="8" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="40" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="24" y1="21.5" x2="24" y2="40" stroke="#fff" stroke-width="3"/><circle cx="24" cy="21.5" r="5" fill="#fff"/></svg>
-          </div>
-          <div class="conveyor-node conveyor-node--auto">Ledgers<br>reconciled</div>
+      <div class="diagnose-visual reveal reveal-delay-2" aria-hidden="true">
+        <div class="diagnose-head">
+          <span class="diagnose-kicker">Custom problem intake</span>
+          <span class="diagnose-phase">
+            <em class="ph ph--scan">Scan</em>
+            <em class="ph ph--id">Identify</em>
+            <em class="ph ph--solve">Solve · multitask</em>
+          </span>
         </div>
-        <div class="conveyor-track"></div>
-        <div class="conveyor-nodes">
-          <div class="conveyor-node conveyor-node--manual">Overdue<br>invoice queue</div>
-          <div class="conveyor-node conveyor-node--engine">
-            <svg width="28" height="28" viewBox="0 0 48 48" fill="none"><line x1="8" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="40" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="24" y1="21.5" x2="24" y2="40" stroke="#fff" stroke-width="3"/><circle cx="24" cy="21.5" r="5" fill="#fff"/></svg>
+
+        <div class="diagnose-stage">
+          <div class="diagnose-grid"></div>
+
+          <div class="diag-signals">
+            <span style="--i:0">3 ledgers, no sync</span>
+            <span style="--i:1">Chase loops in inbox</span>
+            <span style="--i:2">Booth cards going cold</span>
+            <span style="--i:3">Manual exception piles</span>
+            <span style="--i:4">Ownership unclear</span>
+            <span style="--i:5">Hours lost every close</span>
           </div>
-          <div class="conveyor-node conveyor-node--auto">Chase live ·<br>paid stops</div>
-        </div>
-        <div class="conveyor-track"></div>
-        <div class="conveyor-nodes">
-          <div class="conveyor-node conveyor-node--manual">Booth cards<br>&amp; PDFs</div>
-          <div class="conveyor-node conveyor-node--engine">
-            <svg width="28" height="28" viewBox="0 0 48 48" fill="none"><line x1="8" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="40" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="24" y1="21.5" x2="24" y2="40" stroke="#fff" stroke-width="3"/><circle cx="24" cy="21.5" r="5" fill="#fff"/></svg>
+
+          <div class="diag-radar">
+            <div class="diag-radar-ring"></div>
+            <div class="diag-radar-ring diag-radar-ring--2"></div>
+            <div class="diag-radar-sweep"></div>
+            <div class="diag-core">
+              <svg width="26" height="26" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                <line x1="8" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/>
+                <line x1="40" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/>
+                <line x1="24" y1="21.5" x2="24" y2="40" stroke="#fff" stroke-width="3"/>
+                <circle cx="24" cy="21.5" r="5" fill="#fff"/>
+              </svg>
+            </div>
+            <p class="diag-core-label">
+              <span class="cl cl--a">Scan</span>
+              <span class="cl cl--b">Identify</span>
+              <span class="cl cl--c">Orchestrate</span>
+            </p>
           </div>
-          <div class="conveyor-node conveyor-node--auto">CRM + sequences<br>firing</div>
+
+          <div class="diag-lanes">
+            <article class="diag-lane" style="--i:0">
+              <span class="diag-tag">Finance</span>
+              <h4>Month-end close debt</h4>
+              <p>ERP · bank · sheets still owned by specialists</p>
+              <ol class="diag-pipeline">
+                <li style="--s:0">Map</li>
+                <li style="--s:1">Design</li>
+                <li style="--s:2">Live</li>
+              </ol>
+            </article>
+            <article class="diag-lane" style="--i:1">
+              <span class="diag-tag">AR</span>
+              <h4>Invoice chase backlog</h4>
+              <p>Multi-currency overdue queue, logged by hand</p>
+              <ol class="diag-pipeline">
+                <li style="--s:0">Map</li>
+                <li style="--s:1">Design</li>
+                <li style="--s:2">Live</li>
+              </ol>
+            </article>
+            <article class="diag-lane" style="--i:2">
+              <span class="diag-tag">Sales</span>
+              <h4>Trade-show lead decay</h4>
+              <p>Cards &amp; PDFs waiting for CRM + follow-up</p>
+              <ol class="diag-pipeline">
+                <li style="--s:0">Map</li>
+                <li style="--s:1">Design</li>
+                <li style="--s:2">Live</li>
+              </ol>
+            </article>
+          </div>
         </div>
+
+        <p class="diagnose-caption">
+          <span class="cap-a">We find the custom friction in your stack</span>
+          <span class="cap-b">Then run the fixes in parallel — not one ticket at a time</span>
+        </p>
       </div>
     </div>
   </section>
