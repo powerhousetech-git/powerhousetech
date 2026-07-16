@@ -587,11 +587,13 @@
 .transform-caption {
   margin-top: 12px;
   text-align: center;
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.78);
   position: relative;
-  z-index: 3;
+  z-index: 5;
   min-height: 1.2em;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
 }
 .transform-caption .cap-before,
 .transform-caption .cap-after {
