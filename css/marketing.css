@@ -437,6 +437,19 @@ h3{font-size:1.1rem;font-weight:700;letter-spacing:-0.01em}
 }
 .steps-track.is-scrolled .step-card.is-live .step-num{color:var(--teal)}
 .steps-track.is-scrolled .step-card.is-live h3{color:var(--teal-dark,#424fd1)}
+@media(max-width:899px){
+  .steps-track.is-scrolled .step-card{
+    opacity:.88;transform:none;
+  }
+  .steps-track.is-scrolled .step-card.is-done{opacity:.95}
+  .steps-track.is-scrolled .step-card.is-live{
+    opacity:1;transform:none;
+    box-shadow:0 8px 22px rgba(66,79,209,.16);
+  }
+  .steps-4 .step-card{
+    transition:opacity .25s ease,border-color .25s ease,box-shadow .25s ease;
+  }
+}
 .practice-square h3{font-size:1.05rem;margin:0}
 .practice-square p{font-size:.88rem;color:var(--ink-mid);line-height:1.5;margin:0}
 .ready-systems{

@@ -453,21 +453,20 @@
   36%, 100% { opacity: 0; transform: translate3d(0, -4px, 0) scale(0.98); }
 }
 
-/* Engine core */
+/* Engine core — single cohesive mark */
 .transform-engine,
 .ops-engine {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   position: relative;
   z-index: 4;
 }
 .ops-engine-label {
   position: relative;
   z-index: 5;
-  margin-top: 2px;
   font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -478,37 +477,11 @@
 }
 @keyframes ops-engine-label {
   0%, 16%, 33%, 49%, 66%, 82%, 100% { opacity: 0.85; letter-spacing: 0.14em; }
-  19%, 52%, 85% { opacity: 1; letter-spacing: 0.18em; color: #e0e7ff; }
+  19%, 52%, 85% { opacity: 1; letter-spacing: 0.16em; color: #e0e7ff; }
 }
-.engine-halo {
-  position: absolute;
-  width: 86px;
-  height: 86px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(66, 79, 209, 0.35) 0%, transparent 68%);
-  animation: ops-halo 2.4s ease-in-out infinite;
-  z-index: 0;
-}
-@keyframes ops-halo {
-  0%, 100% { transform: scale(0.85); opacity: 0.55; }
-  50% { transform: scale(1.15); opacity: 1; }
-}
-.engine-ring--outer {
-  position: absolute;
-  width: 68px;
-  height: 68px;
-  border-radius: 50%;
-  background: transparent !important;
-  border: 1px dashed rgba(107, 122, 232, 0.55);
-  animation: ops-engine-orbit 6s linear infinite;
-  z-index: 1;
-  box-shadow: none !important;
-}
-.engine-ring--outer::before,
-.engine-ring--outer::after { display: none; }
 .engine-ring {
-  width: 54px;
-  height: 54px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #5b67e0, #424fd1 55%, #313a9e);
   display: flex;
@@ -516,43 +489,17 @@
   justify-content: center;
   position: relative;
   z-index: 2;
+  box-shadow: 0 8px 24px rgba(66, 79, 209, 0.35);
   animation: ops-engine-pulse 15s ease-in-out infinite;
-}
-.engine-ring::before {
-  content: "";
-  position: absolute;
-  inset: 3px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  animation: ops-engine-orbit 3.5s linear infinite reverse;
-}
-.engine-ring::after {
-  content: "";
-  position: absolute;
-  inset: -7px;
-  border-radius: 50%;
-  border: 1px solid transparent;
-  border-top-color: rgba(167, 176, 255, 0.85);
-  border-right-color: rgba(66, 79, 209, 0.35);
-  animation: ops-engine-orbit 2.2s linear infinite;
 }
 .engine-ring svg {
   width: 24px;
   height: 24px;
   color: #fff;
-  animation: ops-logo-spin 15s ease-in-out infinite;
-}
-@keyframes ops-logo-spin {
-  0%, 16%, 33%, 49%, 66%, 82%, 100% { transform: rotate(0deg) scale(1); }
-  19%, 52%, 85% { transform: rotate(18deg) scale(1.08); }
 }
 @keyframes ops-engine-pulse {
-  0%, 16%, 33%, 49%, 66%, 82%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(66, 79, 209, 0.35); }
-  19%, 52%, 85% { transform: scale(1.1); box-shadow: 0 0 0 16px rgba(66, 79, 209, 0); }
-}
-@keyframes ops-engine-orbit {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0%, 16%, 33%, 49%, 66%, 82%, 100% { transform: scale(1); box-shadow: 0 8px 24px rgba(66, 79, 209, 0.35); }
+  19%, 52%, 85% { transform: scale(1.06); box-shadow: 0 10px 28px rgba(66, 79, 209, 0.5); }
 }
 
 .ops-dots {
@@ -650,11 +597,6 @@
   .transform-labels .lbl-after,
   .ops-dots span,
   .engine-ring,
-  .engine-ring::before,
-  .engine-ring::after,
-  .engine-ring--outer,
-  .engine-halo,
-  .engine-ring svg,
   .ops-engine-label,
   .transform-caption .cap-before,
   .transform-caption .cap-after {
@@ -1179,31 +1121,48 @@
     grid-template-columns: 1fr;
     gap: 40px;
   }
+  .transform-visual { max-width: none; }
+  .transform-stage { padding: 18px 14px 14px; }
   .ops-flow {
     grid-template-columns: 1fr;
-    gap: 14px;
+    gap: 10px;
     min-height: auto;
   }
   .ops-lane {
-    min-height: 168px;
+    min-height: 148px;
   }
   .ops-engine {
     flex-direction: row;
     justify-content: center;
-    gap: 10px;
+    align-items: center;
+    gap: 12px;
     min-height: auto;
-    padding: 4px 0;
+    padding: 2px 0 6px;
+  }
+  .engine-ring {
+    width: 44px;
+    height: 44px;
+    box-shadow: 0 6px 16px rgba(66, 79, 209, 0.35);
+  }
+  .engine-ring svg { width: 20px; height: 20px; }
+  .ops-engine-label {
+    margin: 0;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
   }
   .ops-conduits,
-  .ops-systems { display: none; }
-  .ops-particles i { animation-duration: 2.8s; }
+  .ops-systems,
+  .ops-particles,
+  .ops-scan { display: none; }
   .ops-scene,
   .ops-scene--out {
     transform: none;
+    animation-duration: 12s;
   }
   .ops-scene h3 { font-size: 0.95rem; }
   .ops-scene p,
   .ops-ticks li { font-size: 0.72rem; }
+  .ops-dots { margin-top: 10px; }
   .diagnose-stage { min-height: 420px; }
   .diag-lanes {
     grid-template-columns: 1fr;

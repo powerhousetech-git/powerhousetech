@@ -24,12 +24,14 @@
     var lastP = -1;
     var lastIdx = -1;
     var ticking = false;
+    var mobileMq = window.matchMedia('(max-width: 899px)');
 
-    function paint(progress) {
+    function paint(progress, forcedIdx) {
       var p = Math.min(1, Math.max(0, progress));
       var max = cards.length - 1;
-      // Match highlight to bar quarters: 01→25%, 02→50%, 03→75%, 04→100%.
-      var idx = p >= 0.999 ? max : Math.min(max, Math.floor(p * cards.length));
+      var idx = typeof forcedIdx === 'number'
+        ? Math.min(max, Math.max(0, forcedIdx))
+        : (p >= 0.999 ? max : Math.min(max, Math.floor(p * cards.length)));
       if (Math.abs(p - lastP) < 0.002 && idx === lastIdx) return;
       lastP = p;
       lastIdx = idx;
@@ -43,12 +45,34 @@
       });
     }
 
-    function measure() {
+    function measureMobile() {
+      var vh = window.innerHeight || 1;
+      var focus = vh * 0.42;
+      var idx = 0;
+      var best = Infinity;
+
+      cards.forEach(function (c, n) {
+        var r = c.getBoundingClientRect();
+        var mid = (r.top + r.bottom) / 2;
+        var dist = Math.abs(mid - focus);
+        if (dist < best) {
+          best = dist;
+          idx = n;
+        }
+      });
+
+      // Progress follows the stacked column past the focus line.
+      var first = cards[0].getBoundingClientRect();
+      var last = cards[cards.length - 1].getBoundingClientRect();
+      var travel = Math.max(1, last.bottom - first.top);
+      var p = (focus - first.top) / travel;
+      paint(p, idx);
+    }
+
+    function measureDesktop() {
       var rect = track.getBoundingClientRect();
       var vh = window.innerHeight || 1;
       var h = Math.max(rect.height, cardsRow.getBoundingClientRect().height || 0);
-      // Keep the progress scrub inside the window where the full
-      // progress line + all four cards can sit on screen together.
       var margin = Math.min(88, Math.max(48, vh * 0.1));
       var topWhenFullyIn = vh - margin - h;
       var topWhenLeaving = margin;
@@ -56,19 +80,21 @@
       var end;
 
       if (topWhenFullyIn > topWhenLeaving + 48) {
-        // Start once the whole row is visible; finish with cards
-        // still well inside the viewport (not at the clip edge).
         var span = topWhenFullyIn - topWhenLeaving;
         start = topWhenFullyIn - span * 0.08;
         end = topWhenLeaving + span * 0.38;
       } else {
-        // Short viewports: scrub while the row is centered.
         start = Math.min(vh * 0.62, vh - h * 0.35);
         end = Math.max(vh * 0.28, margin);
         if (start <= end) start = end + Math.min(160, vh * 0.2);
       }
 
       paint((start - rect.top) / (start - end));
+    }
+
+    function measure() {
+      if (mobileMq.matches) measureMobile();
+      else measureDesktop();
       ticking = false;
     }
 
@@ -80,6 +106,14 @@
 
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll, { passive: true });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', onScroll, { passive: true });
+    }
+    if (typeof mobileMq.addEventListener === 'function') {
+      mobileMq.addEventListener('change', onScroll);
+    } else if (typeof mobileMq.addListener === 'function') {
+      mobileMq.addListener(onScroll);
+    }
     measure();
   }
 
