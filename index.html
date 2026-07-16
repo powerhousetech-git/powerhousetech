@@ -1562,20 +1562,38 @@ body.landing-visible .theme-toggle-fixed{
         </div>
       </div>
 
-      <!-- Grunt work → automation visual -->
+      <!-- Ops load → production orchestration visual -->
       <div class="transform-visual reveal reveal-delay-1" aria-hidden="true">
-        <div class="transform-stage">
+        <div class="transform-stage ops-stage">
           <div class="transform-labels">
-            <span class="lbl-before">Manual grunt work</span>
-            <span class="lbl-after">Runs on autopilot</span>
+            <span class="lbl-before">Manual ops load</span>
+            <span class="lbl-after">In production</span>
           </div>
-          <div class="transform-flow">
-            <div class="grunt-stack">
-              <div class="grunt-task" style="--i:0"><span class="icon">📋</span> Copy-paste rows</div>
-              <div class="grunt-task" style="--i:1"><span class="icon">📧</span> Chase approvals</div>
-              <div class="grunt-task" style="--i:2"><span class="icon">📊</span> Update spreadsheet</div>
+
+          <div class="ops-flow">
+            <div class="ops-lane ops-lane--before">
+              <article class="ops-scene" style="--s:0">
+                <span class="ops-domain">Finance</span>
+                <h3>Month-end close across 3 ledgers</h3>
+                <p>ERP · bank · sheets reconciled by specialists every close.</p>
+                <span class="ops-load">~14 hrs / cycle</span>
+              </article>
+              <article class="ops-scene" style="--s:1">
+                <span class="ops-domain">Accounts receivable</span>
+                <h3>Multi-currency invoice chase</h3>
+                <p>40+ overdue invoices — extract, chase, log, escalate by hand.</p>
+                <span class="ops-load">Weekly AR drag</span>
+              </article>
+              <article class="ops-scene" style="--s:2">
+                <span class="ops-domain">Sales ops</span>
+                <h3>Trade-show backlog to pipeline</h3>
+                <p>Cards &amp; PDFs typed in, enriched, then follow-ups written one by one.</p>
+                <span class="ops-load">Same-day risk</span>
+              </article>
             </div>
-            <div class="transform-engine">
+
+            <div class="transform-engine ops-engine">
+              <div class="ops-beam ops-beam--in" aria-hidden="true"></div>
               <div class="engine-ring">
                 <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
                   <line x1="8" y1="9.5" x2="24" y2="21.5" stroke="currentColor" stroke-width="3"/>
@@ -1584,17 +1602,48 @@ body.landing-visible .theme-toggle-fixed{
                   <circle cx="24" cy="21.5" r="5" fill="#fff"/>
                 </svg>
               </div>
-              <div class="engine-arrows" aria-hidden="true"><span></span><span></span><span></span></div>
+              <div class="ops-beam ops-beam--out" aria-hidden="true"></div>
+              <span class="ops-engine-label">Orchestrate</span>
             </div>
-            <div class="auto-stack">
-              <div class="auto-task" style="--i:0"><span class="check">✓</span> Data synced</div>
-              <div class="auto-task" style="--i:1"><span class="check">✓</span> Approvals routed</div>
-              <div class="auto-task" style="--i:2"><span class="check">✓</span> Report ready</div>
+
+            <div class="ops-lane ops-lane--after">
+              <article class="ops-scene ops-scene--out" style="--s:0">
+                <span class="ops-domain ops-domain--ok">Live</span>
+                <h3>Books closed · variances flagged</h3>
+                <ul class="ops-ticks">
+                  <li>Systems reconciled</li>
+                  <li>Close pack ready</li>
+                  <li>Exceptions only</li>
+                </ul>
+              </article>
+              <article class="ops-scene ops-scene--out" style="--s:1">
+                <span class="ops-domain ops-domain--ok">Live</span>
+                <h3>Chase sequence · paid stops auto</h3>
+                <ul class="ops-ticks">
+                  <li>Invoices read</li>
+                  <li>Polite nudges sent</li>
+                  <li>Paid flagged</li>
+                </ul>
+              </article>
+              <article class="ops-scene ops-scene--out" style="--s:2">
+                <span class="ops-domain ops-domain--ok">Live</span>
+                <h3>Leads enriched · sequences firing</h3>
+                <ul class="ops-ticks">
+                  <li>Cards captured</li>
+                  <li>CRM updated</li>
+                  <li>Follow-ups from your mailbox</li>
+                </ul>
+              </article>
             </div>
           </div>
+
+          <div class="ops-dots" aria-hidden="true">
+            <span style="--s:0"></span><span style="--s:1"></span><span style="--s:2"></span>
+          </div>
+
           <div class="transform-caption">
-            <span class="cap-before">Your team doing the same thing, every day</span>
-            <span class="cap-after">Same outcome — zero manual steps</span>
+            <span class="cap-before">Cross-system work your specialists still own</span>
+            <span class="cap-after">Same outcomes — orchestrated end-to-end</span>
           </div>
         </div>
       </div>
@@ -1618,47 +1667,47 @@ body.landing-visible .theme-toggle-fixed{
     <div class="container transform-story-inner">
       <div class="reveal">
         <p class="kicker">What we actually do</p>
-        <h2>We eliminate the grunt work — and leave the thinking to your team.</h2>
-        <p>Every engagement starts the same way: find the tasks your people repeat because no system connects the dots. Then we wire those dots together.</p>
+        <h2>We take the heavy operational load — and leave judgment to your team.</h2>
+        <p>Every engagement starts the same way: find the cross-system work your specialists still own because nothing connects the stack. Then we orchestrate it end-to-end.</p>
         <div class="transform-steps">
           <div class="transform-step">
             <span class="num">1</span>
-            <div><h3>Spot the repetition</h3><p>Copy-paste, chasing, reconciling — the work that eats hours but adds no judgment.</p></div>
+            <div><h3>Map the real load</h3><p>Month-end close, AR chase, lead backlog — the multi-system work that burns specialist hours.</p></div>
           </div>
           <div class="transform-step">
             <span class="num">2</span>
-            <div><h3>Design the pipeline</h3><p>Triggers, rules, integrations — encoded once, in tools you already trust.</p></div>
+            <div><h3>Design the pipeline</h3><p>Triggers, rules, integrations, guardrails — encoded once, in tools you already trust.</p></div>
           </div>
           <div class="transform-step">
             <span class="num">3</span>
-            <div><h3>Ship &amp; monitor</h3><p>Production-grade from day one. We watch it run so you don't have to.</p></div>
+            <div><h3>Ship &amp; monitor</h3><p>Production-grade from day one. We watch it run so your team only handles exceptions.</p></div>
           </div>
         </div>
       </div>
       <div class="conveyor-visual reveal reveal-delay-2" aria-hidden="true">
         <p style="font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:8px">Live workflow</p>
         <div class="conveyor-nodes">
-          <div class="conveyor-node conveyor-node--manual">Inbox<br>request</div>
+          <div class="conveyor-node conveyor-node--manual">Month-end<br>close pack</div>
           <div class="conveyor-node conveyor-node--engine">
             <svg width="28" height="28" viewBox="0 0 48 48" fill="none"><line x1="8" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="40" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="24" y1="21.5" x2="24" y2="40" stroke="#fff" stroke-width="3"/><circle cx="24" cy="21.5" r="5" fill="#fff"/></svg>
           </div>
-          <div class="conveyor-node conveyor-node--auto">CRM updated<br>Slack notified</div>
+          <div class="conveyor-node conveyor-node--auto">Ledgers<br>reconciled</div>
         </div>
         <div class="conveyor-track"></div>
         <div class="conveyor-nodes">
-          <div class="conveyor-node conveyor-node--manual">Spreadsheet<br>export</div>
+          <div class="conveyor-node conveyor-node--manual">Overdue<br>invoice queue</div>
           <div class="conveyor-node conveyor-node--engine">
             <svg width="28" height="28" viewBox="0 0 48 48" fill="none"><line x1="8" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="40" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="24" y1="21.5" x2="24" y2="40" stroke="#fff" stroke-width="3"/><circle cx="24" cy="21.5" r="5" fill="#fff"/></svg>
           </div>
-          <div class="conveyor-node conveyor-node--auto">Dashboard<br>refreshed</div>
+          <div class="conveyor-node conveyor-node--auto">Chase live ·<br>paid stops</div>
         </div>
         <div class="conveyor-track"></div>
         <div class="conveyor-nodes">
-          <div class="conveyor-node conveyor-node--manual">Manual<br>approval</div>
+          <div class="conveyor-node conveyor-node--manual">Booth cards<br>&amp; PDFs</div>
           <div class="conveyor-node conveyor-node--engine">
             <svg width="28" height="28" viewBox="0 0 48 48" fill="none"><line x1="8" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="40" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="24" y1="21.5" x2="24" y2="40" stroke="#fff" stroke-width="3"/><circle cx="24" cy="21.5" r="5" fill="#fff"/></svg>
           </div>
-          <div class="conveyor-node conveyor-node--auto">Approved &amp;<br>logged</div>
+          <div class="conveyor-node conveyor-node--auto">CRM + sequences<br>firing</div>
         </div>
       </div>
     </div>
