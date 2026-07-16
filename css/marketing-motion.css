@@ -199,45 +199,33 @@
   22%, 30%, 55%, 63%, 88%, 96% { opacity: 1; transform: translateY(0); }
 }
 
-/* System chips — only around the engine, never over copy */
-.ops-chips {
-  position: absolute;
-  left: 50%;
-  top: 58px;
-  bottom: 78px;
-  width: 92px;
-  margin-left: -46px;
-  pointer-events: none;
-  z-index: 2;
+/* System strip — above the cards, never over engine/copy */
+.ops-systems {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  gap: 8px;
+  width: max-content;
+  margin: 0 0 12px;
+  padding: 2px 0;
+  animation: ops-systems-marquee 18s linear infinite;
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
 }
-.ops-chip {
-  position: absolute;
-  left: 50%;
-  font-size: 0.56rem;
+.ops-systems span {
+  flex: 0 0 auto;
+  font-size: 0.6rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.8);
-  padding: 3px 7px;
+  color: rgba(255, 255, 255, 0.82);
+  padding: 4px 9px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(18, 18, 26, 0.82);
-  white-space: nowrap;
-  transform: translateX(-50%);
-  animation: ops-chip-float 5s ease-in-out infinite;
-  animation-delay: calc(var(--c, 0) * 0.35s);
+  background: rgba(18, 18, 26, 0.92);
 }
-.ops-chip:nth-child(1) { top: 4%; }
-.ops-chip:nth-child(2) { top: 22%; }
-.ops-chip:nth-child(3) { top: 40%; }
-.ops-chip:nth-child(4) { top: 58%; }
-.ops-chip:nth-child(5) { top: 76%; }
-.ops-chip:nth-child(6) { top: 92%; }
-@keyframes ops-chip-float {
-  0%, 12% { opacity: 0; transform: translateX(-50%) translateY(6px) scale(0.9); }
-  22%, 55% { opacity: 0.95; transform: translateX(-50%) translateY(0) scale(1); }
-  70% { opacity: 0.7; transform: translateX(-50%) translateY(-4px) scale(0.96); }
-  85%, 100% { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.88); }
+@keyframes ops-systems-marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
 
 /* Animated SVG conduits — behind cards, softer */
