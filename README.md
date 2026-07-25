@@ -1,55 +1,24 @@
-# Powerhouse
+# Powerhouse Tech
 
-Premium marketing site for Powerhouse — AI automation studio for Indian B2B SaaS founders.
+Marketing site and client workspace for **Powerhouse Tech** — custom workflow automation for international teams (ops, sales, finance, AI).
 
-## Stack
+## What’s live
 
-- **Next.js 16** (App Router)
-- **React 19**
-- **Tailwind CSS v4**
-- **Framer Motion** (scroll reveals, nav, hero)
-- **Geist** via `next/font` (Apple-adjacent typography)
+Static HTML/CSS/JS published via Netlify (`netlify.toml` → publish `.`).
 
-## Develop
+- Marketing: `index.html`, `services.html`, `industries.html`, `about.html`, `contact.html`
+- Ready systems: `invoice-radar.html`, `exhibition-leads.html`, `ai-sales-outreach.html`
+- Workspace shell: signed-in area in `index.html` (`/workspace`, `/app`) — ready-system links only
 
-```bash
-npm install
-npm run dev
-```
+## Legacy note
 
-Open [http://localhost:3000](http://localhost:3000).
+Older CA product surfaces (NCE converter, Schedule III financial statements, working papers, statutory compliance reminders, desktop NCE download) are **retired from the product UI**. Backend fixtures/scripts under `fixtures/`, `coa/`, `supabase/`, and `docs/` may still exist for historical reference and are not marketed.
 
-## Deploy
+## Local
 
-### Vercel (recommended)
+Serve the repo root as a static site (for example `npx serve .` or Netlify Dev). Open `/` for marketing.
 
-```bash
-npx vercel
-```
+## Contact
 
-### Netlify
-
-Repo: **https://github.com/aymaanshahzad23/powerhouse**
-
-1. Go to [https://app.netlify.com/start](https://app.netlify.com/start)
-2. **Import from Git** → GitHub → select `powerhouse`
-3. Netlify reads `netlify.toml` automatically (`npm run build` + Next.js plugin)
-4. Click **Deploy site**
-
-Or with CLI (after `npm i -g netlify-cli` and `netlify login`):
-
-```bash
-netlify init
-netlify deploy --prod
-```
-
-## Project structure
-
-```
-src/
-  app/          layout, page, globals.css (mesh, glass, bento patterns)
-  components/   Nav, Hero, Bento, Process, CTA, Team, …
-  lib/          cn() utility
-```
-
-Legacy static HTML is in `_legacy/`.
+- shreyas@powerhousetech.in
+- yash@powerhousetech.in
