@@ -1,8 +1,8 @@
 # Static multi-page Powerhouse site + exported Med Spa dashboard
+# Dashboard HTML/JS is committed under /dashboard and /_next (built via scripts/build-dashboard.sh).
 [build]
   publish = "."
-  # Rebuild dashboard when possible; fall back to committed /dashboard + /_next
-  command = "bash scripts/build-dashboard.sh || echo 'Using prebuilt dashboard assets'"
+  command = ""
 
 [dev]
   framework = "#static"
