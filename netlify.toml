@@ -1,7 +1,8 @@
 # Static multi-page Powerhouse site + exported Med Spa dashboard
 [build]
   publish = "."
-  command = "bash scripts/build-dashboard.sh"
+  # Rebuild dashboard when possible; fall back to committed /dashboard + /_next
+  command = "bash scripts/build-dashboard.sh || echo 'Using prebuilt dashboard assets'"
 
 [dev]
   framework = "#static"
