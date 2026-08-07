@@ -25,6 +25,33 @@
   to = "/app/invoice-radar.html"
   status = 200
 
+# Client portal — sign in → choose a service dashboard
+[[redirects]]
+  from = "/portal"
+  to = "/portal.html"
+  status = 200
+
+[[redirects]]
+  from = "/client"
+  to = "/portal.html"
+  status = 200
+
+[[redirects]]
+  from = "/signin"
+  to = "/portal.html"
+  status = 200
+
+# Invoice Radar sample dashboard (interactive demo data)
+[[redirects]]
+  from = "/invoice-dashboard"
+  to = "/invoice-radar-portal.html"
+  status = 200
+
+[[redirects]]
+  from = "/invoice-dashboard/"
+  to = "/invoice-radar-portal.html"
+  status = 200
+
 # Med spa ROI dashboard (static export from medspa-dashboard/)
 [[redirects]]
   from = "/dashboard"

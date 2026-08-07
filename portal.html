@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Client Portal — Powerhouse Tech</title>
+  <meta name="description" content="Sign in to open your Powerhouse dashboards — Invoice Radar, Med Spa ROI, and more.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/portal.css">
+</head>
+<body>
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="logo-mark" viewBox="0 0 48 48">
+      <line x1="8" y1="9.5" x2="24" y2="21.5" stroke="currentColor" stroke-width="3"/>
+      <line x1="40" y1="9.5" x2="24" y2="21.5" stroke="currentColor" stroke-width="3"/>
+      <line x1="24" y1="21.5" x2="24" y2="40" stroke="currentColor" stroke-width="3"/>
+      <circle cx="8" cy="9.5" r="5.2" fill="currentColor"/>
+      <circle cx="40" cy="9.5" r="5.2" fill="currentColor"/>
+      <circle cx="24" cy="40" r="5" fill="currentColor"/>
+      <circle cx="24" cy="21.5" r="6.3" fill="#424FD1"/>
+    </symbol>
+  </svg>
+
+  <div class="portal-shell">
+    <header class="portal-nav">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true">
+          <svg><use href="#logo-mark"/></svg>
+        </span>
+        Powerhouse
+      </a>
+      <div class="nav-actions">
+        <div class="user-chip" id="user-chip">
+          <span class="user-avatar" id="user-avatar">P</span>
+          <span class="user-email" id="user-email"></span>
+        </div>
+        <button type="button" class="btn btn-ghost hidden" id="signout-btn">Sign out</button>
+        <a class="btn btn-ghost" href="/">Marketing site</a>
+      </div>
+    </header>
+
+    <main class="portal-main">
+      <!-- SIGN IN -->
+      <section id="auth-view" class="auth-panel" aria-labelledby="auth-title">
+        <h1 id="auth-title">Sign in</h1>
+        <p class="lead">
+          Open your client portal to choose a service and jump into its live dashboard.
+        </p>
+        <button type="button" class="btn btn-google" id="google-signin">
+          <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+            <path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/>
+            <path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/>
+            <path fill="#FBBC05" d="M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34A21.93 21.93 0 0 0 2 24c0 3.55.85 6.91 2.34 9.88l7.35-5.7z"/>
+            <path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"/>
+          </svg>
+          Continue with Google
+        </button>
+        <div class="auth-divider">or</div>
+        <button type="button" class="btn btn-ghost" id="demo-signin" style="width:100%">
+          Continue with demo access
+        </button>
+        <p class="auth-hint">
+          <b>Invite-only for live client data.</b> Demo access opens sample dashboards
+          (Invoice Radar + Med Spa ROI) so you can explore the experience.
+        </p>
+        <p id="auth-error" class="auth-error hidden" role="alert"></p>
+      </section>
+
+      <!-- SERVICES -->
+      <section id="services-view" class="hidden" aria-labelledby="services-title">
+        <div class="services-head">
+          <p class="eyebrow">Client portal</p>
+          <h1 id="services-title">Welcome back, <span id="greet-name">there</span></h1>
+          <p>Choose a service to open its dashboard.</p>
+        </div>
+
+        <div class="service-grid">
+          <a class="service-card" href="/app/invoice-radar">
+            <div class="service-icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            </div>
+            <h2>Invoice Radar</h2>
+            <p>Receivables, approvals, follow-ups, and capture — live from your Google Sheet.</p>
+            <div class="service-meta">
+              <span class="badge badge-live">Live dashboard</span>
+              <span class="cta-label">Open →</span>
+            </div>
+          </a>
+
+          <a class="service-card" href="/invoice-dashboard/">
+            <div class="service-icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+            </div>
+            <h2>Invoice Radar · Sample</h2>
+            <p>Interactive sample dashboard with demo receivables data — great for walkthroughs.</p>
+            <div class="service-meta">
+              <span class="badge badge-demo">Demo data</span>
+              <span class="cta-label">Open →</span>
+            </div>
+          </a>
+
+          <a class="service-card" href="/dashboard/demo/">
+            <div class="service-icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 3 5-7"/></svg>
+            </div>
+            <h2>Med Spa ROI Dashboard</h2>
+            <p>Leads, appointments, reactivation, reviews, and revenue impact for automation clients.</p>
+            <div class="service-meta">
+              <span class="badge badge-demo">Demo · Luxe Glow</span>
+              <span class="cta-label">Open →</span>
+            </div>
+          </a>
+
+          <a class="service-card" href="/contact.html#book">
+            <div class="service-icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 0L7 19l-4 1 1-4Z"/></svg>
+            </div>
+            <h2>Need another system?</h2>
+            <p>Card Capture, AI Sales Outreach, or a custom workflow mapped to your stack.</p>
+            <div class="service-meta">
+              <span class="badge badge-live">Book a call</span>
+              <span class="cta-label">Talk to us →</span>
+            </div>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="portal-foot">Powered by Powerhouse Tech · powerhousetech.in</footer>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
+    import {
+      getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
+    } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
+
+    const firebaseConfig = {
+      apiKey: 'AIzaSyD9fHOILnFLauZqd-C2AZwm-vrkpQk-sV4',
+      authDomain: 'powerhouse-tech-f6da1.firebaseapp.com',
+      projectId: 'powerhouse-tech-f6da1',
+      storageBucket: 'powerhouse-tech-f6da1.firebasestorage.app',
+      messagingSenderId: '946732625664',
+      appId: '1:946732625664:web:627677c716fcf7c16b0de5',
+      measurementId: 'G-QRZLG84GYV',
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const googleProvider = new GoogleAuthProvider();
+    window.phFirebaseAuth = { auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged };
+    window.dispatchEvent(new CustomEvent('ph-firebase-ready'));
+  </script>
+  <script src="/js/portal.js" defer></script>
+</body>
+</html>

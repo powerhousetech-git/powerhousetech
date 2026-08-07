@@ -8,8 +8,11 @@ Static HTML/CSS/JS published via Netlify (`netlify.toml` → publish `.`).
 
 - Marketing: `index.html`, `services.html`, `industries.html`, `about.html`, `contact.html`
 - Ready systems: `invoice-radar.html`, `exhibition-leads.html`, `ai-sales-outreach.html`
-- Workspace shell: signed-in area in `index.html` (`/workspace`, `/app`) — ready-system links only
-- Med spa ROI dashboard: `/dashboard/demo/` (Next.js static export from `medspa-dashboard/`)
+- **Client portal**: `/portal` — sign in, then pick a service dashboard
+- Invoice Radar live: `/app/invoice-radar`
+- Invoice Radar sample: `/invoice-dashboard/`
+- Med spa ROI dashboard: `/dashboard/demo/`
+- Workspace shell: `/workspace`, `/app`
 
 ## Legacy note
 

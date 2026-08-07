@@ -1,7 +1,7 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { Download, RefreshCw, Share2 } from "lucide-react";
+import { Download, LayoutGrid, RefreshCw, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/dashboard/DateRangePicker";
 import type { DateRange } from "@/types/dashboard";
@@ -23,6 +23,13 @@ export function TopBar({
     <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-md">
       <div className="flex flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:gap-4 lg:px-8">
         <div className="min-w-0">
+          <a
+            href="/portal"
+            className="mb-1 inline-flex items-center gap-1.5 text-xs font-medium text-primary-light hover:underline"
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            All services
+          </a>
           <h1 className="truncate text-lg font-semibold tracking-tight sm:text-xl">
             {spaName}
           </h1>
