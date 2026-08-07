@@ -19,3 +19,8 @@ firebase.json
 AGENTS.md
 CLAUDE.md
 README.md
+
+# Med spa dashboard build artifacts (published copies live at /dashboard + /_next)
+medspa-dashboard/node_modules
+medspa-dashboard/.next
+medspa-dashboard/out

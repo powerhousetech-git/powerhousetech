@@ -2,6 +2,12 @@
 
 Next.js 14 App Router dashboard for Powerhouse Tech med spa clients.
 
+## Live
+
+- https://powerhousetech.in/dashboard/demo/
+
+Netlify builds this via `scripts/build-dashboard.sh` (static export into `/dashboard` + `/_next`).
+
 ## Run locally
 
 ```bash
@@ -20,7 +26,7 @@ Open [http://localhost:3000/dashboard/demo](http://localhost:3000/dashboard/demo
 
 ## Env
 
-See `.env.local`:
+See `.env.example`:
 
 - `NEXT_PUBLIC_DEMO_MODE=true` — demo banner
 - `NEXT_PUBLIC_BOOKING_URL` — CTA link

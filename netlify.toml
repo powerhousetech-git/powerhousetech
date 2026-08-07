@@ -1,7 +1,7 @@
-# Static multi-page Powerhouse site
+# Static multi-page Powerhouse site + exported Med Spa dashboard
 [build]
   publish = "."
-  command = ""
+  command = "bash scripts/build-dashboard.sh"
 
 [dev]
   framework = "#static"
@@ -23,6 +23,17 @@
   from = "/app/invoice-radar"
   to = "/app/invoice-radar.html"
   status = 200
+
+# Med spa ROI dashboard (static export from medspa-dashboard/)
+[[redirects]]
+  from = "/dashboard"
+  to = "/dashboard/demo/"
+  status = 302
+
+[[redirects]]
+  from = "/dashboard/"
+  to = "/dashboard/demo/"
+  status = 302
 
 # Marketing subpages — clean URLs (match local `serve` behavior)
 [[redirects]]
