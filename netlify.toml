@@ -36,26 +36,48 @@
   to = "/demos/card-capture.html"
   status = 200
 
-# Legacy Med Spa URL → AI Sales Outreach demo
+# Legacy Med Spa URL → AI Sales Outreach demo (force: static /dashboard/demo/ still exists)
 [[redirects]]
   from = "/dashboard/demo"
   to = "/demo/ai-sales-outreach"
   status = 302
+  force = true
 
 [[redirects]]
   from = "/dashboard/demo/"
   to = "/demo/ai-sales-outreach"
   status = 302
+  force = true
+
+[[redirects]]
+  from = "/dashboard/demo/*"
+  to = "/demo/ai-sales-outreach"
+  status = 302
+  force = true
 
 [[redirects]]
   from = "/dashboard"
   to = "/demo/ai-sales-outreach"
   status = 302
+  force = true
 
 [[redirects]]
   from = "/dashboard/"
   to = "/demo/ai-sales-outreach"
   status = 302
+  force = true
+
+[[redirects]]
+  from = "/dashboard/luxe-glow"
+  to = "/demo/ai-sales-outreach"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/dashboard/luxe-glow/"
+  to = "/demo/ai-sales-outreach"
+  status = 302
+  force = true
 
 # Old Overview workspace is retired as a landing — send people to the portal
 [[redirects]]
