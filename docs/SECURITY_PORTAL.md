@@ -25,9 +25,10 @@
 1. Apply migration `20260810120000_portal_users_events.sql`.
 2. Deploy Edge Functions `portal-session` and `admin-api` (`verify_jwt: false` — they verify Firebase ID tokens themselves).
 3. Confirm Firebase authorized domains include `powerhousetech.in`.
-4. Sign in as shreyas@ → should land on `/admin`.
+4. Sign in as shreyas@ → should land on `/admin` (via `/portal`).
 5. Public sample demos (`/dashboard/demo/`, `/invoice-dashboard/`) load without sign-in; live `/app/invoice-radar` stays gated.
 6. `/sample-automations` embeds those public demos (no Loom placeholders).
+7. `/app` and `/workspace` redirect to `/portal` — the old Overview shell is not a product landing (`/app/workspace` is opt-in legacy only).
 
 ## Deploy without `SUPABASE_ACCESS_TOKEN`
 

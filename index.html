@@ -3026,10 +3026,30 @@ function initThemeToggles() {
 
 initThemeToggles();
 
-/* ==================== SIGN-IN OVERLAY ==================== */
+/* ==================== SIGN-IN → PORTAL ==================== */
 let pendingAppMode = null;
 
+function wantsLegacyWorkspace() {
+  try {
+    if (new URLSearchParams(window.location.search).get('workspace') === '1') return true;
+    const path = (window.location.pathname || '').replace(/\/$/, '');
+    return path === '/app/workspace';
+  } catch {
+    return false;
+  }
+}
+
+/** Product landing after Google auth is /portal — not the old Overview shell. */
+function goClientLanding() {
+  window.location.assign('/portal');
+}
+
 function openSignin(mode){
+  // Modal kept for rare in-page flows; marketing CTAs go straight to portal.
+  if (!wantsLegacyWorkspace()) {
+    goClientLanding();
+    return;
+  }
   if (mode) pendingAppMode = mode;
   overlay.classList.add('show');
   document.body.classList.add('modal-open');
@@ -3037,21 +3057,18 @@ function openSignin(mode){
   hamburger.setAttribute('aria-expanded', 'false');
 }
 function openSigninForDesktop(){
-  if (currentUser?.uid) {
-    if (dashboard.hidden) enterDashboard(currentUser);
-    else setAppMode('desktop');
-    return;
-  }
-  pendingAppMode = 'desktop';
-  openSignin();
+  goClientLanding();
 }
 function closeSignin(){
   overlay.classList.remove('show');
   document.body.classList.remove('modal-open');
 }
-document.querySelectorAll('.js-open-signin').forEach(b => b.addEventListener('click', () => openSignin()));
+document.querySelectorAll('.js-open-signin').forEach(b => b.addEventListener('click', (e) => {
+  e.preventDefault();
+  goClientLanding();
+}));
 document.querySelectorAll('.js-open-signin-desktop').forEach(b => {
-  b.addEventListener('click', (e) => { e.preventDefault(); openSigninForDesktop(); });
+  b.addEventListener('click', (e) => { e.preventDefault(); goClientLanding(); });
 });
 document.getElementById('signin-close').addEventListener('click', closeSignin);
 overlay.addEventListener('click', e => { if (e.target === overlay) closeSignin(); });
@@ -3075,11 +3092,19 @@ function showLanding(){
 
 function enterDashboard(user){
   if (!user?.email || !user?.uid) {
-    openSignin();
+    goClientLanding();
+    return;
+  }
+  if (!wantsLegacyWorkspace()) {
+    // Overview is not a product landing — send people to the portal.
+    currentUser = user;
+    try { sessionStorage.setItem('ph_user', JSON.stringify(user)); } catch (_) {}
+    closeSignin();
+    goClientLanding();
     return;
   }
   currentUser = user;
-  sessionStorage.setItem('ph_user', JSON.stringify(user));
+  try { sessionStorage.setItem('ph_user', JSON.stringify(user)); } catch (_) {}
   closeSignin();
   landing.hidden = true;
   dashboard.hidden = false;
@@ -3574,6 +3599,8 @@ function setupFirebaseAuth(){
     googleBtn.style.opacity = '0.7';
     try {
       await signInWithPopup(auth, googleProvider);
+      // Successful auth → client portal (admin routing happens there).
+      window.location.assign('/portal');
     } catch (err) {
       if (err.code === 'auth/popup-closed-by-user') {
         resetGoogleBtn();
@@ -3591,11 +3618,28 @@ function setupFirebaseAuth(){
 
   onAuthStateChanged(auth, (user) => {
     if (user){
-      enterDashboard(firebaseUserToProfile(user));
+      const profile = firebaseUserToProfile(user);
+      currentUser = profile;
+      try { sessionStorage.setItem('ph_user', JSON.stringify(profile)); } catch (_) {}
       sessionRestored = true;
+      closeSignin();
+
+      // Never auto-open the old Overview on the marketing homepage.
+      if (wantsLegacyWorkspace()) {
+        enterDashboard(profile);
+        return;
+      }
+
+      // Keep marketing site browsable while signed in.
+      if (!dashboard.hidden) {
+        landing.hidden = false;
+        dashboard.hidden = true;
+        document.body.classList.add('landing-visible');
+      }
       return;
     }
     sessionStorage.removeItem('ph_user');
+    currentUser = null;
     if (sessionRestored || !dashboard.hidden) {
       showLanding();
     }

@@ -9,20 +9,37 @@
   publish = "."
   port = 8742
 
-# Client workspace: optional clean URL
-[[redirects]]
-  from = "/workspace"
-  to = "/index.html"
-  status = 200
-
-[[redirects]]
-  from = "/app"
-  to = "/index.html"
-  status = 200
-
+# Live Invoice Radar app (must stay above the /app → portal redirect)
 [[redirects]]
   from = "/app/invoice-radar"
   to = "/app/invoice-radar.html"
+  status = 200
+
+# Old Overview workspace is retired as a landing — send people to the portal
+[[redirects]]
+  from = "/app"
+  to = "/portal"
+  status = 302
+
+[[redirects]]
+  from = "/app/"
+  to = "/portal"
+  status = 302
+
+[[redirects]]
+  from = "/workspace"
+  to = "/portal"
+  status = 302
+
+[[redirects]]
+  from = "/workspace/"
+  to = "/portal"
+  status = 302
+
+# Opt-in legacy shell (credits / retired tools) — not a default landing
+[[redirects]]
+  from = "/app/workspace"
+  to = "/index.html?workspace=1"
   status = 200
 
 # Client portal — sign in → choose a service dashboard
