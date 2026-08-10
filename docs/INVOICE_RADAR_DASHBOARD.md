@@ -24,7 +24,8 @@ Run [`supabase/migrations/20260710120000_user_service_entitlements.sql`](supabas
 ### 2. Deploy Edge Function
 
 ```bash
-export SUPABASE_ACCESS_TOKEN="sbp_..."
+# Prefer Supabase MCP (apply_migration / deploy_edge_function) when no CLI token.
+# Or: export SUPABASE_ACCESS_TOKEN="sbp_..."
 npm run deploy:functions
 ```
 

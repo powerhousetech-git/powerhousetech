@@ -23,7 +23,17 @@
 ## Operational checklist
 
 1. Apply migration `20260810120000_portal_users_events.sql`.
-2. Deploy Edge Functions `portal-session` and `admin-api`.
+2. Deploy Edge Functions `portal-session` and `admin-api` (`verify_jwt: false` — they verify Firebase ID tokens themselves).
 3. Confirm Firebase authorized domains include `powerhousetech.in`.
 4. Sign in as shreyas@ → should land on `/admin`.
 5. Unsigned visit to `/dashboard/demo/` → redirect to `/portal?returnTo=…`.
+
+## Deploy without `SUPABASE_ACCESS_TOKEN`
+
+Cloud/agent environments often lack a CLI personal access token. Prefer **Supabase MCP** (authenticated in Cursor) instead of `scripts/deploy-functions.sh`:
+
+- `apply_migration` — run SQL migrations (e.g. `portal_users_events`)
+- `deploy_edge_function` — ship `portal-session` / `admin-api` with relative `_shared/*` files and `verify_jwt: false`
+- `list_edge_functions` / `execute_sql` — verify deploy + seed (`shreyas@powerhousetech.in` is admin)
+
+CLI remains optional: create a token at https://supabase.com/dashboard/account/tokens, then `export SUPABASE_ACCESS_TOKEN=sbp_...` and run `./scripts/deploy-functions.sh`.
