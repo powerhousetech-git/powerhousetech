@@ -21,6 +21,8 @@ FUNCTIONS=(
   book-build-status
   software-download
   invoice-radar-proxy
+  portal-session
+  admin-api
 )
 
 echo "Deploying: ${FUNCTIONS[*]}"
