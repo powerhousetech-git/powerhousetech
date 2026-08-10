@@ -7,16 +7,12 @@ Marketing site and client workspace for **Powerhouse Tech** — custom workflow 
 Static HTML/CSS/JS published via Netlify (`netlify.toml` → publish `.`).
 
 - Marketing: `index.html`, `services.html`, `industries.html`, `about.html`, `contact.html`
-- **Demos:** `/sample-automations` — interactive dashboard cards (sign-in required to open)
-- **Client portal:** `/portal` — Google sign-in, then pick a service
-- **Admin:** `/admin` — opens automatically for `shreyas@powerhousetech.in` (Supabase `is_admin`)
-- Invoice Radar live: `/app/invoice-radar`
-- Invoice Radar sample: `/invoice-dashboard/`
-- Med spa ROI dashboard: `/dashboard/demo/`
-- Client portal (post sign-in home): `/portal`
+- **Client portal (post sign-in home):** `/portal`
+- **Admin:** `/admin` — `shreyas@powerhousetech.in` (Supabase `is_admin`)
+- **Demos:** `/sample-automations` — AI Sales Outreach, Card Capture, Invoice Radar samples
 - Live Invoice Radar: `/app/invoice-radar`
-- Public demos: `/sample-automations`, `/demo/ai-sales-outreach`, `/demo/card-capture`, `/invoice-dashboard/`
-- Legacy Med Spa Next export (redirects to outreach): `/dashboard/demo/`
+- Sample demos: `/demo/ai-sales-outreach`, `/demo/card-capture`, `/invoice-dashboard/`
+- Legacy `/dashboard/demo/` redirects to AI Sales Outreach
 
 See `docs/SECURITY_PORTAL.md` for auth/admin security notes. Apply Supabase migration `20260810120000_portal_users_events.sql` and deploy Edge Functions `portal-session` + `admin-api`.
 
