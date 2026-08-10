@@ -218,6 +218,22 @@ tbody tr:hover { background: #fafafe; }
 .nav-item.active .step-num {
   color: rgba(255, 255, 255, 0.85);
 }
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -4px;
+  padding-bottom: 2px;
+}
+.table-scroll table {
+  min-width: 520px;
+}
+html.is-embed body {
+  background: var(--bg);
+}
+html.is-embed .side-foot {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .app {
     grid-template-columns: 1fr;
@@ -238,11 +254,40 @@ tbody tr:hover { background: #fafafe; }
     overflow-y: hidden;
     gap: 6px;
     padding: 10px 12px;
+    padding-top: max(10px, env(safe-area-inset-top));
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    box-shadow: 0 8px 24px rgba(8, 8, 14, 0.28);
   }
   .side::-webkit-scrollbar { display: none; }
-  .side .brand,
+  .side .brand {
+    display: flex;
+    flex: 0 0 auto;
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 0 10px 0 0;
+    border: 0;
+    border-right: 1px solid #23232f;
+    background: #111119;
+    box-shadow: 8px 0 12px -8px rgba(0, 0, 0, 0.45);
+  }
+  .side .brand svg {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+  }
+  .side .brand .name {
+    font-size: 0.82rem;
+    line-height: 1.15;
+    max-width: 9ch;
+  }
+  .side .brand .sub {
+    display: none;
+  }
   .side .nav-sec,
   .side .side-foot {
     display: none;
@@ -254,10 +299,136 @@ tbody tr:hover { background: #fafafe; }
     padding: 8px 12px;
     touch-action: manipulation;
   }
-  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .kpis { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .kpi { padding: 14px; }
+  .kpi .val { font-size: 1.35rem; }
   .two-col, .doors, .seq { grid-template-columns: 1fr; }
-  .main { padding: 16px 14px 48px; }
-  .topbar h1 { font-size: 1.45rem; }
-  .step-next { flex-direction: column; align-items: stretch; }
-  .step-next .btn { width: 100%; justify-content: center; }
+  .main {
+    padding: 14px 14px max(40px, env(safe-area-inset-bottom));
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  .topbar {
+    margin-bottom: 16px;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .topbar h1 { font-size: 1.35rem; line-height: 1.2; }
+  .topbar .sub { font-size: 0.82rem; line-height: 1.4; }
+  .top-actions {
+    width: 100%;
+    gap: 8px;
+  }
+  .top-actions .btn,
+  .top-actions .chip {
+    min-height: 36px;
+  }
+  .banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
+  .banner .btn { margin-left: 0; width: 100%; justify-content: center; }
+  .card {
+    padding: 14px;
+    margin-bottom: 14px;
+    border-radius: 12px;
+  }
+  .card-head { margin-bottom: 12px; }
+  .stage-row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'lab amt'
+      'bar bar';
+    gap: 6px 10px;
+  }
+  .stage-row .lab { grid-area: lab; }
+  .stage-row .amt { grid-area: amt; }
+  .stage-row .bar { grid-area: bar; }
+  .step-next { flex-direction: column; align-items: stretch; padding: 14px; }
+  .step-next .btn { width: 100%; justify-content: center; min-height: 44px; }
+  .table-scroll {
+    margin: 0 -14px;
+    padding: 0 14px 4px;
+  }
+  .table-scroll table {
+    min-width: 540px;
+  }
+  th, td { padding: 11px 10px; }
+  .door { padding: 16px 14px; min-height: 44px; }
+  .seq-step { padding: 12px; }
+}
+
+@media (max-width: 480px) {
+  .kpis { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .kpi .label { font-size: 0.7rem; margin-bottom: 6px; }
+  .kpi .val { font-size: 1.2rem; }
+  .top-actions .chip-demo { display: none; }
+  .side .brand .name {
+    max-width: 7.5ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* Stack data tables into cards on very narrow phones */
+@media (max-width: 560px) {
+  .table-scroll {
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+  }
+  .table-scroll table {
+    min-width: 0;
+    width: 100%;
+  }
+  .table-scroll thead {
+    display: none;
+  }
+  .table-scroll tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .table-scroll tr {
+    display: grid;
+    gap: 6px;
+    padding: 12px 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fbfbfe;
+  }
+  .table-scroll td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 0;
+    border: 0;
+    font-size: 0.86rem;
+    text-align: right;
+  }
+  .table-scroll td::before {
+    content: attr(data-label);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    text-align: left;
+    flex: 0 0 42%;
+  }
+  .table-scroll td:first-child {
+    font-weight: 700;
+    text-align: left;
+    display: block;
+  }
+  .table-scroll td:first-child::before {
+    display: none;
+  }
+  .table-scroll td:empty {
+    display: none;
+  }
 }

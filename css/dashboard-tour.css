@@ -95,3 +95,22 @@
 body.ph-tour-active {
   overflow: hidden;
 }
+@media (max-width: 640px) {
+  .ph-tour-card {
+    width: calc(100vw - 24px);
+    left: 12px !important;
+    right: 12px;
+    max-height: min(42vh, 320px);
+    padding: 14px 14px 12px;
+  }
+  .ph-tour-actions {
+    flex-wrap: wrap;
+  }
+  .ph-tour-actions button {
+    min-height: 40px;
+    touch-action: manipulation;
+  }
+  .ph-tour-highlight {
+    border-radius: 10px;
+  }
+}

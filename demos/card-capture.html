@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="description" content="Card Capture & Follow-Up Engine demo — capture, OCR confirm, sequences, then overview.">
 <title>Card Capture — Demo · PowerhouseTech</title>
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Instrument+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/demo-dashboard.css?v=2">
-<link rel="stylesheet" href="/css/dashboard-tour.css?v=3">
+<link rel="stylesheet" href="/css/demo-dashboard.css?v=3">
+<link rel="stylesheet" href="/css/dashboard-tour.css?v=4">
 </head>
 <body>
 <div class="app" id="cc-app">
@@ -198,7 +198,7 @@
   </main>
 </div>
 
-<script src="/js/dashboard-tour.js?v=3"></script>
+<script src="/js/dashboard-tour.js?v=4"></script>
 <script>
 (function () {
   var QUEUE = [
@@ -233,6 +233,8 @@
   document.getElementById('db-table').innerHTML = DB.map(function (d) {
     return '<tr><td><b>' + d.name + '</b></td><td>' + d.co + '</td><td>' + d.ind + '</td><td><span class="pill ' + (d.status === 'New' ? 'p-new' : 'p-cool') + '">' + d.status + '</span></td></tr>';
   }).join('');
+
+  if (window.phDemoMobile) window.phDemoMobile.wrapTables();
 
   var titles = {
     capture: ['01 · Capture / upload', 'Upload booth snaps, bulk photos, or PDF scans'],

@@ -48,11 +48,16 @@
       '<a class="btn btn-ghost" href="/contact.html#book">Book a call</a>' +
       '</div></div>' +
       '<div class="demo-frame">' +
-      '<div class="demo-chrome">' +
-      '<div class="demo-chrome-dots" aria-hidden="true"><span></span><span></span><span></span></div>' +
+      '<div class="demo-chrome demo-chrome--desktop" aria-hidden="true">' +
+      '<div class="demo-chrome-dots"><span></span><span></span><span></span></div>' +
       '<div class="demo-chrome-url">' +
       esc(urlLabel) +
       '</div></div>' +
+      '<div class="demo-phone" aria-label="' +
+      esc(d.title) +
+      ' mobile preview">' +
+      '<div class="demo-phone-bezel">' +
+      '<div class="demo-phone-notch" aria-hidden="true"></div>' +
       '<div class="demo-frame-body' +
       themeClass +
       '">' +
@@ -62,10 +67,14 @@
       esc(d.title) +
       ' interactive demo" loading="lazy" referrerpolicy="same-origin"></iframe>' +
       '<div class="demo-frame-fallback" data-fallback>' +
-      '<p>Preview didn’t load in this browser frame.</p>' +
+      '<p>Preview didn’t load in this frame.</p>' +
       '<a class="btn btn-primary" href="' +
       esc(href) +
       '">Open full demo</a></div>' +
+      '</div>' +
+      '<div class="demo-phone-home" aria-hidden="true"></div>' +
+      '</div>' +
+      '<p class="demo-phone-caption">Mobile layout · scroll inside the phone</p>' +
       '</div></div></article>'
     );
   }

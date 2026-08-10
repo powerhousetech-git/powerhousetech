@@ -228,4 +228,47 @@
   }
 
   global.phTour = { start: start, shouldAutoStart: shouldAutoStart, reset: reset };
+
+  function wrapDemoTables(root) {
+    var scope = root || document;
+    scope.querySelectorAll('.card > table, .main .card table').forEach(function (table) {
+      if (!table.closest('.table-scroll')) {
+        var wrap = document.createElement('div');
+        wrap.className = 'table-scroll';
+        table.parentNode.insertBefore(wrap, table);
+        wrap.appendChild(table);
+      }
+      var headers = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) {
+        return (th.textContent || '').trim();
+      });
+      table.querySelectorAll('tbody tr').forEach(function (tr) {
+        Array.prototype.forEach.call(tr.children, function (td, i) {
+          if (!td.getAttribute('data-label') && headers[i]) {
+            td.setAttribute('data-label', headers[i]);
+          }
+        });
+      });
+    });
+  }
+
+  function bootDemoMobile() {
+    try {
+      if (window.self !== window.top) {
+        document.documentElement.classList.add('is-embed');
+      }
+    } catch (_) {
+      document.documentElement.classList.add('is-embed');
+    }
+    wrapDemoTables();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootDemoMobile);
+  } else {
+    bootDemoMobile();
+  }
+  // Catch tables painted by later inline scripts on the same tick.
+  setTimeout(bootDemoMobile, 0);
+
+  global.phDemoMobile = { wrapTables: wrapDemoTables, boot: bootDemoMobile };
 })(window);
