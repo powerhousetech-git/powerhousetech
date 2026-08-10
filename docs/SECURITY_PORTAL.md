@@ -2,11 +2,13 @@
 
 ## Auth model
 
-- **Identity:** Firebase Google sign-in (`powerhouse-tech-f6da1`).
+- **Identity:** Firebase Google sign-in (`powerhouse-tech-f6da1`), with **browser local persistence** (IndexedDB) so one sign-in lasts across pages until Sign out.
+- **Client cache:** `localStorage.ph_auth_user` + `sessionStorage.ph_user` (UX only — Firebase remains source of truth).
+- **Portal:** Restores session before showing the Google button; cached users see services immediately (no re-prompt).
 - **Gated routes:** `/app/invoice-radar`, `/admin` (live client / admin).
-- **Public sample demos:** `/dashboard/demo/`, `/invoice-dashboard/`, marketing pages (`/`, `/services`, `/sample-automations`, `/contact`, …).
+- **Public sample demos:** `/demo/*`, `/invoice-dashboard/`, marketing pages — **never** require Google sign-in.
 - **ReturnTo:** `sessionStorage.ph_return_to` + query `?returnTo=` allowlisted to relative paths only (`js/auth-gate.js` → `safeReturnTo`).
-- Sample demos use mock data and load without Google sign-in so marketing visitors never hit a blank auth wall.
+- Marketing / home nav shows **Portal** when a session exists, **Sign in** otherwise.
 
 ## Admin
 

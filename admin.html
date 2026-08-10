@@ -104,9 +104,10 @@
   </div>
 
   <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
+    import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
     import {
       getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
+      setPersistence, browserLocalPersistence,
     } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
     const firebaseConfig = {
       apiKey: 'AIzaSyD9fHOILnFLauZqd-C2AZwm-vrkpQk-sV4',
@@ -117,8 +118,9 @@
       appId: '1:946732625664:web:627677c716fcf7c16b0de5',
       measurementId: 'G-QRZLG84GYV',
     };
-    const app = initializeApp(firebaseConfig);
+    const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
     const auth = getAuth(app);
+    await setPersistence(auth, browserLocalPersistence).catch(() => {});
     window.phFirebaseAuth = {
       auth,
       googleProvider: new GoogleAuthProvider(),
@@ -128,7 +130,7 @@
     };
     window.dispatchEvent(new CustomEvent('ph-firebase-ready'));
   </script>
-  <script src="/js/auth-gate.js"></script>
+  <script src="/js/auth-gate.js?v=2"></script>
   <script src="/js/admin.js" defer></script>
 </body>
 </html>

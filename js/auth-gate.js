@@ -3,14 +3,18 @@
  * - requireAuth / guardPage: redirect unsigned users to /portal?returnTo=…
  * - safeReturnTo: allowlist relative paths only
  * - recordSession: upsert portal user + event via Edge Function
+ * - Session: Firebase local persistence + localStorage cache so sign-in is once per browser session
  */
 (function (global) {
   var USER_KEY = 'ph_user';
+  var LOCAL_USER_KEY = 'ph_auth_user';
   var RETURN_KEY = 'ph_return_to';
   var DEMO_KEY = 'ph_portal_demo';
   var SUPABASE_URL = 'https://msratyvmnuvozuthgkmi.supabase.co';
   var SESSION_API = SUPABASE_URL + '/functions/v1/portal-session';
   var ADMIN_ME_API = SUPABASE_URL + '/functions/v1/admin-api?op=me';
+
+  var authUserPromise = null;
 
   function waitForFirebase() {
     if (global.phFirebaseAuth) return Promise.resolve(global.phFirebaseAuth);
@@ -26,6 +30,39 @@
         resolve(global.phFirebaseAuth || null);
       }, 10000);
     });
+  }
+
+  /** Wait for Firebase Auth to finish restoring from IndexedDB (not just SDK load). */
+  function waitForAuthUser() {
+    if (authUserPromise) return authUserPromise;
+    authUserPromise = waitForFirebase().then(function (fb) {
+      if (!fb || !fb.auth) return null;
+      if (fb.auth.currentUser && fb.auth.currentUser.email) {
+        return fb.auth.currentUser;
+      }
+      return new Promise(function (resolve) {
+        var settled = false;
+        var unsub = fb.onAuthStateChanged(fb.auth, function (user) {
+          if (settled) return;
+          settled = true;
+          if (typeof unsub === 'function') unsub();
+          resolve(user && user.email ? user : null);
+        });
+        setTimeout(function () {
+          if (settled) return;
+          settled = true;
+          if (typeof unsub === 'function') unsub();
+          var u = fb.auth.currentUser;
+          resolve(u && u.email ? u : null);
+        }, 8000);
+      });
+    });
+    return authUserPromise;
+  }
+
+  /** Reset cached auth promise (e.g. after sign-out). */
+  function resetAuthUserCache() {
+    authUserPromise = null;
   }
 
   function safeReturnTo(path) {
@@ -61,28 +98,51 @@
     }
   }
 
+  function userPayload(user) {
+    return {
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName || '',
+      photoURL: user.photoURL || '',
+      ts: Date.now(),
+    };
+  }
+
   function writeUser(user) {
+    if (!user || !user.email) return;
+    var payload = JSON.stringify(userPayload(user));
     try {
-      sessionStorage.setItem(
-        USER_KEY,
-        JSON.stringify({
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName || '',
-          photoURL: user.photoURL || '',
-        })
-      );
+      sessionStorage.setItem(USER_KEY, payload);
       sessionStorage.removeItem(DEMO_KEY);
+    } catch (_) {}
+    try {
+      localStorage.setItem(LOCAL_USER_KEY, payload);
+    } catch (_) {}
+    try {
+      global.dispatchEvent(
+        new CustomEvent('ph-auth-changed', { detail: { user: userPayload(user) } })
+      );
     } catch (_) {}
   }
 
-  function readCachedUser() {
+  function parseUser(raw) {
     try {
-      var raw = sessionStorage.getItem(USER_KEY);
       if (!raw) return null;
       var u = JSON.parse(raw);
       if (!u || !u.email || u.uid === 'demo-portal') return null;
       return u;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function readCachedUser() {
+    try {
+      var fromSession = parseUser(sessionStorage.getItem(USER_KEY));
+      if (fromSession) return fromSession;
+    } catch (_) {}
+    try {
+      return parseUser(localStorage.getItem(LOCAL_USER_KEY));
     } catch (_) {
       return null;
     }
@@ -93,6 +153,13 @@
       sessionStorage.removeItem(USER_KEY);
       sessionStorage.removeItem(DEMO_KEY);
     } catch (_) {}
+    try {
+      localStorage.removeItem(LOCAL_USER_KEY);
+    } catch (_) {}
+    resetAuthUserCache();
+    try {
+      global.dispatchEvent(new CustomEvent('ph-auth-changed', { detail: { user: null } }));
+    } catch (_) {}
   }
 
   function portalSignInUrl(returnTo) {
@@ -102,8 +169,7 @@
   }
 
   async function getIdToken() {
-    var fb = await waitForFirebase();
-    var user = fb && fb.auth && fb.auth.currentUser;
+    var user = await waitForAuthUser();
     if (!user) return null;
     return user.getIdToken();
   }
@@ -160,42 +226,81 @@
       return null;
     }
 
-    return new Promise(function (resolve) {
-      var unsub = fb.onAuthStateChanged(fb.auth, function (user) {
-        if (typeof unsub === 'function') unsub();
-        if (user && user.email) {
-          writeUser(user);
-          resolve(user);
-          if (opts.record !== false) {
-            recordSession(opts.eventType || 'dashboard_view', returnTo, {
-              title: opts.title || document.title,
-            });
-          }
-        } else {
-          clearUser();
-          global.location.replace(portalSignInUrl(returnTo));
-          resolve(null);
-        }
-      });
-    });
+    var user = await waitForAuthUser();
+    if (user && user.email) {
+      writeUser(user);
+      if (opts.record !== false) {
+        recordSession(opts.eventType || 'dashboard_view', returnTo, {
+          title: opts.title || document.title,
+        });
+      }
+      return user;
+    }
+    clearUser();
+    global.location.replace(portalSignInUrl(returnTo));
+    return null;
   }
 
-  /** Navigate to a gated URL (or portal sign-in with returnTo). */
+  /** Navigate to a URL; only redirect to sign-in if truly signed out. */
   async function openGated(href) {
     var target = safeReturnTo(href);
-    var fb = await waitForFirebase();
-    var user = fb && fb.auth && fb.auth.currentUser;
+    var user = await waitForAuthUser();
     if (user && user.email) {
       writeUser(user);
       recordSession('demo_open', target, {});
       global.location.href = target;
       return;
     }
+    // Public demos never need a gate — open directly.
+    if (
+      /^\/(demo\/|invoice-dashboard\/?|sample-automations)/.test(target) ||
+      target.indexOf('/demos/') === 0
+    ) {
+      global.location.href = target;
+      return;
+    }
     global.location.href = portalSignInUrl(target);
+  }
+
+  /** Update marketing / home Sign in → Portal when session exists. */
+  function applyNavSession(user) {
+    var label = user && user.email ? 'Portal' : 'Sign in';
+    var title = user && user.email ? 'Open your portal' : 'Sign in';
+    document.querySelectorAll('[data-auth-cta], a.nav-cta[href="/portal"], a.mobile-signin[href="/portal"]').forEach(
+      function (el) {
+        if (el.tagName === 'A' && (el.getAttribute('href') || '').indexOf('/portal') === 0) {
+          el.textContent = label;
+          el.setAttribute('title', title);
+          if (user && user.email) el.setAttribute('data-signed-in', '1');
+          else el.removeAttribute('data-signed-in');
+        }
+      }
+    );
+    document.querySelectorAll('[data-auth-cta]').forEach(function (el) {
+      el.textContent = label;
+    });
+  }
+
+  function bootNavSession() {
+    applyNavSession(readCachedUser());
+    waitForAuthUser().then(function (user) {
+      if (user) {
+        writeUser(user);
+        applyNavSession(userPayload(user));
+      } else {
+        clearUser();
+        applyNavSession(null);
+      }
+    });
+    global.addEventListener('ph-auth-changed', function (ev) {
+      applyNavSession(ev.detail && ev.detail.user);
+    });
   }
 
   global.phAuthGate = {
     waitForFirebase: waitForFirebase,
+    waitForAuthUser: waitForAuthUser,
+    resetAuthUserCache: resetAuthUserCache,
     safeReturnTo: safeReturnTo,
     setReturnTo: setReturnTo,
     consumeReturnTo: consumeReturnTo,
@@ -209,7 +314,10 @@
     fetchAdminMe: fetchAdminMe,
     guardPage: guardPage,
     openGated: openGated,
+    applyNavSession: applyNavSession,
+    bootNavSession: bootNavSession,
     USER_KEY: USER_KEY,
+    LOCAL_USER_KEY: LOCAL_USER_KEY,
     RETURN_KEY: RETURN_KEY,
   };
 })(window);

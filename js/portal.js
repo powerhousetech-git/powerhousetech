@@ -1,9 +1,9 @@
 (() => {
-  const USER_KEY = 'ph_user';
   const gate = () => window.phAuthGate;
 
   const authView = document.getElementById('auth-view');
   const servicesView = document.getElementById('services-view');
+  const restoringView = document.getElementById('restoring-view');
   const googleBtn = document.getElementById('google-signin');
   const demoBtn = document.getElementById('demo-signin');
   const signOutBtn = document.getElementById('signout-btn');
@@ -13,6 +13,9 @@
   const userEmail = document.getElementById('user-email');
   const greetName = document.getElementById('greet-name');
   const adminLink = document.getElementById('admin-link');
+
+  let handledUid = null;
+  let bootDone = false;
 
   // Public demos don't need the portal — keep sign-in focused.
   if (demoBtn) {
@@ -33,7 +36,15 @@
     authError.classList.toggle('hidden', !msg);
   }
 
+  function showRestoring() {
+    restoringView?.classList.remove('hidden');
+    authView?.classList.add('hidden');
+    servicesView?.classList.add('hidden');
+    signOutBtn?.classList.add('hidden');
+  }
+
   function showServices(user) {
+    restoringView?.classList.add('hidden');
     authView?.classList.add('hidden');
     servicesView?.classList.remove('hidden');
     signOutBtn?.classList.remove('hidden');
@@ -53,6 +64,7 @@
   }
 
   function showAuth() {
+    restoringView?.classList.add('hidden');
     servicesView?.classList.add('hidden');
     authView?.classList.remove('hidden');
     signOutBtn?.classList.add('hidden');
@@ -62,12 +74,31 @@
 
   async function afterSignIn(user, opts) {
     opts = opts || {};
-    gate().writeUser(user);
-    const session = await gate().recordSession('sign_in', '/portal', {
-      display_name: user.displayName || '',
-    });
+    if (!user?.email) {
+      showAuth();
+      return;
+    }
 
-    // Prefer explicit returnTo (from gated dashboard deep link)
+    // Avoid double-handling the same restored session (popup + onAuthStateChanged).
+    if (handledUid === user.uid && opts.skipIfHandled) {
+      showServices({
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+      });
+      return;
+    }
+    handledUid = user.uid;
+
+    gate().writeUser(user);
+
+    let session = null;
+    if (opts.record !== false) {
+      session = await gate().recordSession(opts.eventType || 'sign_in', '/portal', {
+        display_name: user.displayName || '',
+      });
+    }
+
     const params = new URLSearchParams(window.location.search);
     const qReturn = params.get('returnTo');
     if (qReturn) gate().setReturnTo(qReturn);
@@ -79,17 +110,17 @@
       adminLink.classList.toggle('hidden', !isAdmin);
     }
 
-    // Default landing for admins (unless returning to a specific dashboard)
     const stored = gate().peekReturnTo();
     const hasExplicitReturn =
       stored && stored !== '/portal' && stored !== '/portal/';
 
-    if (isAdmin && !hasExplicitReturn && !opts.stayOnPortal) {
+    // Fresh Google popup: admins land on /admin unless they had a returnTo.
+    if (isAdmin && !hasExplicitReturn && opts.preferAdmin) {
       window.location.replace('/admin');
       return;
     }
 
-    if (hasExplicitReturn && opts.followReturn !== false) {
+    if (hasExplicitReturn && opts.followReturn) {
       const dest = gate().consumeReturnTo('/portal');
       if (dest !== '/portal' && dest !== window.location.pathname) {
         window.location.replace(dest);
@@ -110,8 +141,13 @@
     try {
       const fb = await gate().waitForFirebase();
       if (!fb) throw new Error('Authentication is still loading. Try again.');
+      gate().resetAuthUserCache();
       const result = await fb.signInWithPopup(fb.auth, fb.googleProvider);
-      await afterSignIn(result.user);
+      await afterSignIn(result.user, {
+        preferAdmin: true,
+        followReturn: true,
+        eventType: 'sign_in',
+      });
     } catch (err) {
       if (err?.code !== 'auth/popup-closed-by-user') {
         console.error(err);
@@ -123,6 +159,7 @@
   }
 
   async function signOut() {
+    handledUid = null;
     gate().clearUser();
     try {
       const fb = await gate().waitForFirebase();
@@ -136,7 +173,7 @@
   googleBtn?.addEventListener('click', signInGoogle);
   signOutBtn?.addEventListener('click', signOut);
 
-  // Service cards → gated open
+  // Service cards → gated open (live products only; demos are public hrefs)
   document.querySelectorAll('[data-gated-href]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.preventDefault();
@@ -150,28 +187,35 @@
     const qReturn = params.get('returnTo');
     if (qReturn) gate().setReturnTo(qReturn);
 
-    const fb = await gate().waitForFirebase();
-    if (!fb) {
-      showAuth();
+    const cached = gate().readCachedUser();
+    if (cached) {
+      // Optimistic: don't flash the Google button if we already signed in this browser.
+      showServices(cached);
+    } else {
+      showRestoring();
+    }
+
+    const user = await gate().waitForAuthUser();
+    bootDone = true;
+
+    if (user?.email) {
+      await afterSignIn(user, {
+        preferAdmin: false,
+        followReturn: Boolean(qReturn),
+        eventType: 'session_restore',
+        record: true,
+        skipIfHandled: false,
+      });
       return;
     }
 
-    fb.onAuthStateChanged(fb.auth, async (user) => {
-      if (user?.email) {
-        await afterSignIn(user, { stayOnPortal: !qReturn, followReturn: Boolean(qReturn) });
-      } else {
-        // Clear stale demo sessions
-        const cached = gate().readCachedUser();
-        if (!cached) {
-          try {
-            sessionStorage.removeItem(USER_KEY);
-            sessionStorage.removeItem('ph_portal_demo');
-          } catch (_) {}
-        }
-        showAuth();
-      }
-    });
+    gate().clearUser();
+    handledUid = null;
+    showAuth();
   }
 
-  boot();
+  boot().catch((err) => {
+    console.error(err);
+    if (!bootDone) showAuth();
+  });
 })();

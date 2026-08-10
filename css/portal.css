@@ -219,6 +219,20 @@ a {
   font-size: 0.85rem;
 }
 
+.auth-spinner {
+  width: 28px;
+  height: 28px;
+  margin: 8px 0 4px;
+  border: 2.5px solid rgba(66, 79, 209, 0.25);
+  border-top-color: var(--primary, #424fd1);
+  border-radius: 50%;
+  animation: ph-spin 0.7s linear infinite;
+}
+
+@keyframes ph-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Services */
 .services-head {
   margin-bottom: 28px;

@@ -65,6 +65,22 @@
     return '<a href="' + page.href + '"' + cls + '>' + page.label + '</a>';
   }
 
+  function navAuthLabel() {
+    try {
+      var cached = JSON.parse(localStorage.getItem('ph_auth_user') || 'null');
+      if (cached && cached.email) return 'Portal';
+    } catch (e) {}
+    return 'Sign in';
+  }
+
+  function navAuthCta() {
+    return (
+      '<a href="/portal" class="btn btn-ghost nav-cta" data-auth-cta>' +
+      navAuthLabel() +
+      '</a>'
+    );
+  }
+
   window.phRenderNav = function (mount) {
     var el = document.getElementById(mount || 'ph-nav');
     if (!el) return;
@@ -73,6 +89,7 @@
     var bookCta = onContact
       ? ''
       : '<a href="/contact.html#book" class="btn btn-primary nav-cta">Book a call</a>';
+    var authLabel = navAuthLabel();
     el.innerHTML =
       '<header class="nav">' +
       '<div class="nav-inner">' +
@@ -81,11 +98,15 @@
       '<nav class="nav-links" aria-label="Primary">' + desktop + '</nav>' +
       '<div class="nav-right">' +
       THEME_TOGGLE_HTML +
+      navAuthCta() +
       bookCta +
       '<button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">☰</button>' +
       '</div></div>' +
       '<nav class="mobile-nav" id="mobile-nav" aria-label="Mobile">' +
       PAGES.map(navLink).join('') +
+      '<a href="/portal" class="mobile-signin" data-auth-cta>' +
+      authLabel +
+      '</a>' +
       '</nav></header>';
     phInitNav();
   };
@@ -174,6 +195,25 @@
       m.id = 'marketing-motion';
       m.src = '/js/marketing-motion.js';
       document.body.appendChild(m);
+    }
+    // Soft-load auth so Sign in → Portal without a second Google prompt.
+    if (!document.getElementById('ph-firebase-boot')) {
+      var fb = document.createElement('script');
+      fb.id = 'ph-firebase-boot';
+      fb.type = 'module';
+      fb.src = '/js/firebase-boot.js';
+      document.body.appendChild(fb);
+    }
+    if (!document.getElementById('ph-auth-gate')) {
+      var ag = document.createElement('script');
+      ag.id = 'ph-auth-gate';
+      ag.src = '/js/auth-gate.js?v=2';
+      ag.onload = function () {
+        if (window.phAuthGate) window.phAuthGate.bootNavSession();
+      };
+      document.body.appendChild(ag);
+    } else if (window.phAuthGate) {
+      window.phAuthGate.bootNavSession();
     }
   });
 })();

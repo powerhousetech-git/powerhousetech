@@ -638,7 +638,7 @@ renderAll();
 
 <link rel="stylesheet" href="/css/dashboard-tour.css?v=3">
 <script type="module" src="/js/firebase-boot.js"></script>
-<script src="/js/auth-gate.js"></script>
+<script src="/js/auth-gate.js?v=2"></script>
 <script src="/js/dashboard-tour.js?v=3"></script>
 <script>
 (async function(){
@@ -649,7 +649,9 @@ renderAll();
       window.addEventListener('ph-firebase-ready',r,{once:true});
       setTimeout(r,4000);
     });
-    const user=window.phFirebaseAuth?.auth?.currentUser;
+    const user = window.phAuthGate
+      ? await window.phAuthGate.waitForAuthUser()
+      : window.phFirebaseAuth?.auth?.currentUser;
     if(user&&window.phAuthGate){
       window.phAuthGate.writeUser(user);
       window.phAuthGate.recordSession('dashboard_view','/invoice-dashboard/',{title:'Invoice Radar Sample',public_demo:true});

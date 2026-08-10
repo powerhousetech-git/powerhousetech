@@ -45,10 +45,16 @@
     </header>
 
     <main class="portal-main">
-      <section id="auth-view" class="auth-panel" aria-labelledby="auth-title">
+      <section id="restoring-view" class="auth-panel" aria-live="polite">
+        <h1>Welcome back</h1>
+        <p class="lead">Restoring your session…</p>
+        <div class="auth-spinner" aria-hidden="true"></div>
+      </section>
+
+      <section id="auth-view" class="auth-panel hidden" aria-labelledby="auth-title">
         <h1 id="auth-title">Sign in</h1>
         <p class="lead">
-          Use Google to open your portal and try the product demos.
+          Use Google once — your session stays active across the portal and demos.
         </p>
         <button type="button" class="btn btn-google" id="google-signin">
           <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
@@ -127,9 +133,10 @@
   </div>
 
   <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
+    import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
     import {
       getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
+      setPersistence, browserLocalPersistence,
     } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
 
     const firebaseConfig = {
@@ -142,13 +149,14 @@
       measurementId: 'G-QRZLG84GYV',
     };
 
-    const app = initializeApp(firebaseConfig);
+    const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
     const auth = getAuth(app);
+    await setPersistence(auth, browserLocalPersistence).catch(() => {});
     const googleProvider = new GoogleAuthProvider();
     window.phFirebaseAuth = { auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged };
     window.dispatchEvent(new CustomEvent('ph-firebase-ready'));
   </script>
-  <script src="/js/auth-gate.js"></script>
-  <script src="/js/portal.js" defer></script>
+  <script src="/js/auth-gate.js?v=2"></script>
+  <script src="/js/portal.js?v=2" defer></script>
 </body>
 </html>

@@ -1,14 +1,17 @@
 /**
  * Lightweight Firebase Auth bootstrap for static pages.
  * Sets window.phFirebaseAuth and dispatches ph-firebase-ready.
+ * Uses local persistence so sign-in survives navigation across pages.
  */
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
+import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
 import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
   signOut,
   onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
 } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
 
 const firebaseConfig = {
@@ -21,8 +24,11 @@ const firebaseConfig = {
   measurementId: 'G-QRZLG84GYV',
 };
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const auth = getAuth(app);
+
+setPersistence(auth, browserLocalPersistence).catch(function () {});
+
 window.phFirebaseAuth = {
   auth,
   googleProvider: new GoogleAuthProvider(),

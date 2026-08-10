@@ -1544,7 +1544,7 @@ body.landing-visible .theme-toggle-fixed{
           <svg class="icon-sun" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
           <svg class="icon-moon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         </button>
-        <a href="/portal" class="btn btn-ghost nav-cta" style="margin-right:8px">Sign in</a>
+        <a href="/portal" class="btn btn-ghost nav-cta" data-auth-cta style="margin-right:8px">Sign in</a>
         <a href="/contact.html#book" class="btn btn-primary nav-cta">Book a call</a>
         <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">☰</button>
       </div>
@@ -1555,7 +1555,7 @@ body.landing-visible .theme-toggle-fixed{
       <a href="/industries.html">Industries</a>
       <a href="/about.html">About</a>
       <a href="/contact.html">Contact</a>
-      <a href="/portal" class="mobile-signin">Sign in</a>
+      <a href="/portal" class="mobile-signin" data-auth-cta>Sign in</a>
     </nav>
   </header>
 
@@ -2937,10 +2937,11 @@ body.landing-visible .theme-toggle-fixed{
 
 <script type="module">
 // ─── FIREBASE ───────────────────────────────────────────────────────────────
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
+import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
 import { getAnalytics, isSupported } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-analytics.js';
 import {
   getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
+  setPersistence, browserLocalPersistence,
 } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
 
 const firebaseConfig = {
@@ -2953,8 +2954,9 @@ const firebaseConfig = {
   measurementId: 'G-QRZLG84GYV',
 };
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const auth = getAuth(app);
+await setPersistence(auth, browserLocalPersistence).catch(() => {});
 const googleProvider = new GoogleAuthProvider();
 
 isSupported().then((ok) => { if (ok) getAnalytics(app); });
@@ -2962,6 +2964,7 @@ isSupported().then((ok) => { if (ok) getAnalytics(app); });
 window.phFirebaseAuth = { auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged };
 window.dispatchEvent(new CustomEvent('ph-firebase-ready'));
 </script>
+<script src="/js/auth-gate.js?v=2"></script>
 
 <script>
 // ─── CONFIG ─────────────────────────────────────────────────────────────────
@@ -3633,6 +3636,8 @@ function setupFirebaseAuth(){
       const profile = firebaseUserToProfile(user);
       currentUser = profile;
       try { sessionStorage.setItem('ph_user', JSON.stringify(profile)); } catch (_) {}
+      if (window.phAuthGate) window.phAuthGate.writeUser(user);
+      if (window.phAuthGate) window.phAuthGate.applyNavSession(profile);
       sessionRestored = true;
       closeSignin();
 
@@ -3651,6 +3656,11 @@ function setupFirebaseAuth(){
       return;
     }
     sessionStorage.removeItem('ph_user');
+    if (window.phAuthGate) window.phAuthGate.clearUser();
+    document.querySelectorAll('[data-auth-cta]').forEach((el) => {
+      el.textContent = 'Sign in';
+      el.removeAttribute('data-signed-in');
+    });
     currentUser = null;
     if (sessionRestored || !dashboard.hidden) {
       showLanding();
@@ -3661,6 +3671,7 @@ function setupFirebaseAuth(){
   document.getElementById('signout').addEventListener('click', async () => {
     sessionStorage.removeItem('ph_user');
     currentUser = null;
+    if (window.phAuthGate) window.phAuthGate.clearUser();
     try { await signOut(auth); } catch (err) { console.error('Firebase sign-out error:', err); }
     showLanding();
     window.scrollTo(0, 0);
@@ -3669,6 +3680,11 @@ function setupFirebaseAuth(){
 
 if (window.phFirebaseAuth) setupFirebaseAuth();
 else window.addEventListener('ph-firebase-ready', setupFirebaseAuth);
+
+// Reflect cached session in nav immediately (Portal vs Sign in).
+if (window.phAuthGate) {
+  window.phAuthGate.applyNavSession(window.phAuthGate.readCachedUser());
+}
 
 if (new URLSearchParams(window.location.search).get('login') === '1') {
   window.location.replace('/portal');
