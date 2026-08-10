@@ -16,8 +16,7 @@ window.PH_SITE = {
       embed: '/dashboard/demo/',
       badge: 'Try instantly',
       theme: 'dark',
-      cta: 'Open full screen',
-      access: 'public'
+      cta: 'Open full screen'
     },
     {
       id: 'demo-invoice-sample',
@@ -34,27 +33,7 @@ window.PH_SITE = {
       embed: '/invoice-dashboard/',
       badge: 'Try instantly',
       theme: 'light',
-      cta: 'Open full screen',
-      access: 'public'
-    },
-    {
-      id: 'demo-invoice-live',
-      title: 'Invoice Radar · Your data',
-      product: 'Live client workspace',
-      summary:
-        'Same product wired to your Google Sheet after invite. Sign in with the Google account on your entitlement.',
-      bullets: [
-        'Live KPIs from your Master Sheet',
-        'Approve, snooze, skip, mark paid',
-        'Sheet Log activity feed'
-      ],
-      href: '/app/invoice-radar',
-      embed: null,
-      badge: 'Client access',
-      theme: 'light',
-      cta: 'Sign in to open',
-      access: 'gated',
-      preview: 'invoice-live'
+      cta: 'Open full screen'
     }
   ],
   contacts: [
