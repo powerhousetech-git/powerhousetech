@@ -3,19 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Watch sample automations built by Powerhouse — Loom walkthroughs of real workflow patterns for ops, finance, and AI.">
-<title>Sample automations — Powerhouse</title>
+<meta name="description" content="Try interactive Powerhouse product demos — Med Spa ROI and Invoice Radar — in your browser. No video, no waitlist.">
+<title>Product demos — Powerhouse</title>
 <script>(function(){try{if(localStorage.getItem('ph_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/marketing.css">
 <link rel="stylesheet" href="/css/marketing-extras.css">
 <link rel="stylesheet" href="/css/marketing-theme.css">
 <link rel="stylesheet" href="/css/marketing-motion.css">
+<link rel="stylesheet" href="/css/demos.css">
 </head>
-<body class="marketing-site">
+<body class="marketing-site demos-page">
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
   <symbol id="logo-mark" viewBox="0 0 48 48">
     <line x1="8" y1="9.5" x2="24" y2="21.5" stroke="currentColor" stroke-width="3"/>
@@ -29,16 +30,32 @@
 </svg>
 <div id="ph-nav"></div>
 <main>
-  <section class="page-hero page-hero--dark">
-    <div class="container reveal">
-      <p class="kicker" style="color:#C9CEF5">See it in action</p>
-      <h1>Try the demo dashboards.</h1>
-      <p class="lead">Interactive previews of Invoice Radar and Med Spa ROI — sign in with Google to open them. No video required.</p>
+  <section class="demos-hero">
+    <div class="container demos-hero-inner reveal">
+      <p class="demos-brand">Powerhouse</p>
+      <h1>Click through the real product.</h1>
+      <p class="lead">Two live sample workspaces you can use now — plus client login for your own Invoice Radar sheet. No Loom embeds.</p>
+      <div class="demos-hero-actions">
+        <a class="btn btn-primary" href="#demo-medspa">Try Med Spa ROI</a>
+        <a class="btn btn-ghost" href="#demo-invoice-sample">Try Invoice Radar</a>
+      </div>
     </div>
   </section>
-  <section class="section">
+
+  <section class="section demos-section">
     <div class="container">
-      <div class="loom-grid reveal" id="loom-demos"></div>
+      <div class="demos-stack" id="product-demos"></div>
+    </div>
+  </section>
+
+  <section class="section demos-cta-band">
+    <div class="container reveal">
+      <h2>Want this on your data?</h2>
+      <p>We wire the same dashboards to your sheets, CRM, or booking tools — usually in days, not months.</p>
+      <div class="demos-hero-actions">
+        <a class="btn btn-primary" href="/contact.html#book">Book a discovery call</a>
+        <a class="btn btn-ghost" href="/portal">Client portal</a>
+      </div>
     </div>
   </section>
 </main>
@@ -47,5 +64,6 @@
 <script type="module" src="/js/firebase-boot.js"></script>
 <script src="/js/auth-gate.js"></script>
 <script src="/js/marketing.js"></script>
+<script src="/js/demos.js"></script>
 </body>
 </html>

@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { AuthGate } from "@/components/dashboard/AuthGate";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AppointmentsSection } from "@/components/dashboard/sections/AppointmentsSection";
 import { LeadPipelineSection } from "@/components/dashboard/sections/LeadPipelineSection";
@@ -19,6 +18,7 @@ function normalizeRange(range: string | null): DateRange {
   return "30d";
 }
 
+/** Public sample dashboard — no auth gate so demos never hang on a black screen. */
 export function DashboardClient({ clientSlug }: { clientSlug: string }) {
   const searchParams = useSearchParams();
   const range = normalizeRange(searchParams.get("range"));
@@ -29,16 +29,14 @@ export function DashboardClient({ clientSlug }: { clientSlug: string }) {
   );
 
   return (
-    <AuthGate>
-      <DashboardShell data={data}>
-        <OverviewSection data={data} />
-        <LeadPipelineSection data={data} />
-        <AppointmentsSection data={data} />
-        <ReactivationSection data={data} />
-        <ReviewsSection data={data} />
-        <RevenueImpactSection data={data} />
-        <ActivityLogSection data={data} />
-      </DashboardShell>
-    </AuthGate>
+    <DashboardShell data={data}>
+      <OverviewSection data={data} />
+      <LeadPipelineSection data={data} />
+      <AppointmentsSection data={data} />
+      <ReactivationSection data={data} />
+      <ReviewsSection data={data} />
+      <RevenueImpactSection data={data} />
+      <ActivityLogSection data={data} />
+    </DashboardShell>
   );
 }

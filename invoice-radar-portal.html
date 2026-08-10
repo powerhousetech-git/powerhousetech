@@ -177,15 +177,7 @@ tbody tr:hover{background:#FAFAFE}
 </head>
 <body>
 
-<div id="ir-auth-gate" style="min-height:100vh;display:grid;place-items:center;background:#F5F6FA;font-family:Inter,system-ui,sans-serif;padding:24px">
-  <div style="max-width:420px;width:100%;background:#fff;border:1px solid #E7E8F0;border-radius:16px;padding:28px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.06)">
-    <h1 style="font-family:'DM Serif Display',serif;font-weight:400;font-size:1.6rem;margin:0 0 8px">Sign in required</h1>
-    <p id="ir-auth-msg" style="color:#7A7A88;font-size:.92rem;line-height:1.5;margin:0 0 18px">Checking your Google session…</p>
-    <a href="/portal?returnTo=%2Finvoice-dashboard%2F" style="display:inline-block;background:#424FD1;color:#fff;text-decoration:none;font-weight:600;padding:10px 16px;border-radius:10px">Sign in to continue</a>
-  </div>
-</div>
-
-<div class="app" id="ir-app" hidden>
+<div class="app" id="ir-app">
   <aside class="side">
     <div class="brand">
       <svg viewBox="0 0 48 48"><line x1="8" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="40" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="24" y1="21.5" x2="24" y2="40" stroke="#fff" stroke-width="3"/><circle cx="8" cy="9.5" r="5.2" fill="#fff"/><circle cx="40" cy="9.5" r="5.2" fill="#fff"/><circle cx="24" cy="40" r="5" fill="#fff"/><circle cx="24" cy="21.5" r="6.3" fill="#424FD1"/></svg>
@@ -585,36 +577,33 @@ renderAll();
 <script src="/js/dashboard-tour.js"></script>
 <script>
 (async function(){
-  const gate=document.getElementById('ir-auth-gate');
-  const app=document.getElementById('ir-app')||document.querySelector('.app');
+  // Public sample demo — no hard auth wall (sign-in only soft-records engagement).
   try{
     await new Promise(r=>{
       if(window.phFirebaseAuth) return r();
       window.addEventListener('ph-firebase-ready',r,{once:true});
-      setTimeout(r,8000);
+      setTimeout(r,4000);
     });
-    const user=await window.phAuthGate.guardPage({eventType:'dashboard_view',title:'Invoice Radar Sample'});
-    if(!user) return;
-    if(gate) gate.style.display='none';
-    if(app){ app.hidden=false; app.removeAttribute('hidden'); }
-    const tourSteps=[
-      {selector:'#overview',title:'Dashboard overview',body:'KPIs and aging show what is owed to you right now.'},
-      {selector:'[data-view="approvals"]',title:'Approvals',body:'Open Approvals to edit and approve reminders before they send.'},
-      {selector:'[data-view="receivables"]',title:'Receivables',body:'Mark invoices paid to stop chasing automatically.'},
-      {selector:'[data-view="capture"]',title:'Capture',body:'Demo the three capture doors — photo, email, or manual.'},
-      {selector:'[data-view="activity"]',title:'Sheet log',body:'Every action is recorded in the Activity / Sheet log.'},
-    ];
-    document.getElementById('btn-tour')?.addEventListener('click',()=>{
-      window.phTour?.reset('invoice-sample');
-      window.phTour?.start({id:'invoice-sample',steps:tourSteps});
-    });
-    if(window.phTour?.shouldAutoStart('invoice-sample')){
-      setTimeout(()=>window.phTour.start({id:'invoice-sample',steps:tourSteps}),700);
+    const user=window.phFirebaseAuth?.auth?.currentUser;
+    if(user&&window.phAuthGate){
+      window.phAuthGate.writeUser(user);
+      window.phAuthGate.recordSession('dashboard_view','/invoice-dashboard/',{title:'Invoice Radar Sample',public_demo:true});
     }
-  }catch(err){
-    console.error(err);
-    const msg=document.getElementById('ir-auth-msg');
-    if(msg) msg.textContent='Could not verify sign-in. Use the button below.';
+  }catch(_){}
+
+  const tourSteps=[
+    {selector:'#overview',title:'Dashboard overview',body:'KPIs and aging show what is owed to you right now.'},
+    {selector:'[data-view="approvals"]',title:'Approvals',body:'Open Approvals to edit and approve reminders before they send.'},
+    {selector:'[data-view="receivables"]',title:'Receivables',body:'Mark invoices paid to stop chasing automatically.'},
+    {selector:'[data-view="capture"]',title:'Capture',body:'Demo the three capture doors — photo, email, or manual.'},
+    {selector:'[data-view="activity"]',title:'Sheet log',body:'Every action is recorded in the Activity / Sheet log.'},
+  ];
+  document.getElementById('btn-tour')?.addEventListener('click',()=>{
+    window.phTour?.reset('invoice-sample');
+    window.phTour?.start({id:'invoice-sample',steps:tourSteps});
+  });
+  if(window.phTour?.shouldAutoStart('invoice-sample')){
+    setTimeout(()=>window.phTour.start({id:'invoice-sample',steps:tourSteps}),700);
   }
 })();
 </script>

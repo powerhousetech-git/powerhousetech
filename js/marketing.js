@@ -116,43 +116,14 @@
     }
   };
 
-  function loomEmbedId(url) {
-    var m = url.match(/loom\.com\/(?:share|embed)\/([a-zA-Z0-9]+)/);
-    return m ? m[1] : null;
-  }
-
   window.phRenderLoomDemos = function (mount) {
-    var root = document.getElementById(mount || 'loom-demos');
-    if (!root || !window.PH_SITE) return;
-    root.innerHTML = window.PH_SITE.demos.map(function (d, i) {
-      var href = d.href || '#';
-      var badge = d.badge || d.duration || 'Demo';
-      var bullets = (d.bullets || []).map(function (b) { return '<li>' + b + '</li>'; }).join('');
-      var media =
-        '<div class="loom-embed-wrap"><div class="loom-placeholder demo-dash-preview">' +
-        '<div class="play" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></div>' +
-        '<p>' + (d.cta || 'Open interactive dashboard') + '</p></div></div>';
-      return (
-        '<article class="loom-card" id="' + d.id + '"><div class="loom-card-head">' +
-        '<span class="badge">' + badge + '</span><h2>' + d.title + '</h2><p>' + d.summary + '</p><ul>' + bullets + '</ul></div>' +
-        media +
-        '<div class="loom-card-foot">' +
-        '<span class="loom-meta">Demo dashboard ' + (i + 1) + '</span>' +
-        '<button type="button" class="btn btn-primary demo-open-btn" data-gated-href="' + href + '">' +
-        (d.cta || 'Open demo') + '</button></div></article>'
-      );
-    }).join('');
-
-    root.querySelectorAll('[data-gated-href]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var target = btn.getAttribute('data-gated-href');
-        if (window.phAuthGate && target) {
-          window.phAuthGate.openGated(target);
-        } else if (target) {
-          window.location.href = '/portal?returnTo=' + encodeURIComponent(target);
-        }
-      });
-    });
+    // Back-compat: product demos renderer lives in demos.js
+    if (typeof window.phRenderProductDemos === 'function') {
+      window.phRenderProductDemos(mount === 'loom-demos' ? 'product-demos' : mount);
+      if (mount === 'loom-demos' || !mount) {
+        window.phRenderProductDemos('loom-demos');
+      }
+    }
   };
 
   window.phRenderContacts = function (mount) {

@@ -14,7 +14,7 @@
   const greetName = document.getElementById('greet-name');
   const adminLink = document.getElementById('admin-link');
 
-  // Hide demo bypass — dashboards require real Google accounts
+  // Sample demos are public on /sample-automations — portal is for client / live access.
   if (demoBtn) {
     demoBtn.classList.add('hidden');
     demoBtn.style.display = 'none';
@@ -24,7 +24,7 @@
   const authHint = document.querySelector('.auth-hint');
   if (authHint) {
     authHint.innerHTML =
-      '<b>Google sign-in required.</b> Use the Google account your Powerhouse invite was sent to. After sign-in you can open any demo dashboard.';
+      '<b>Client sign-in.</b> Use the Google account on your Powerhouse invite for live Invoice Radar. Prefer a quick look? <a href="/sample-automations">Try the public demos</a>.';
   }
 
   function showError(msg) {

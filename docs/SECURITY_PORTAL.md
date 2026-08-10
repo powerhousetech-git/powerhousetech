@@ -3,10 +3,10 @@
 ## Auth model
 
 - **Identity:** Firebase Google sign-in (`powerhouse-tech-f6da1`).
-- **Gated routes:** `/dashboard/*`, `/invoice-dashboard/`, `/app/invoice-radar`, `/admin`, portal service cards.
-- **Public:** marketing pages (`/`, `/services`, `/sample-automations`, `/contact`, …).
+- **Gated routes:** `/app/invoice-radar`, `/admin` (live client / admin).
+- **Public sample demos:** `/dashboard/demo/`, `/invoice-dashboard/`, marketing pages (`/`, `/services`, `/sample-automations`, `/contact`, …).
 - **ReturnTo:** `sessionStorage.ph_return_to` + query `?returnTo=` allowlisted to relative paths only (`js/auth-gate.js` → `safeReturnTo`).
-- **No anonymous demo bypass** for dashboards — sample *data* still runs after Google sign-in.
+- Sample demos use mock data and load without Google sign-in so marketing visitors never hit a blank auth wall.
 
 ## Admin
 
@@ -26,7 +26,8 @@
 2. Deploy Edge Functions `portal-session` and `admin-api` (`verify_jwt: false` — they verify Firebase ID tokens themselves).
 3. Confirm Firebase authorized domains include `powerhousetech.in`.
 4. Sign in as shreyas@ → should land on `/admin`.
-5. Unsigned visit to `/dashboard/demo/` → redirect to `/portal?returnTo=…`.
+5. Public sample demos (`/dashboard/demo/`, `/invoice-dashboard/`) load without sign-in; live `/app/invoice-radar` stays gated.
+6. `/sample-automations` embeds those public demos (no Loom placeholders).
 
 ## Deploy without `SUPABASE_ACCESS_TOKEN`
 

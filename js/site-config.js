@@ -3,45 +3,58 @@ window.PH_SITE = {
   demos: [
     {
       id: 'demo-medspa',
-      title: 'Med Spa ROI Dashboard',
-      duration: 'Interactive',
-      summary: 'See how automation recovers revenue from leads, no-shows, reactivation, and reviews.',
+      title: 'Med Spa ROI',
+      product: 'Luxe Glow · sample spa',
+      summary:
+        'See recovered revenue from leads, no-shows, reactivation, and reviews — live KPIs you can click through.',
       bullets: [
-        'KPI overview with before/after automation',
-        'Lead pipeline, appointments, and reactivation',
+        'Before/after automation KPIs',
+        'Lead pipeline & appointment recovery',
         'Payback period and ROI waterfall'
       ],
       href: '/dashboard/demo/',
-      badge: 'Demo · Luxe Glow',
-      cta: 'Open dashboard'
+      embed: '/dashboard/demo/',
+      badge: 'Try instantly',
+      theme: 'dark',
+      cta: 'Open full screen',
+      access: 'public'
     },
     {
       id: 'demo-invoice-sample',
-      title: 'Invoice Radar · Sample',
-      duration: 'Interactive',
-      summary: 'Walk the approve-to-send loop with sample receivables, capture, and follow-ups.',
+      title: 'Invoice Radar',
+      product: 'Sample receivables workspace',
+      summary:
+        'Approve reminders, age receivables, capture invoices, and mark paid — the full loop with demo data.',
       bullets: [
-        'Approvals with editable draft reminders',
-        'Receivables aging and mark-paid flow',
-        'Capture review and activity log'
+        'Approve-to-send reminder drafts',
+        'Aging buckets and mark-paid',
+        'Capture doors + activity log'
       ],
       href: '/invoice-dashboard/',
-      badge: 'Demo data',
-      cta: 'Open dashboard'
+      embed: '/invoice-dashboard/',
+      badge: 'Try instantly',
+      theme: 'light',
+      cta: 'Open full screen',
+      access: 'public'
     },
     {
       id: 'demo-invoice-live',
-      title: 'Invoice Radar · Live',
-      duration: 'Entitled clients',
-      summary: 'Production dashboard connected to your Google Sheet (invite + entitlement required).',
+      title: 'Invoice Radar · Your data',
+      product: 'Live client workspace',
+      summary:
+        'Same product wired to your Google Sheet after invite. Sign in with the Google account on your entitlement.',
       bullets: [
         'Live KPIs from your Master Sheet',
         'Approve, snooze, skip, mark paid',
         'Sheet Log activity feed'
       ],
       href: '/app/invoice-radar',
-      badge: 'Live',
-      cta: 'Open live app'
+      embed: null,
+      badge: 'Client access',
+      theme: 'light',
+      cta: 'Sign in to open',
+      access: 'gated',
+      preview: 'invoice-live'
     }
   ],
   contacts: [
