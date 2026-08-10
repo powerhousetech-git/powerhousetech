@@ -599,6 +599,7 @@ renderAll();
     {selector:'[data-view="activity"]',title:'Sheet log',body:'Every action is recorded in the Activity / Sheet log.'},
   ];
   document.getElementById('btn-tour')?.addEventListener('click',()=>{
+    if(typeof go==='function') go('overview');
     window.phTour?.reset('invoice-sample');
     window.phTour?.start({id:'invoice-sample',steps:tourSteps});
   });
