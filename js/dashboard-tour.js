@@ -105,6 +105,15 @@
     if (!current || !overlay) return;
     index = Math.max(0, Math.min(i, current.steps.length - 1));
     var step = current.steps[index] || {};
+
+    // Optional: switch demo view before measuring the target.
+    if (step.view && typeof current.navigate === 'function') {
+      try { current.navigate(step.view); } catch (_) {}
+    }
+    if (typeof step.before === 'function') {
+      try { step.before(); } catch (_) {}
+    }
+
     var hl = overlay.querySelector('.ph-tour-highlight');
     var cardEl = overlay.querySelector('.ph-tour-card');
     var el = null;
@@ -117,12 +126,19 @@
     // Only highlight targets that are currently visible (active view).
     if (el) {
       var view = el.closest('.view');
-      if (view && !view.classList.contains('active') && view.style.display === 'none') {
-        el = null;
+      if (view) {
+        // Invoice sample uses .hidden; shared demos use .view.active
+        if (view.classList.contains('hidden')) el = null;
+        else if (
+          view.parentElement &&
+          view.parentElement.querySelector('.view.active') &&
+          !view.classList.contains('active')
+        ) {
+          el = null;
+        }
       }
-      // Hidden sections in invoice sample use .hidden / .view.hidden
+      // Hidden sections
       if (el && (el.offsetParent === null && getComputedStyle(el).position !== 'fixed')) {
-        // Try scrolling/nav — but if truly not visible, fall back to centered card
         var cs = getComputedStyle(el);
         if (cs.display === 'none' || cs.visibility === 'hidden') el = null;
       }
@@ -136,37 +152,54 @@
     overlay.querySelector('.ph-tour-next').textContent =
       index >= current.steps.length - 1 ? 'Done' : 'Next';
 
-    if (el) {
-      try {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-      } catch (_) {}
-      // Wait a tick for scroll/layout, then measure in viewport coords.
-      requestAnimationFrame(function () {
-        if (!current || !overlay) return;
-        var backdrop = overlay.querySelector('.ph-tour-backdrop');
-        var r = el.getBoundingClientRect();
-        // If target collapsed or off-screen, center the card only.
-        if (r.width < 4 || r.height < 4) {
-          hl.hidden = true;
-          if (backdrop) backdrop.style.opacity = '1';
-          placeCard(cardEl, null);
-          return;
+    // After a view switch, wait a frame so layout settles.
+    requestAnimationFrame(function () {
+      if (!current || !overlay) return;
+      if (!el && step.selector) {
+        try { el = document.querySelector(step.selector); } catch (_) { el = null; }
+        if (el) {
+          var v2 = el.closest('.view');
+          if (v2 && v2.classList.contains('hidden')) el = null;
+          else if (
+            v2 &&
+            v2.parentElement &&
+            v2.parentElement.querySelector('.view.active') &&
+            !v2.classList.contains('active')
+          ) {
+            el = null;
+          }
         }
-        hl.hidden = false;
-        // Highlight ring carries the dimming — hide flat backdrop to avoid double black.
-        if (backdrop) backdrop.style.opacity = '0';
-        hl.style.top = Math.max(8, r.top - 8) + 'px';
-        hl.style.left = Math.max(8, r.left - 8) + 'px';
-        hl.style.width = Math.min(window.innerWidth - 16, r.width + 16) + 'px';
-        hl.style.height = Math.min(window.innerHeight - 16, r.height + 16) + 'px';
-        placeCard(cardEl, r);
-      });
-    } else {
-      hl.hidden = true;
-      var backdrop = overlay.querySelector('.ph-tour-backdrop');
-      if (backdrop) backdrop.style.opacity = '1';
-      placeCard(cardEl, null);
-    }
+      }
+
+      if (el) {
+        try {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+        } catch (_) {}
+        requestAnimationFrame(function () {
+          if (!current || !overlay) return;
+          var backdrop = overlay.querySelector('.ph-tour-backdrop');
+          var r = el.getBoundingClientRect();
+          if (r.width < 4 || r.height < 4) {
+            hl.hidden = true;
+            if (backdrop) backdrop.style.opacity = '1';
+            placeCard(cardEl, null);
+            return;
+          }
+          hl.hidden = false;
+          if (backdrop) backdrop.style.opacity = '0';
+          hl.style.top = Math.max(8, r.top - 8) + 'px';
+          hl.style.left = Math.max(8, r.left - 8) + 'px';
+          hl.style.width = Math.min(window.innerWidth - 16, r.width + 16) + 'px';
+          hl.style.height = Math.min(window.innerHeight - 16, r.height + 16) + 'px';
+          placeCard(cardEl, r);
+        });
+      } else {
+        hl.hidden = true;
+        var backdrop = overlay.querySelector('.ph-tour-backdrop');
+        if (backdrop) backdrop.style.opacity = '1';
+        placeCard(cardEl, null);
+      }
+    });
   }
 
   function start(opts) {

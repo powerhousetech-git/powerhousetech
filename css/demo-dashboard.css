@@ -184,6 +184,38 @@ tbody tr:hover { background: #fafafe; }
   0% { background: var(--teal-soft); }
   100% { background: transparent; }
 }
+.step-next {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fbfbfe;
+}
+.step-next p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--ink-mid);
+  line-height: 1.45;
+}
+.step-next strong {
+  color: var(--ink);
+}
+.nav-item .step-num {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #7c7e90;
+  width: 18px;
+  flex: 0 0 18px;
+}
+.nav-item.active .step-num {
+  color: rgba(255, 255, 255, 0.85);
+}
 @media (max-width: 900px) {
   .app { grid-template-columns: 1fr; }
   .side { display: none; }

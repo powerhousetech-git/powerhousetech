@@ -29,9 +29,17 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--i
 .nav-item:hover{background:#1D1D28;color:#fff}
 .nav-item.active{background:var(--teal);color:#fff;font-weight:600}
 .nav-item .dot{width:18px;flex:0 0 18px;text-align:center;opacity:.9}
+.nav-item .step-num{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:.68rem;font-weight:700;color:#7C7E90;width:18px;flex:0 0 18px}
+.nav-item.active .step-num{color:rgba(255,255,255,.85)}
 .nav-item .cnt{margin-left:auto;background:#D64545;color:#fff;font-size:.68rem;font-weight:700;border-radius:999px;padding:1px 7px;min-width:19px;text-align:center}
 .nav-item.active .cnt{background:rgba(255,255,255,.25)}
 .nav-sec{font-size:.64rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5A5C6E;padding:14px 12px 5px}
+.step-next{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:8px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:#FBFBFE}
+.step-next p{margin:0;font-size:.88rem;color:var(--ink-mid);line-height:1.45}
+.step-next strong{color:var(--ink)}
+.step-banner{display:flex;align-items:flex-start;gap:14px;background:var(--teal-soft);border:1px solid #C8CEF5;border-radius:12px;padding:14px 18px;margin-bottom:20px;cursor:default}
+.step-banner .b-t{font-weight:700;font-size:.92rem}
+.step-banner .b-d{font-size:.8rem;color:var(--ink-mid)}
 .side-foot{margin-top:auto;font-size:.68rem;color:#5A5C6E;padding:10px 12px;border-top:1px solid #23232F}
 .main{padding:26px 34px 60px;max-width:1180px}
 .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:26px;gap:16px;flex-wrap:wrap}
@@ -183,16 +191,15 @@ tbody tr:hover{background:#FAFAFE}
       <svg viewBox="0 0 48 48"><line x1="8" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="40" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="24" y1="21.5" x2="24" y2="40" stroke="#fff" stroke-width="3"/><circle cx="8" cy="9.5" r="5.2" fill="#fff"/><circle cx="40" cy="9.5" r="5.2" fill="#fff"/><circle cx="24" cy="40" r="5" fill="#fff"/><circle cx="24" cy="21.5" r="6.3" fill="#424FD1"/></svg>
       <div><div class="name">Invoice Radar</div><div class="sub">by Powerhouse</div></div>
     </div>
-    <div class="nav-sec">Overview</div>
-    <div class="nav-item active" data-view="overview"><span class="dot">▦</span> Dashboard</div>
-    <div class="nav-sec">Money in</div>
+    <div class="nav-sec">Workflow</div>
+    <div class="nav-item active" data-view="capture"><span class="step-num">01</span> Capture <span class="cnt" id="nav-rev" style="background:#C77700">0</span></div>
+    <div class="nav-item" data-view="approvals"><span class="step-num">02</span> Confirm / Approvals <span class="cnt" id="nav-appr">0</span></div>
+    <div class="nav-item" data-view="reminders"><span class="step-num">03</span> Follow-up sequence</div>
+    <div class="nav-item" data-view="overview"><span class="step-num">04</span> Overview</div>
+    <div class="nav-sec">Money</div>
     <div class="nav-item" data-view="receivables"><span class="dot">↙</span> Receivables</div>
-    <div class="nav-item" data-view="approvals"><span class="dot">✓</span> Approvals <span class="cnt" id="nav-appr">0</span></div>
-    <div class="nav-item" data-view="reminders"><span class="dot">✉</span> Follow-ups</div>
-    <div class="nav-sec">Money out</div>
     <div class="nav-item" data-view="payables"><span class="dot">↗</span> Payables</div>
-    <div class="nav-sec">Data &amp; setup</div>
-    <div class="nav-item" data-view="capture"><span class="dot">＋</span> Capture <span class="cnt" id="nav-rev" style="background:#C77700">0</span></div>
+    <div class="nav-sec">Log &amp; setup</div>
     <div class="nav-item" data-view="activity"><span class="dot">☰</span> Activity / Sheet</div>
     <div class="nav-item" data-view="integrations"><span class="dot">⚙</span> Integrations</div>
     <div class="side-foot"><a href="/portal" style="color:#9B9DB0;text-decoration:none">← All services</a><br>Interactive prototype · sample data</div>
@@ -201,8 +208,8 @@ tbody tr:hover{background:#FAFAFE}
   <main class="main">
     <div class="topbar">
       <div>
-        <h1 id="view-title">Dashboard</h1>
-        <div class="sub" id="view-sub">Everything owed to you and by you, in one place.</div>
+        <h1 id="view-title">01 · Capture</h1>
+        <div class="sub" id="view-sub">Upload photos, email invoices, or CSV — then confirm extractions</div>
       </div>
       <div class="top-actions"><button type="button" class="btn btn-sm" id="btn-tour">Tour</button>
         <span class="chip chip-gate">🔒 Approve-to-send</span>
@@ -211,8 +218,14 @@ tbody tr:hover{background:#FAFAFE}
       </div>
     </div>
 
-    <!-- OVERVIEW -->
-    <section id="overview" class="view">
+    <!-- 04 OVERVIEW -->
+    <section id="overview" class="view hidden">
+      <div class="step-banner">
+        <div>
+          <div class="b-t">Step 4 — Overview</div>
+          <div class="b-d">Everything owed to you and by you, rolled up after capture → confirm → chase.</div>
+        </div>
+      </div>
       <div id="appr-banner"></div>
       <div class="kpis" id="kpi-overview"></div>
       <div class="two-col">
@@ -224,6 +237,10 @@ tbody tr:hover{background:#FAFAFE}
           <div class="card-head"><div><h3>Needs attention</h3><div class="hint">Auto-picked by the radar.</div></div></div>
           <div id="attention"></div>
         </div>
+      </div>
+      <div class="step-next">
+        <p><strong>Done.</strong> Restart the workflow anytime from Capture.</p>
+        <button type="button" class="btn" onclick="go('capture')">Back to Capture</button>
       </div>
     </section>
 
@@ -237,8 +254,14 @@ tbody tr:hover{background:#FAFAFE}
       </div>
     </section>
 
-    <!-- APPROVALS (the star) -->
+    <!-- 02 APPROVALS -->
     <section id="approvals" class="view hidden">
+      <div class="step-banner">
+        <div>
+          <div class="b-t">Step 2 — Confirm / Approvals</div>
+          <div class="b-d">Verify extracted amounts and approve reminder wording before anything reaches customers.</div>
+        </div>
+      </div>
       <div class="card">
         <div class="card-head">
           <div><h3>Reminders waiting for your OK</h3><div class="hint">These customers will be contacted on the date shown. Verify, edit the wording, change the channel, or snooze — nothing sends until you approve.</div></div>
@@ -246,14 +269,28 @@ tbody tr:hover{background:#FAFAFE}
         </div>
         <div id="appr-list"></div>
       </div>
+      <div class="step-next">
+        <p><strong>Next:</strong> See the customized follow-up sequence across overdue invoices.</p>
+        <button type="button" class="btn btn-primary" onclick="go('reminders')">Continue to Follow-up sequence →</button>
+      </div>
     </section>
 
-    <!-- FOLLOW-UPS -->
+    <!-- 03 FOLLOW-UPS -->
     <section id="reminders" class="view hidden">
+      <div class="step-banner">
+        <div>
+          <div class="b-t">Step 3 — Follow-up sequence</div>
+          <div class="b-d">Friendly first nudge sends automatically; firmer reminders wait for your approval.</div>
+        </div>
+      </div>
       <div class="card">
-        <div class="card-head"><div><h3>Reminder sequences</h3><div class="hint">Friendly first nudge sends automatically; firmer reminders wait for your approval. Everything stops the moment an invoice is paid.</div></div></div>
+        <div class="card-head"><div><h3>Reminder sequences</h3><div class="hint">Everything stops the moment an invoice is paid.</div></div></div>
         <table><thead><tr><th>Invoice</th><th>Customer</th><th>Overdue</th><th>Stage</th><th>Mode</th><th>Channel</th></tr></thead>
         <tbody id="fu-rows"></tbody></table>
+      </div>
+      <div class="step-next">
+        <p><strong>Next:</strong> Get the overview — aging, KPIs, and what needs attention.</p>
+        <button type="button" class="btn btn-primary" onclick="go('overview')">Continue to Overview →</button>
       </div>
     </section>
 
@@ -267,8 +304,14 @@ tbody tr:hover{background:#FAFAFE}
       </div>
     </section>
 
-    <!-- CAPTURE -->
-    <section id="capture" class="view hidden">
+    <!-- 01 CAPTURE -->
+    <section id="capture" class="view">
+      <div class="step-banner">
+        <div>
+          <div class="b-t">Step 1 — Capture / upload</div>
+          <div class="b-d">Photo, Gmail, or CSV — Claude reads each invoice and files it. Confirm low-confidence rows before they chase.</div>
+        </div>
+      </div>
       <div id="review-card" class="card hidden">
         <div class="card-head"><div><h3>⚠ Needs your review</h3><div class="hint">Claude wasn't fully confident on these — confirm the amount and due date before they enter the database and start chasing.</div></div></div>
         <div id="review-list"></div>
@@ -302,6 +345,19 @@ tbody tr:hover{background:#FAFAFE}
         <div class="card-head"><div><h3>Recently captured</h3><div class="hint">Newest at top.</div></div></div>
         <table><thead><tr><th>Ref</th><th>Party</th><th>Type</th><th>Source</th><th>Amount</th><th>Captured</th></tr></thead>
         <tbody id="cap-rows"></tbody></table>
+      </div>
+      <div class="step-next">
+        <p><strong>Next:</strong> Confirm extractions and approve outbound reminders.</p>
+        <button type="button" class="btn btn-primary" onclick="go('approvals')">Continue to Confirm / Approvals →</button>
+      </div>
+    </section>
+
+    <!-- ACTIVITY -->
+    <section id="activity" class="view hidden">
+      <div class="card">
+        <div class="card-head"><div><h3>Activity / Sheet log</h3><div class="hint">Audit trail of captures, reminders, and payments.</div></div></div>
+        <table><thead><tr><th>When</th><th>Ref</th><th>Event</th><th>Channel</th><th>Detail</th></tr></thead>
+        <tbody id="activity-rows"></tbody></table>
       </div>
     </section>
 
@@ -541,7 +597,16 @@ function toggleZoho(){
   renderAll();
 }
 
-const TITLES={overview:['Dashboard','Everything owed to you and by you, in one place.'],receivables:['Receivables','Invoices your customers still owe you.'],approvals:['Approvals','Verify reminders before they reach your customers.'],payables:['Payables','Bills you need to pay, captured automatically.'],reminders:['Follow-ups','Reminder sequences — auto for gentle, approval for firm.'],capture:['Capture','Turn any invoice — paper, email, or app — into clean data.'],activity:['Activity / Sheet','Audit trail of captures, reminders, and payments.'],integrations:['Integrations','How invoices come in and reminders go out.']};
+const TITLES={
+  capture:['01 · Capture','Upload photos, email invoices, or CSV — then confirm extractions'],
+  approvals:['02 · Confirm / Approvals','Verify reminders before they reach your customers'],
+  reminders:['03 · Follow-up sequence','Customized chase — auto for gentle, approval for firm'],
+  overview:['04 · Overview','Everything owed to you and by you, in one place'],
+  receivables:['Receivables','Invoices your customers still owe you'],
+  payables:['Payables','Bills you need to pay, captured automatically'],
+  activity:['Activity / Sheet','Audit trail of captures, reminders, and payments'],
+  integrations:['Integrations','How invoices come in and reminders go out']
+};
 function go(v){
   document.querySelectorAll('.view').forEach(el=>el.classList.add('hidden'));
   document.getElementById(v).classList.remove('hidden');
@@ -551,7 +616,7 @@ function go(v){
   window.scrollTo(0,0);
 }
 document.querySelectorAll('.nav-item').forEach(n=>n.addEventListener('click',()=>go(n.dataset.view)));
-
+go('capture');
 
 const ACTIVITY=[
   {when:'2026-06-28 10:14',ref:'INV-1042',event:'reminder_approved',channel:'whatsapp',detail:'Gentle nudge approved and queued'},
@@ -592,16 +657,17 @@ renderAll();
   }catch(_){}
 
   const tourSteps=[
-    {selector:'#kpi-overview',title:'Dashboard overview',body:'KPIs show what is owed to you, overdue, and collected — at a glance.'},
-    {selector:'.aging',title:'Receivables aging',body:'See how far invoices have aged so you know what to chase first.'},
-    {selector:'[data-view="approvals"]',title:'Approvals',body:'Open Approvals to edit and approve reminders before they send.'},
-    {selector:'[data-view="capture"]',title:'Capture',body:'Demo the three capture doors — photo, email, or manual.'},
-    {selector:'[data-view="activity"]',title:'Sheet log',body:'Every action is recorded in the Activity / Sheet log.'},
+    {view:'capture',selector:'#capture .doors',title:'01 Capture',body:'Photo, email, or CSV — Claude reads each invoice into a clean database.'},
+    {view:'approvals',selector:'#approvals .card',title:'02 Confirm / Approvals',body:'Verify wording and approve reminders before they reach customers.'},
+    {view:'reminders',selector:'#reminders .card',title:'03 Follow-up sequence',body:'Gentle nudges auto-send; firmer stages wait for your OK.'},
+    {view:'overview',selector:'#kpi-overview',title:'04 Overview',body:'See aging, KPIs, and what needs attention once the workflow is running.'},
   ];
   document.getElementById('btn-tour')?.addEventListener('click',()=>{
-    if(typeof go==='function') go('overview');
-    window.phTour?.reset('invoice-sample');
-    window.phTour?.start({id:'invoice-sample',steps:tourSteps});
+    if(typeof go==='function') go('capture');
+    setTimeout(()=>{
+      window.phTour?.reset('invoice-sample');
+      window.phTour?.start({id:'invoice-sample',navigate:go,steps:tourSteps});
+    },50);
   });
   // Manual tour only — auto-start overlay was covering demos in a black screen.
 })();

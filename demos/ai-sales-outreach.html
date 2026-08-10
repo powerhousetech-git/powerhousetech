@@ -19,13 +19,14 @@
       <svg viewBox="0 0 48 48" aria-hidden="true"><line x1="8" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="40" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="24" y1="21.5" x2="24" y2="40" stroke="#fff" stroke-width="3"/><circle cx="8" cy="9.5" r="5.2" fill="#fff"/><circle cx="40" cy="9.5" r="5.2" fill="#fff"/><circle cx="24" cy="40" r="5" fill="#fff"/><circle cx="24" cy="21.5" r="6.3" fill="#424FD1"/></svg>
       <div><div class="name">AI Sales Outreach</div><div class="sub">by Powerhouse</div></div>
     </div>
-    <div class="nav-sec">Workspace</div>
-    <button type="button" class="nav-item active" data-view="overview"><span class="dot">▦</span> Overview</button>
-    <button type="button" class="nav-item" data-view="pipeline"><span class="dot">↗</span> Pipeline</button>
-    <button type="button" class="nav-item" data-view="sends"><span class="dot">✉</span> Sends &amp; cap</button>
-    <button type="button" class="nav-item" data-view="followups"><span class="dot">↻</span> Follow-ups</button>
-    <button type="button" class="nav-item" data-view="triage"><span class="dot">✓</span> Reply triage <span class="cnt" id="nav-warm">8</span></button>
-    <button type="button" class="nav-item" data-view="deliverability"><span class="dot">🛡</span> Deliverability</button>
+    <div class="nav-sec">Workflow</div>
+    <button type="button" class="nav-item active" data-view="pipeline"><span class="step-num">01</span> Pipeline</button>
+    <button type="button" class="nav-item" data-view="sends"><span class="step-num">02</span> Sends &amp; cap</button>
+    <button type="button" class="nav-item" data-view="followups"><span class="step-num">03</span> Follow-ups</button>
+    <button type="button" class="nav-item" data-view="triage"><span class="step-num">04</span> Reply triage <span class="cnt" id="nav-warm">8</span></button>
+    <button type="button" class="nav-item" data-view="deliverability"><span class="step-num">05</span> Deliverability</button>
+    <button type="button" class="nav-item" data-view="overview"><span class="step-num">06</span> Overview</button>
+    <div class="nav-sec">Log</div>
     <button type="button" class="nav-item" data-view="activity"><span class="dot">☰</span> Activity</button>
     <div class="side-foot"><a href="/portal">← All services</a><br>Sample data · Northline SaaS</div>
   </aside>
@@ -33,8 +34,8 @@
   <main class="main">
     <div class="topbar">
       <div>
-        <h1 id="view-title">Overview</h1>
-        <div class="sub" id="view-sub">Northline SaaS · cold outreach engine</div>
+        <h1 id="view-title">01 · Pipeline</h1>
+        <div class="sub" id="view-sub">Validate prospects and stage them for personalization</div>
       </div>
       <div class="top-actions">
         <span class="chip chip-demo">Demo data</span>
@@ -43,11 +44,131 @@
       </div>
     </div>
 
-    <section class="view active" id="overview">
+    <!-- 01 PIPELINE -->
+    <section class="view active" id="pipeline">
       <div class="banner">
         <div>
-          <div class="b-t">Sending is ON · day 12 of ramp</div>
-          <div class="b-d">42 / 60 daily cap used · 8 warm replies waiting with drafts</div>
+          <div class="b-t">Step 1 — Pipeline</div>
+          <div class="b-d">Validate prospects and stage them for personalization — nothing stalls.</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h3>Prospect pipeline</h3><p class="hint">Intake → personalize → send → follow-up → triage.</p></div></div>
+        <table>
+          <thead><tr><th>Prospect</th><th>Company</th><th>Stage</th><th>Last touch</th></tr></thead>
+          <tbody id="pipeline-table"></tbody>
+        </table>
+      </div>
+      <div class="step-next">
+        <p><strong>Next:</strong> Personalize and send under a safe daily ramp.</p>
+        <button type="button" class="btn btn-primary" data-go="sends">Continue to Sends &amp; cap →</button>
+      </div>
+    </section>
+
+    <!-- 02 SENDS -->
+    <section class="view" id="sends">
+      <div class="banner">
+        <div>
+          <div class="b-t">Step 2 — Sends &amp; cap</div>
+          <div class="b-d">AI personalizes each opener, then sends under a safe volume ramp.</div>
+        </div>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><div class="label">Daily cap</div><div class="val">60</div><div class="foot">Ramping +5 / day</div></div>
+        <div class="kpi"><div class="label">Sent today</div><div class="val">42</div><div class="foot up">18 left</div></div>
+        <div class="kpi"><div class="label">Personalization queue</div><div class="val">214</div><div class="foot">Ready to send</div></div>
+      </div>
+      <div class="card">
+        <h3>Send control</h3>
+        <p class="hint">Volume ramps under a daily cap so the domain stays out of spam. Toggle sending anytime.</p>
+        <button type="button" class="btn btn-primary" id="btn-toggle-send">Sending is ON — click to pause</button>
+      </div>
+      <div class="step-next">
+        <p><strong>Next:</strong> Add customized follow-up cadence for no-replies.</p>
+        <button type="button" class="btn btn-primary" data-go="followups">Continue to Follow-ups →</button>
+      </div>
+    </section>
+
+    <!-- 03 FOLLOW-UPS -->
+    <section class="view" id="followups">
+      <div class="banner">
+        <div>
+          <div class="b-t">Step 3 — Follow-ups</div>
+          <div class="b-d">Timed, contextual nudges when nobody replies — Day 3 and Day 7.</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h3>Follow-up cadence</h3><p class="hint">No-reply prospects get a timed, contextual nudge.</p></div></div>
+        <div class="seq">
+          <div class="seq-step"><b>Day 0</b><strong>Intro sent</strong><span>1,842 prospects</span></div>
+          <div class="seq-step"><b>Day 3</b><strong>Follow-up #1</strong><span>906 fired · 211 skipped (replied)</span></div>
+          <div class="seq-step"><b>Day 7</b><strong>Follow-up #2</strong><span>211 fired · rest closed or warm</span></div>
+        </div>
+      </div>
+      <div class="step-next">
+        <p><strong>Next:</strong> Triage replies — warm leads land with a draft ready.</p>
+        <button type="button" class="btn btn-primary" data-go="triage">Continue to Reply triage →</button>
+      </div>
+    </section>
+
+    <!-- 04 TRIAGE -->
+    <section class="view" id="triage">
+      <div class="banner">
+        <div>
+          <div class="b-t">Step 4 — Reply triage</div>
+          <div class="b-d">Interested / not now / OOO / unsubscribe — with a draft for the ones that matter.</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h3>Reply triage</h3><p class="hint">Claim a draft and keep the conversation moving.</p></div></div>
+        <table>
+          <thead><tr><th>From</th><th>Class</th><th>Snippet</th><th>Draft</th><th></th></tr></thead>
+          <tbody id="triage-table"></tbody>
+        </table>
+      </div>
+      <div class="step-next">
+        <p><strong>Next:</strong> Check deliverability — bounces and complaints stay suppressed.</p>
+        <button type="button" class="btn btn-primary" data-go="deliverability">Continue to Deliverability →</button>
+      </div>
+    </section>
+
+    <!-- 05 DELIVERABILITY -->
+    <section class="view" id="deliverability">
+      <div class="banner">
+        <div>
+          <div class="b-t">Step 5 — Deliverability</div>
+          <div class="b-d">Guardian catches bad addresses so sender reputation stays intact.</div>
+        </div>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><div class="label">Bounce rate</div><div class="val">1.2%</div><div class="foot up">Healthy</div></div>
+        <div class="kpi"><div class="label">Complaints</div><div class="val">0.08%</div><div class="foot">Auto-suppressed</div></div>
+        <div class="kpi"><div class="label">Suppression list</div><div class="val">63</div><div class="foot">Never contacted again</div></div>
+      </div>
+      <div class="card">
+        <h3>Guardian</h3>
+        <p class="hint">Bad addresses are caught and suppressed so sender reputation stays intact.</p>
+        <table>
+          <thead><tr><th>Address</th><th>Reason</th><th>When</th></tr></thead>
+          <tbody>
+            <tr><td>info@oldco.example</td><td>Hard bounce</td><td class="mono">2h ago</td></tr>
+            <tr><td>noreply@vendor.io</td><td>Role address rejected</td><td class="mono">Yesterday</td></tr>
+            <tr><td>sam@agency.test</td><td>Complaint</td><td class="mono">3d ago</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="step-next">
+        <p><strong>Next:</strong> See the full outreach overview — throughput, replies, and health.</p>
+        <button type="button" class="btn btn-primary" data-go="overview">Continue to Overview →</button>
+      </div>
+    </section>
+
+    <!-- 06 OVERVIEW -->
+    <section class="view" id="overview">
+      <div class="banner">
+        <div>
+          <div class="b-t">Step 6 — Overview</div>
+          <div class="b-d">Sending is ON · day 12 of ramp · 8 warm replies waiting with drafts</div>
         </div>
       </div>
       <div class="kpis" id="kpi-overview">
@@ -71,69 +192,9 @@
           </table>
         </div>
       </div>
-    </section>
-
-    <section class="view" id="pipeline">
-      <div class="card">
-        <div class="card-head"><div><h3>Prospect pipeline</h3><p class="hint">Intake → personalize → send → follow-up → triage.</p></div></div>
-        <table>
-          <thead><tr><th>Prospect</th><th>Company</th><th>Stage</th><th>Last touch</th></tr></thead>
-          <tbody id="pipeline-table"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="view" id="sends">
-      <div class="kpis">
-        <div class="kpi"><div class="label">Daily cap</div><div class="val">60</div><div class="foot">Ramping +5 / day</div></div>
-        <div class="kpi"><div class="label">Sent today</div><div class="val">42</div><div class="foot up">18 left</div></div>
-        <div class="kpi"><div class="label">Personalization queue</div><div class="val">214</div><div class="foot">Ready to send</div></div>
-      </div>
-      <div class="card">
-        <h3>Send control</h3>
-        <p class="hint">Volume ramps under a daily cap so the domain stays out of spam. Toggle sending anytime.</p>
-        <button type="button" class="btn btn-primary" id="btn-toggle-send">Sending is ON — click to pause</button>
-      </div>
-    </section>
-
-    <section class="view" id="followups">
-      <div class="card">
-        <div class="card-head"><div><h3>Follow-up cadence</h3><p class="hint">No-reply prospects get a timed, contextual nudge.</p></div></div>
-        <div class="seq">
-          <div class="seq-step"><b>Day 0</b><strong>Intro sent</strong><span>1,842 prospects</span></div>
-          <div class="seq-step"><b>Day 3</b><strong>Follow-up #1</strong><span>906 fired · 211 skipped (replied)</span></div>
-          <div class="seq-step"><b>Day 7</b><strong>Follow-up #2</strong><span>211 fired · rest closed or warm</span></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="view" id="triage">
-      <div class="card">
-        <div class="card-head"><div><h3>Reply triage</h3><p class="hint">Interested / not now / OOO / unsubscribe — with a draft for the ones that matter.</p></div></div>
-        <table>
-          <thead><tr><th>From</th><th>Class</th><th>Snippet</th><th>Draft</th><th></th></tr></thead>
-          <tbody id="triage-table"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="view" id="deliverability">
-      <div class="kpis">
-        <div class="kpi"><div class="label">Bounce rate</div><div class="val">1.2%</div><div class="foot up">Healthy</div></div>
-        <div class="kpi"><div class="label">Complaints</div><div class="val">0.08%</div><div class="foot">Auto-suppressed</div></div>
-        <div class="kpi"><div class="label">Suppression list</div><div class="val">63</div><div class="foot">Never contacted again</div></div>
-      </div>
-      <div class="card">
-        <h3>Guardian</h3>
-        <p class="hint">Bad addresses are caught and suppressed so sender reputation stays intact.</p>
-        <table>
-          <thead><tr><th>Address</th><th>Reason</th><th>When</th></tr></thead>
-          <tbody>
-            <tr><td>info@oldco.example</td><td>Hard bounce</td><td class="mono">2h ago</td></tr>
-            <tr><td>noreply@vendor.io</td><td>Role address rejected</td><td class="mono">Yesterday</td></tr>
-            <tr><td>sam@agency.test</td><td>Complaint</td><td class="mono">3d ago</td></tr>
-          </tbody>
-        </table>
+      <div class="step-next">
+        <p><strong>Done.</strong> Restart the workflow anytime from Pipeline.</p>
+        <button type="button" class="btn" data-go="pipeline">Back to Pipeline</button>
       </div>
     </section>
 
@@ -211,12 +272,12 @@
   }).join('');
 
   var titles = {
-    overview: ['Overview', 'Northline SaaS · cold outreach engine'],
-    pipeline: ['Pipeline', 'Every prospect has a stage'],
-    sends: ['Sends & cap', 'Safe ramped schedule from your mailbox'],
-    followups: ['Follow-ups', 'Timed nudges when nobody replies'],
-    triage: ['Reply triage', 'Warm leads land classified with a draft'],
-    deliverability: ['Deliverability', 'Bounces and complaints stay suppressed'],
+    pipeline: ['01 · Pipeline', 'Validate prospects and stage them for personalization'],
+    sends: ['02 · Sends & cap', 'AI personalize, then send under a safe ramp'],
+    followups: ['03 · Follow-ups', 'Timed nudges when nobody replies'],
+    triage: ['04 · Reply triage', 'Warm leads land classified with a draft'],
+    deliverability: ['05 · Deliverability', 'Bounces and complaints stay suppressed'],
+    overview: ['06 · Overview', 'Northline SaaS · cold outreach rollup'],
     activity: ['Activity', 'Audit trail for the outreach engine']
   };
 
@@ -225,9 +286,10 @@
     document.querySelectorAll('.nav-item').forEach(function (el) {
       el.classList.toggle('active', el.getAttribute('data-view') === view);
     });
-    var t = titles[view] || titles.overview;
+    var t = titles[view] || titles.pipeline;
     document.getElementById('view-title').textContent = t[0];
     document.getElementById('view-sub').textContent = t[1];
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   document.querySelectorAll('.nav-item').forEach(function (btn) {
@@ -255,15 +317,20 @@
   });
 
   var tourSteps = [
-    { selector: '#kpi-overview', title: 'Outreach KPIs', body: 'Validated prospects, safe sends, reply rate, and warm leads in one glance.' },
-    { selector: '#pipeline-bars', title: 'Seven-stage pipeline', body: 'Intake → personalize → send → follow-up → scan → triage → suppress.' },
-    { selector: '#warm-mini', title: 'Needs you now', body: 'Warm replies land here with a draft ready for you to claim.' },
-    { selector: '[data-view="triage"]', title: 'Reply triage', body: 'Open triage in the sidebar to work the full reply queue.' }
+    { view: 'pipeline', selector: '#pipeline .card', title: '01 Pipeline', body: 'Validate prospects and stage them — nothing stalls.' },
+    { view: 'sends', selector: '#sends .kpis', title: '02 Sends & cap', body: 'Personalize and send under a safe daily ramp.' },
+    { view: 'followups', selector: '#followups .seq', title: '03 Follow-ups', body: 'Timed nudges fire when nobody replies.' },
+    { view: 'triage', selector: '#triage .card', title: '04 Reply triage', body: 'Warm leads land classified with a draft ready.' },
+    { view: 'deliverability', selector: '#deliverability .kpis', title: '05 Deliverability', body: 'Bounces and complaints stay suppressed.' },
+    { view: 'overview', selector: '#overview .kpis', title: '06 Overview', body: 'See the full outreach rollup when the workflow is running.' }
   ];
   document.getElementById('btn-tour').addEventListener('click', function () {
-    go('overview');
-    window.phTour && window.phTour.start({ id: 'outreach-demo', steps: tourSteps });
+    go('pipeline');
+    setTimeout(function () {
+      window.phTour && window.phTour.start({ id: 'outreach-demo', navigate: go, steps: tourSteps });
+    }, 50);
   });
+  go('pipeline');
 })();
 </script>
 </body>

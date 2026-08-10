@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Card Capture & Follow-Up Engine demo — booth photos to clean leads and automated sequences.">
+<meta name="description" content="Card Capture & Follow-Up Engine demo — capture, OCR confirm, sequences, then overview.">
 <title>Card Capture — Demo · Powerhouse</title>
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Instrument+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/demo-dashboard.css">
-<link rel="stylesheet" href="/css/dashboard-tour.css?v=2">
+<link rel="stylesheet" href="/css/dashboard-tour.css?v=3">
 </head>
 <body>
 <div class="app" id="cc-app">
@@ -19,13 +19,12 @@
       <svg viewBox="0 0 48 48" aria-hidden="true"><line x1="8" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="40" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="24" y1="21.5" x2="24" y2="40" stroke="#fff" stroke-width="3"/><circle cx="8" cy="9.5" r="5.2" fill="#fff"/><circle cx="40" cy="9.5" r="5.2" fill="#fff"/><circle cx="24" cy="40" r="5" fill="#fff"/><circle cx="24" cy="21.5" r="6.3" fill="#424FD1"/></svg>
       <div><div class="name">Card Capture</div><div class="sub">by Powerhouse</div></div>
     </div>
-    <div class="nav-sec">Show floor</div>
-    <button type="button" class="nav-item active" data-view="overview"><span class="dot">▦</span> Overview</button>
-    <button type="button" class="nav-item" data-view="capture"><span class="dot">＋</span> Capture <span class="cnt" id="nav-queue">14</span></button>
-    <button type="button" class="nav-item" data-view="ocr"><span class="dot">◎</span> OCR review</button>
-    <button type="button" class="nav-item" data-view="database"><span class="dot">☰</span> Database</button>
-    <div class="nav-sec">Follow-up</div>
-    <button type="button" class="nav-item" data-view="mail"><span class="dot">✉</span> Sequences</button>
+    <div class="nav-sec">Workflow</div>
+    <button type="button" class="nav-item active" data-view="capture"><span class="step-num">01</span> Capture / upload <span class="cnt" id="nav-queue">14</span></button>
+    <button type="button" class="nav-item" data-view="ocr"><span class="step-num">02</span> OCR review</button>
+    <button type="button" class="nav-item" data-view="mail"><span class="step-num">03</span> Follow-up sequence</button>
+    <button type="button" class="nav-item" data-view="overview"><span class="step-num">04</span> Overview</button>
+    <div class="nav-sec">Log</div>
     <button type="button" class="nav-item" data-view="activity"><span class="dot">⌁</span> Activity</button>
     <div class="side-foot"><a href="/portal">← All services</a><br>Sample · India Electronics Expo</div>
   </aside>
@@ -33,8 +32,8 @@
   <main class="main">
     <div class="topbar">
       <div>
-        <h1 id="view-title">Overview</h1>
-        <div class="sub" id="view-sub">India Electronics Expo · booth capture</div>
+        <h1 id="view-title">01 · Capture / upload</h1>
+        <div class="sub" id="view-sub">Upload booth snaps, bulk photos, or PDF scans</div>
       </div>
       <div class="top-actions">
         <span class="chip chip-demo">Demo data</span>
@@ -43,49 +42,16 @@
       </div>
     </div>
 
-    <section class="view active" id="overview">
+    <!-- 01 CAPTURE -->
+    <section class="view active" id="capture">
       <div class="banner">
         <div>
-          <div class="b-t">0 leads lost · Day 0 / 3 / 7 sequences running</div>
-          <div class="b-d">Photos &amp; PDFs → OCR → clean DB in seconds → customized follow-ups from your mailbox</div>
+          <div class="b-t">Step 1 — Capture / upload</div>
+          <div class="b-d">Phone snaps, bulk zips, or multi-page PDFs land in the intake hopper for OCR.</div>
         </div>
       </div>
-      <div class="kpis">
-        <div class="kpi"><div class="label">Cards processed</div><div class="val">486</div><div class="foot up">+92 today</div></div>
-        <div class="kpi"><div class="label">OCR success</div><div class="val">96.4%</div><div class="foot">18 need review</div></div>
-        <div class="kpi"><div class="label">In database</div><div class="val">451</div><div class="foot">Seconds to write</div></div>
-        <div class="kpi"><div class="label">Duplicates skipped</div><div class="val">27</div><div class="foot">No double-messaging</div></div>
-        <div class="kpi"><div class="label">Emails sent</div><div class="val">312</div><div class="foot">Industry-aware intros</div></div>
-        <div class="kpi"><div class="label">Leads lost</div><div class="val">0</div><div class="foot up">Core promise</div></div>
-      </div>
-      <div class="two-col">
-        <div class="card">
-          <div class="card-head"><div><h3>Booth → inbox pipeline</h3><p class="hint">Capture · Read · Database · Mail · Follow-ups</p></div></div>
-          <div class="stages">
-            <div class="stage-row"><span class="lab">Capture queue</span><div class="bar"><span style="width:28%"></span></div><span class="amt">14</span></div>
-            <div class="stage-row"><span class="lab">OCR review</span><div class="bar"><span style="width:18%"></span></div><span class="amt">18</span></div>
-            <div class="stage-row"><span class="lab">In database</span><div class="bar"><span style="width:92%"></span></div><span class="amt">451</span></div>
-            <div class="stage-row"><span class="lab">Sequence active</span><div class="bar"><span style="width:64%"></span></div><span class="amt">312</span></div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-head"><div><h3>By industry</h3><p class="hint">Customized intro copy per vertical.</p></div></div>
-          <table>
-            <thead><tr><th>Industry</th><th>Leads</th><th>Sent</th></tr></thead>
-            <tbody>
-              <tr><td>Electronics</td><td>186</td><td>142</td></tr>
-              <tr><td>Auto components</td><td>94</td><td>71</td></tr>
-              <tr><td>Textiles</td><td>88</td><td>55</td></tr>
-              <tr><td>Pharma</td><td>83</td><td>44</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <section class="view" id="capture">
       <div class="card">
-        <div class="card-head"><div><h3>Capture doors</h3><p class="hint">Single snaps or bulk photos / PDFs / zips into the intake hopper.</p></div></div>
+        <div class="card-head"><div><h3>Capture doors</h3><p class="hint">Single snaps or bulk photos / PDFs / zips.</p></div></div>
         <div class="doors">
           <div class="door" data-capture="photo"><div class="t">Phone snap</div><div class="d">One card at the booth — lands in queue instantly.</div></div>
           <div class="door" data-capture="bulk"><div class="t">Bulk photos</div><div class="d">Drop a folder or zip from the show floor.</div></div>
@@ -100,31 +66,50 @@
           <tbody id="queue-table"></tbody>
         </table>
       </div>
+      <div class="step-next">
+        <p><strong>Next:</strong> Confirm fields through OCR review.</p>
+        <button type="button" class="btn btn-primary" data-go="ocr">Continue to OCR review →</button>
+      </div>
     </section>
 
+    <!-- 02 OCR -->
     <section class="view" id="ocr">
+      <div class="banner">
+        <div>
+          <div class="b-t">Step 2 — OCR review</div>
+          <div class="b-d">Confirm name, title, company, email, phone, website — then write clean leads to the database.</div>
+        </div>
+      </div>
       <div class="card">
-        <div class="card-head"><div><h3>OCR review</h3><p class="hint">Name, title, company, email, phone, website — confirm low-confidence fields.</p></div></div>
+        <div class="card-head"><div><h3>Confirm extracted fields</h3><p class="hint">Low-confidence rows need a quick check before they enter the DB.</p></div></div>
         <table>
           <thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Confidence</th><th></th></tr></thead>
           <tbody id="ocr-table"></tbody>
         </table>
       </div>
-    </section>
-
-    <section class="view" id="database">
       <div class="card">
-        <div class="card-head"><div><h3>Lead database</h3><p class="hint">Written in seconds. De-duped. Status New / De-duped.</p></div></div>
+        <div class="card-head"><div><h3>Written to database</h3><p class="hint">Confirmed cards land in seconds — de-duped automatically.</p></div></div>
         <table>
-          <thead><tr><th>Name</th><th>Company</th><th>Industry</th><th>Status</th><th>Sequence</th></tr></thead>
+          <thead><tr><th>Name</th><th>Company</th><th>Industry</th><th>Status</th></tr></thead>
           <tbody id="db-table"></tbody>
         </table>
       </div>
+      <div class="step-next">
+        <p><strong>Next:</strong> Set customized follow-up and reply sequences.</p>
+        <button type="button" class="btn btn-primary" data-go="mail">Continue to follow-up sequence →</button>
+      </div>
     </section>
 
+    <!-- 03 SEQUENCES -->
     <section class="view" id="mail">
+      <div class="banner">
+        <div>
+          <div class="b-t">Step 3 — Follow-up sequence</div>
+          <div class="b-d">Industry-aware intros from your mailbox, then Day 3 / Day 7 nudges. Skip anyone already contacted.</div>
+        </div>
+      </div>
       <div class="card">
-        <div class="card-head"><div><h3>Follow-up engine</h3><p class="hint">Day 0 intro → Day 3 nudge → Day 7 check-in. Skip if already contacted.</p></div></div>
+        <div class="card-head"><div><h3>Reply sequence</h3><p class="hint">Day 0 intro → Day 3 nudge → Day 7 check-in.</p></div></div>
         <div class="seq">
           <div class="seq-step"><b>Day 0</b><strong>Intro</strong><span>312 sent · industry-aware</span></div>
           <div class="seq-step"><b>Day 3</b><strong>Nudge</strong><span>188 queued · 41 skipped (replied)</span></div>
@@ -134,6 +119,64 @@
       <div class="card">
         <h3>Already-contacted guard</h3>
         <p class="hint">27 duplicates skipped this show — no double-messaging from the booth list.</p>
+      </div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-head"><div><h3>By industry</h3><p class="hint">Customized intro copy per vertical.</p></div></div>
+          <table>
+            <thead><tr><th>Industry</th><th>Leads</th><th>Sent</th></tr></thead>
+            <tbody>
+              <tr><td>Electronics</td><td>186</td><td>142</td></tr>
+              <tr><td>Auto components</td><td>94</td><td>71</td></tr>
+              <tr><td>Textiles</td><td>88</td><td>55</td></tr>
+              <tr><td>Pharma</td><td>83</td><td>44</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h3>Sequence status</h3>
+          <p class="hint" style="margin-bottom:12px">Leads currently in each cadence step.</p>
+          <div class="stages">
+            <div class="stage-row"><span class="lab">Day 0 sent</span><div class="bar"><span style="width:100%"></span></div><span class="amt">312</span></div>
+            <div class="stage-row"><span class="lab">Day 3 queued</span><div class="bar"><span style="width:60%"></span></div><span class="amt">188</span></div>
+            <div class="stage-row"><span class="lab">Day 7 queued</span><div class="bar"><span style="width:30%"></span></div><span class="amt">96</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="step-next">
+        <p><strong>Next:</strong> See the full show overview — throughput, OCR quality, and zero leads lost.</p>
+        <button type="button" class="btn btn-primary" data-go="overview">Continue to overview →</button>
+      </div>
+    </section>
+
+    <!-- 04 OVERVIEW -->
+    <section class="view" id="overview">
+      <div class="banner">
+        <div>
+          <div class="b-t">Step 4 — Overview</div>
+          <div class="b-d">0 leads lost · Capture → OCR → sequences rolled up for the show.</div>
+        </div>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><div class="label">Cards processed</div><div class="val">486</div><div class="foot up">+92 today</div></div>
+        <div class="kpi"><div class="label">OCR success</div><div class="val">96.4%</div><div class="foot">18 needed review</div></div>
+        <div class="kpi"><div class="label">In database</div><div class="val">451</div><div class="foot">Seconds to write</div></div>
+        <div class="kpi"><div class="label">Duplicates skipped</div><div class="val">27</div><div class="foot">No double-messaging</div></div>
+        <div class="kpi"><div class="label">Emails sent</div><div class="val">312</div><div class="foot">Industry-aware intros</div></div>
+        <div class="kpi"><div class="label">Leads lost</div><div class="val">0</div><div class="foot up">Core promise</div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h3>Booth → inbox pipeline</h3><p class="hint">How this show flowed end to end.</p></div></div>
+        <div class="stages">
+          <div class="stage-row"><span class="lab">01 Capture</span><div class="bar"><span style="width:100%"></span></div><span class="amt">486</span></div>
+          <div class="stage-row"><span class="lab">02 OCR confirmed</span><div class="bar"><span style="width:96%"></span></div><span class="amt">468</span></div>
+          <div class="stage-row"><span class="lab">03 In sequence</span><div class="bar"><span style="width:64%"></span></div><span class="amt">312</span></div>
+          <div class="stage-row"><span class="lab">Leads lost</span><div class="bar"><span style="width:0%"></span></div><span class="amt">0</span></div>
+        </div>
+      </div>
+      <div class="step-next">
+        <p><strong>Done.</strong> Restart the workflow anytime from Capture.</p>
+        <button type="button" class="btn" data-go="capture">Back to Capture</button>
       </div>
     </section>
 
@@ -155,7 +198,7 @@
   </main>
 </div>
 
-<script src="/js/dashboard-tour.js?v=2"></script>
+<script src="/js/dashboard-tour.js?v=3"></script>
 <script>
 (function () {
   var QUEUE = [
@@ -171,11 +214,11 @@
     { name: 'Mei Lin', co: 'SilkRoute Textiles', email: 'mei@silkroute.cn', conf: '94%' }
   ];
   var DB = [
-    { name: 'Ravi Mehta', co: 'CircuitHub', ind: 'Electronics', status: 'New', seq: 'Day 0 sent' },
-    { name: 'Ananya Shah', co: 'Volt Components', ind: 'Electronics', status: 'De-duped', seq: 'Skipped' },
-    { name: 'Carlos Dias', co: 'Nova Pharma', ind: 'Pharma', status: 'New', seq: 'Day 3 queued' },
-    { name: 'Mei Lin', co: 'SilkRoute Textiles', ind: 'Textiles', status: 'New', seq: 'Day 0 sent' },
-    { name: 'Jon Hale', co: 'AxleWorks', ind: 'Auto', status: 'New', seq: 'Day 7 queued' }
+    { name: 'Ravi Mehta', co: 'CircuitHub', ind: 'Electronics', status: 'New' },
+    { name: 'Ananya Shah', co: 'Volt Components', ind: 'Electronics', status: 'De-duped' },
+    { name: 'Carlos Dias', co: 'Nova Pharma', ind: 'Pharma', status: 'New' },
+    { name: 'Mei Lin', co: 'SilkRoute Textiles', ind: 'Textiles', status: 'New' },
+    { name: 'Jon Hale', co: 'AxleWorks', ind: 'Auto', status: 'New' }
   ];
 
   document.getElementById('queue-table').innerHTML = QUEUE.map(function (q) {
@@ -188,15 +231,14 @@
   }).join('');
 
   document.getElementById('db-table').innerHTML = DB.map(function (d) {
-    return '<tr><td><b>' + d.name + '</b></td><td>' + d.co + '</td><td>' + d.ind + '</td><td><span class="pill ' + (d.status === 'New' ? 'p-new' : 'p-cool') + '">' + d.status + '</span></td><td>' + d.seq + '</td></tr>';
+    return '<tr><td><b>' + d.name + '</b></td><td>' + d.co + '</td><td>' + d.ind + '</td><td><span class="pill ' + (d.status === 'New' ? 'p-new' : 'p-cool') + '">' + d.status + '</span></td></tr>';
   }).join('');
 
   var titles = {
-    overview: ['Overview', 'India Electronics Expo · booth capture'],
-    capture: ['Capture', 'Photos, bulk zips, and PDF scans'],
-    ocr: ['OCR review', 'Confirm low-confidence fields'],
-    database: ['Database', 'Clean leads in seconds — de-duped'],
-    mail: ['Sequences', 'Day 0 / 3 / 7 from your mailbox'],
+    capture: ['01 · Capture / upload', 'Upload booth snaps, bulk photos, or PDF scans'],
+    ocr: ['02 · OCR review', 'Confirm fields, then write clean leads to the database'],
+    mail: ['03 · Follow-up sequence', 'Customized Day 0 / 3 / 7 from your mailbox'],
+    overview: ['04 · Overview', 'Show results — throughput, quality, zero leads lost'],
     activity: ['Activity', 'Full audit trail for the show']
   };
 
@@ -205,13 +247,17 @@
     document.querySelectorAll('.nav-item').forEach(function (el) {
       el.classList.toggle('active', el.getAttribute('data-view') === view);
     });
-    var t = titles[view] || titles.overview;
+    var t = titles[view] || titles.capture;
     document.getElementById('view-title').textContent = t[0];
     document.getElementById('view-sub').textContent = t[1];
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   document.querySelectorAll('.nav-item').forEach(function (btn) {
     btn.addEventListener('click', function () { go(btn.getAttribute('data-view')); });
+  });
+  document.querySelectorAll('[data-go]').forEach(function (btn) {
+    btn.addEventListener('click', function () { go(btn.getAttribute('data-go')); });
   });
 
   document.querySelectorAll('[data-capture]').forEach(function (door) {
@@ -219,9 +265,9 @@
       var kind = door.getAttribute('data-capture');
       var msg = document.getElementById('capture-msg');
       var n = document.getElementById('nav-queue');
-      var next = parseInt(n.textContent, 10) + (kind === 'bulk' ? 12 : 1);
+      var next = parseInt(n.textContent, 10) + (kind === 'bulk' ? 12 : kind === 'pdf' ? 8 : 1);
       n.textContent = String(next);
-      msg.textContent = 'Added ' + kind + ' to hopper · queue now ' + next + '.';
+      msg.textContent = 'Added ' + kind + ' to hopper · queue now ' + next + '. Ready for OCR review.';
       door.classList.add('flash');
     });
   });
@@ -235,14 +281,16 @@
   });
 
   var tourSteps = [
-    { selector: '#overview .kpis', title: 'Show-floor KPIs', body: 'Throughput, OCR quality, database writes, and zero leads lost.' },
-    { selector: '#overview .stages', title: 'Booth → inbox', body: 'Capture queue through sequence-active — watch the pipeline fill.' },
-    { selector: '[data-view="capture"]', title: 'Capture', body: 'Snap, bulk upload, or PDF — everything lands in the hopper.' },
-    { selector: '[data-view="mail"]', title: 'Follow-ups', body: 'Day 0 / 3 / 7 sequences with an already-contacted guard.' }
+    { view: 'capture', selector: '#capture .doors', title: '01 Capture', body: 'Snap, bulk upload, or PDF — everything lands in the hopper.' },
+    { view: 'ocr', selector: '#ocr .card', title: '02 OCR review', body: 'Confirm low-confidence fields, then leads write to the database.' },
+    { view: 'mail', selector: '#mail .seq', title: '03 Follow-up sequence', body: 'Day 0 / 3 / 7 sequences with an already-contacted guard.' },
+    { view: 'overview', selector: '#overview .kpis', title: '04 Overview', body: 'See throughput, OCR quality, and zero leads lost for the show.' }
   ];
   document.getElementById('btn-tour').addEventListener('click', function () {
-    go('overview');
-    window.phTour && window.phTour.start({ id: 'card-capture-demo', steps: tourSteps });
+    go('capture');
+    setTimeout(function () {
+      window.phTour && window.phTour.start({ id: 'card-capture-demo', navigate: go, steps: tourSteps });
+    }, 50);
   });
 })();
 </script>
