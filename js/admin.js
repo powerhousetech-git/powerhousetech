@@ -89,32 +89,58 @@
     const body = document.querySelector('#ent-table tbody');
     body.innerHTML = entitlements
       .map(
-        (e) => `<tr>
+        (e) => `<tr data-email="${escapeAttr(e.email)}">
         <td>${escapeHtml(e.email)}</td>
-        <td>${e.invoice_radar_enabled ? '<span class="badge badge-on">Enabled</span>' : '<span class="badge badge-off">Off</span>'}</td>
+        <td class="ent-status">${e.invoice_radar_enabled ? '<span class="badge badge-on">Enabled</span>' : '<span class="badge badge-off">Off</span>'}</td>
         <td>${e.invoice_radar_web_app_configured ? 'Configured' : 'Missing URL'}</td>
-        <td><button type="button" class="toggle ${e.invoice_radar_enabled ? 'on' : ''}" data-email="${escapeAttr(e.email)}" data-on="${e.invoice_radar_enabled}" aria-label="Toggle"></button></td>
+        <td><button type="button" class="toggle ${e.invoice_radar_enabled ? 'on' : ''}" data-email="${escapeAttr(e.email)}" data-on="${e.invoice_radar_enabled ? 'true' : 'false'}" aria-pressed="${e.invoice_radar_enabled ? 'true' : 'false'}" aria-label="Toggle Invoice Radar for ${escapeAttr(e.email)}"></button></td>
       </tr>`
       )
       .join('');
+
     body.querySelectorAll('.toggle').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const email = btn.getAttribute('data-email');
-        const next = btn.getAttribute('data-on') !== 'true';
-        btn.disabled = true;
-        try {
-          await api('entitlement', {
-            method: 'POST',
-            body: { email, invoice_radar_enabled: next },
-          });
-          await loadEntitlements();
-        } catch (err) {
-          alert(err.message);
-        } finally {
-          btn.disabled = false;
-        }
-      });
+      btn.addEventListener('click', onToggleEntitlement);
     });
+  }
+
+  async function onToggleEntitlement(ev) {
+    const btn = ev.currentTarget;
+    if (!btn || btn.dataset.busy === '1') return;
+    const email = btn.getAttribute('data-email');
+    const next = btn.getAttribute('data-on') !== 'true';
+    const row = btn.closest('tr');
+    const statusCell = row?.querySelector('.ent-status');
+    const prevOn = btn.getAttribute('data-on') === 'true';
+
+    // Optimistic UI — flip immediately, sync in background.
+    btn.dataset.busy = '1';
+    btn.classList.toggle('on', next);
+    btn.setAttribute('data-on', next ? 'true' : 'false');
+    btn.setAttribute('aria-pressed', next ? 'true' : 'false');
+    if (statusCell) {
+      statusCell.innerHTML = next
+        ? '<span class="badge badge-on">Enabled</span>'
+        : '<span class="badge badge-off">Off</span>';
+    }
+
+    try {
+      await api('entitlement', {
+        method: 'POST',
+        body: { email, invoice_radar_enabled: next },
+      });
+    } catch (err) {
+      btn.classList.toggle('on', prevOn);
+      btn.setAttribute('data-on', prevOn ? 'true' : 'false');
+      btn.setAttribute('aria-pressed', prevOn ? 'true' : 'false');
+      if (statusCell) {
+        statusCell.innerHTML = prevOn
+          ? '<span class="badge badge-on">Enabled</span>'
+          : '<span class="badge badge-off">Off</span>';
+      }
+      alert(err.message || 'Could not update entitlement');
+    } finally {
+      btn.dataset.busy = '0';
+    }
   }
 
   async function loadCredits() {

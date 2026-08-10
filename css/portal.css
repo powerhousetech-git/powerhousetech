@@ -1,3 +1,5 @@
+@import url('/css/touch.css');
+
 :root {
   --ink: #16161a;
   --ink-mid: #4a4a58;
@@ -347,10 +349,12 @@ a {
   animation-delay: 0.12s;
 }
 
-.service-card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(66, 79, 209, 0.45);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+@media (hover: hover) and (pointer: fine) {
+  .service-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(66, 79, 209, 0.45);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  }
 }
 
 .service-card.disabled {

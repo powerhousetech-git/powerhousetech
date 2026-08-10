@@ -177,9 +177,20 @@
     var ham = document.getElementById('hamburger');
     var mob = document.getElementById('mobile-nav');
     if (!ham || !mob) return;
-    ham.addEventListener('click', function () {
+    if (ham.dataset.navBound) return;
+    ham.dataset.navBound = '1';
+    function toggleMenu(e) {
+      if (e) e.preventDefault();
       var open = mob.classList.toggle('open');
       ham.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    ham.addEventListener('click', toggleMenu);
+    // Close menu when a nav link is tapped (single tap navigation).
+    mob.querySelectorAll('a').forEach(function (a) {
+      a.addEventListener('click', function () {
+        mob.classList.remove('open');
+        ham.setAttribute('aria-expanded', 'false');
+      });
     });
   }
 

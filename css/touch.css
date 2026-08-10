@@ -1,0 +1,42 @@
+/**
+ * Mobile / touch interaction fixes shared across marketing, portal, demos, admin.
+ * - touch-action: manipulation → single-tap buttons/links (no 300ms wait / sticky hover)
+ * - hover transforms only on real hover devices → avoids iOS first-tap-as-hover
+ */
+a, button, .btn, .toggle, .nav-item, .hamburger, .door, .service-card,
+[data-theme-toggle], .mobile-signin, .chan-toggle button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(66, 79, 209, 0.18);
+}
+
+/* Sticky :hover on iOS makes the first tap apply hover and the second activate.
+   Keep lift/transform hovers for mouse only. */
+@media (hover: hover) and (pointer: fine) {
+  .service-card:hover,
+  .card:hover,
+  .mini-card:hover:not(.soon),
+  .tool-card:hover,
+  .ready-card--lift:hover,
+  .demo-product:hover .demo-frame {
+    /* rules live in component sheets; this file only gates via overrides below */
+  }
+}
+
+/* Disable transform-on-hover for coarse pointers (phones/tablets). */
+@media (hover: none), (pointer: coarse) {
+  .service-card:hover,
+  .card:hover,
+  .mini-card:hover,
+  .tool-card:hover,
+  .ready-card:hover,
+  .ready-card--lift:hover,
+  .demo-product:hover .demo-frame {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+  .service-card:hover,
+  .mini-card:hover,
+  .tool-card:hover {
+    border-color: inherit;
+  }
+}

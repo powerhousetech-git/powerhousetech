@@ -173,11 +173,13 @@
   transition: transform 0.35s ease, box-shadow 0.35s ease;
 }
 
-.demo-product:hover .demo-frame {
-  transform: translateY(-2px);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.06) inset,
-    0 28px 56px rgba(16, 16, 24, 0.18);
+@media (hover: hover) and (pointer: fine) {
+  .demo-product:hover .demo-frame {
+    transform: translateY(-2px);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.06) inset,
+      0 28px 56px rgba(16, 16, 24, 0.18);
+  }
 }
 
 .demo-chrome {
@@ -417,6 +419,10 @@
   color: #8b95f0;
 }
 
+.demos-page .mobile-cta {
+  display: none !important;
+}
+
 @media (max-width: 800px) {
   .demo-product-head {
     grid-template-columns: 1fr;
@@ -424,6 +430,12 @@
   .demo-product-actions {
     flex-direction: row;
     flex-wrap: wrap;
+  }
+  .demo-product-actions .btn {
+    flex: 1 1 auto;
+    min-height: 44px;
+    justify-content: center;
+    touch-action: manipulation;
   }
   .demo-frame-body {
     height: min(70vh, 520px);
@@ -437,5 +449,9 @@
   }
   .demos-hero {
     padding: 88px 0 36px;
+  }
+  .demos-hero-actions .btn {
+    min-height: 44px;
+    touch-action: manipulation;
   }
 }

@@ -1,4 +1,6 @@
 /* Shared light demo dashboard chrome — Invoice / Outreach / Card Capture */
+@import url('/css/touch.css');
+
 :root {
   --teal: #424fd1;
   --teal-dark: #3340b8;
@@ -217,9 +219,45 @@ tbody tr:hover { background: #fafafe; }
   color: rgba(255, 255, 255, 0.85);
 }
 @media (max-width: 900px) {
-  .app { grid-template-columns: 1fr; }
-  .side { display: none; }
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .side {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    height: auto;
+    max-height: none;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 6px;
+    padding: 10px 12px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .side::-webkit-scrollbar { display: none; }
+  .side .brand,
+  .side .nav-sec,
+  .side .side-foot {
+    display: none;
+  }
+  .nav-item {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    min-height: 40px;
+    padding: 8px 12px;
+    touch-action: manipulation;
+  }
   .kpis { grid-template-columns: repeat(2, 1fr); }
   .two-col, .doors, .seq { grid-template-columns: 1fr; }
-  .main { padding: 20px 16px 48px; }
+  .main { padding: 16px 14px 48px; }
+  .topbar h1 { font-size: 1.45rem; }
+  .step-next { flex-direction: column; align-items: stretch; }
+  .step-next .btn { width: 100%; justify-content: center; }
 }

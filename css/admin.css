@@ -1,3 +1,5 @@
+@import url('/css/touch.css');
+
 :root {
   --bg: #0a0a0f;
   --surface: #13131a;
@@ -36,8 +38,9 @@ body {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+  touch-action: manipulation;
 }
-.admin-side button.active, .admin-side button:hover {
+.admin-side button.active {
   background: rgba(66, 79, 209, 0.15);
   color: #fff;
 }
@@ -95,18 +98,46 @@ tr:last-child td { border-bottom: 0; }
 .muted { color: var(--muted); }
 .hidden { display: none !important; }
 .toggle {
-  appearance: none; width: 40px; height: 22px; border-radius: 999px;
-  background: #333; position: relative; cursor: pointer; border: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 48px;
+  height: 28px;
+  border-radius: 999px;
+  background: #333;
+  position: relative;
+  cursor: pointer;
+  border: 0;
+  touch-action: manipulation;
+  transition: background 0.15s ease;
+  flex: 0 0 auto;
 }
+.toggle:disabled,
+.toggle[data-busy="1"] { opacity: 0.7; }
 .toggle.on { background: var(--primary); }
 .toggle::after {
-  content: ''; position: absolute; top: 3px; left: 3px;
-  width: 16px; height: 16px; border-radius: 50%; background: #fff;
-  transition: .15s;
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,.35);
 }
-.toggle.on::after { left: 21px; }
+.toggle.on::after { left: 23px; }
+@media (hover: hover) and (pointer: fine) {
+  .admin-side button:hover {
+    background: rgba(66, 79, 209, 0.15);
+    color: #fff;
+  }
+}
 @media (max-width: 900px) {
   .admin-shell { grid-template-columns: 1fr; }
-  .admin-side { flex-direction: row; flex-wrap: wrap; }
+  .admin-side { flex-direction: row; flex-wrap: wrap; position: sticky; top: 0; z-index: 5; }
+  .admin-side button { min-height: 44px; }
   .kpis { grid-template-columns: 1fr 1fr; }
+  .admin-main { padding: 20px 16px 48px; }
+  .toggle { min-width: 48px; min-height: 28px; }
 }

@@ -15,6 +15,8 @@
   var ADMIN_ME_API = SUPABASE_URL + '/functions/v1/admin-api?op=me';
 
   var authUserPromise = null;
+  var cachedToken = null;
+  var cachedTokenExp = 0;
 
   function waitForFirebase() {
     if (global.phFirebaseAuth) return Promise.resolve(global.phFirebaseAuth);
@@ -156,6 +158,8 @@
     try {
       localStorage.removeItem(LOCAL_USER_KEY);
     } catch (_) {}
+    cachedToken = null;
+    cachedTokenExp = 0;
     resetAuthUserCache();
     try {
       global.dispatchEvent(new CustomEvent('ph-auth-changed', { detail: { user: null } }));
@@ -168,10 +172,19 @@
     return '/portal?returnTo=' + encodeURIComponent(rt);
   }
 
-  async function getIdToken() {
+  async function getIdToken(force) {
     var user = await waitForAuthUser();
-    if (!user) return null;
-    return user.getIdToken();
+    if (!user) {
+      cachedToken = null;
+      cachedTokenExp = 0;
+      return null;
+    }
+    var now = Date.now();
+    if (!force && cachedToken && now < cachedTokenExp) return cachedToken;
+    cachedToken = await user.getIdToken(!!force);
+    // Refresh a bit before the typical 1h expiry.
+    cachedTokenExp = now + 50 * 60 * 1000;
+    return cachedToken;
   }
 
   async function recordSession(eventType, path, meta) {
