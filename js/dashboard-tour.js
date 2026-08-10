@@ -26,6 +26,12 @@
     overlay.querySelector('.ph-tour-skip').onclick = function () {
       finish(true);
     };
+    overlay.querySelector('.ph-tour-backdrop').onclick = function () {
+      finish(true);
+    };
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && current) finish(true);
+    });
     overlay.querySelector('.ph-tour-back').onclick = function () {
       go(index - 1);
     };
@@ -104,10 +110,16 @@
   }
 
   function shouldAutoStart(id) {
+    // Never auto-start inside demos iframes — dark overlay reads as a black screen.
+    try {
+      if (window.self !== window.top) return false;
+    } catch (_) {
+      return false;
+    }
     try {
       return !localStorage.getItem(storageKey(id));
     } catch (_) {
-      return true;
+      return false;
     }
   }
 

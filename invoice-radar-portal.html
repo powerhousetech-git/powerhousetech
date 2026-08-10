@@ -602,9 +602,7 @@ renderAll();
     window.phTour?.reset('invoice-sample');
     window.phTour?.start({id:'invoice-sample',steps:tourSteps});
   });
-  if(window.phTour?.shouldAutoStart('invoice-sample')){
-    setTimeout(()=>window.phTour.start({id:'invoice-sample',steps:tourSteps}),700);
-  }
+  // Manual tour only — auto-start overlay was covering demos in a black screen.
 })();
 </script>
 

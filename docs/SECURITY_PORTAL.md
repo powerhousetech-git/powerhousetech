@@ -26,9 +26,10 @@
 2. Deploy Edge Functions `portal-session` and `admin-api` (`verify_jwt: false` — they verify Firebase ID tokens themselves).
 3. Confirm Firebase authorized domains include `powerhousetech.in`.
 4. Sign in as shreyas@ → should land on `/admin` (via `/portal`).
-5. Public sample demos (`/dashboard/demo/`, `/invoice-dashboard/`) load without sign-in; live `/app/invoice-radar` stays gated.
-6. `/sample-automations` embeds those public demos (no Loom placeholders).
+5. Public sample demos (`/demo/ai-sales-outreach`, `/demo/card-capture`, `/invoice-dashboard/`) load without sign-in; live `/app/invoice-radar` stays gated.
+6. `/sample-automations` embeds those public demos (no Loom placeholders). Tours are manual-only (no auto dark overlay).
 7. `/app` and `/workspace` redirect to `/portal` — the old Overview shell is not a product landing (`/app/workspace` is opt-in legacy only).
+8. Legacy `/dashboard/demo/` redirects to `/demo/ai-sales-outreach`.
 
 ## Deploy without `SUPABASE_ACCESS_TOKEN`
 

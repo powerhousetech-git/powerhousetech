@@ -15,6 +15,48 @@
   to = "/app/invoice-radar.html"
   status = 200
 
+# Public product demos (light static dashboards — no dark Next auth wall)
+[[redirects]]
+  from = "/demo/ai-sales-outreach"
+  to = "/demos/ai-sales-outreach.html"
+  status = 200
+
+[[redirects]]
+  from = "/demo/ai-sales-outreach/"
+  to = "/demos/ai-sales-outreach.html"
+  status = 200
+
+[[redirects]]
+  from = "/demo/card-capture"
+  to = "/demos/card-capture.html"
+  status = 200
+
+[[redirects]]
+  from = "/demo/card-capture/"
+  to = "/demos/card-capture.html"
+  status = 200
+
+# Legacy Med Spa URL → AI Sales Outreach demo
+[[redirects]]
+  from = "/dashboard/demo"
+  to = "/demo/ai-sales-outreach"
+  status = 302
+
+[[redirects]]
+  from = "/dashboard/demo/"
+  to = "/demo/ai-sales-outreach"
+  status = 302
+
+[[redirects]]
+  from = "/dashboard"
+  to = "/demo/ai-sales-outreach"
+  status = 302
+
+[[redirects]]
+  from = "/dashboard/"
+  to = "/demo/ai-sales-outreach"
+  status = 302
+
 # Old Overview workspace is retired as a landing — send people to the portal
 [[redirects]]
   from = "/app"
@@ -78,17 +120,6 @@
   from = "/invoice-dashboard/"
   to = "/invoice-radar-portal.html"
   status = 200
-
-# Med spa ROI dashboard (static export from medspa-dashboard/)
-[[redirects]]
-  from = "/dashboard"
-  to = "/dashboard/demo/"
-  status = 302
-
-[[redirects]]
-  from = "/dashboard/"
-  to = "/dashboard/demo/"
-  status = 302
 
 # Marketing subpages — clean URLs (match local `serve` behavior)
 [[redirects]]

@@ -2,21 +2,38 @@ window.PH_SITE = {
   calendlyUrl: 'https://calendly.com/shreyas-powerhousetech/30min',
   demos: [
     {
-      id: 'demo-medspa',
-      title: 'Med Spa ROI',
-      product: 'Luxe Glow · sample spa',
+      id: 'demo-outreach',
+      title: 'AI Sales Outreach',
+      product: 'Northline SaaS · sample pipeline',
       summary:
-        'See recovered revenue from leads, no-shows, reactivation, and reviews — live KPIs you can click through.',
+        'Prospect intake, AI personalization, safe sends, follow-ups, and reply triage — click through the live sample.',
       bullets: [
-        'Before/after automation KPIs',
-        'Lead pipeline & appointment recovery',
-        'Payback period and ROI waterfall'
+        'Seven-stage outreach pipeline',
+        'Daily send cap and warm-lead queue',
+        'Reply classification with drafts'
       ],
-      href: '/dashboard/demo/',
-      embed: '/dashboard/demo/',
+      href: '/demo/ai-sales-outreach',
+      embed: '/demo/ai-sales-outreach',
       badge: 'Try instantly',
-      theme: 'dark',
-      cta: 'Open full screen'
+      theme: 'light',
+      cta: 'Open demo'
+    },
+    {
+      id: 'demo-card-capture',
+      title: 'Card Capture',
+      product: 'India Electronics Expo · sample show',
+      summary:
+        'Booth photos to clean leads in seconds, then Day 0 / 3 / 7 follow-ups from your mailbox — zero leads lost.',
+      bullets: [
+        'Capture doors: snap, bulk, PDF',
+        'OCR review and de-duped database',
+        'Industry-aware follow-up sequences'
+      ],
+      href: '/demo/card-capture',
+      embed: '/demo/card-capture',
+      badge: 'Try instantly',
+      theme: 'light',
+      cta: 'Open demo'
     },
     {
       id: 'demo-invoice-sample',
@@ -33,7 +50,7 @@ window.PH_SITE = {
       embed: '/invoice-dashboard/',
       badge: 'Try instantly',
       theme: 'light',
-      cta: 'Open full screen'
+      cta: 'Open demo'
     }
   ],
   contacts: [

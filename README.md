@@ -15,8 +15,8 @@ Static HTML/CSS/JS published via Netlify (`netlify.toml` → publish `.`).
 - Med spa ROI dashboard: `/dashboard/demo/`
 - Client portal (post sign-in home): `/portal`
 - Live Invoice Radar: `/app/invoice-radar`
-- Public demos: `/sample-automations`, `/dashboard/demo/`, `/invoice-dashboard/`
-- Legacy Overview shell (opt-in only): `/app/workspace`
+- Public demos: `/sample-automations`, `/demo/ai-sales-outreach`, `/demo/card-capture`, `/invoice-dashboard/`
+- Legacy Med Spa Next export (redirects to outreach): `/dashboard/demo/`
 
 See `docs/SECURITY_PORTAL.md` for auth/admin security notes. Apply Supabase migration `20260810120000_portal_users_events.sql` and deploy Edge Functions `portal-session` + `admin-api`.
 

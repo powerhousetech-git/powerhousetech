@@ -87,11 +87,7 @@ export function DashboardTour() {
         loadCss("/css/dashboard-tour.css");
         await loadScript("/js/dashboard-tour.js");
         if (cancelled || !window.phTour) return;
-        if (window.phTour.shouldAutoStart(TOUR_ID)) {
-          setTimeout(() => {
-            window.phTour?.start({ id: TOUR_ID, steps: STEPS });
-          }, 800);
-        }
+        // Manual tour only — auto-start dark overlay looked like a black screen on demos.
       } catch (err) {
         console.warn(err);
       }

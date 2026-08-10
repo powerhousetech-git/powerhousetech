@@ -221,7 +221,7 @@
 .demo-frame-body {
   position: relative;
   height: min(72vh, 640px);
-  background: #0a0a0f;
+  background: #f5f6fa;
 }
 
 .demo-frame-body.is-light {

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="AI Sales Outreach System demo — prospect pipeline, safe sends, follow-ups, and reply triage.">
+<title>AI Sales Outreach — Demo · Powerhouse</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Instrument+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/demo-dashboard.css">
+<link rel="stylesheet" href="/css/dashboard-tour.css">
+</head>
+<body>
+<div class="app" id="ao-app">
+  <aside class="side">
+    <div class="brand">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><line x1="8" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="40" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="24" y1="21.5" x2="24" y2="40" stroke="#fff" stroke-width="3"/><circle cx="8" cy="9.5" r="5.2" fill="#fff"/><circle cx="40" cy="9.5" r="5.2" fill="#fff"/><circle cx="24" cy="40" r="5" fill="#fff"/><circle cx="24" cy="21.5" r="6.3" fill="#424FD1"/></svg>
+      <div><div class="name">AI Sales Outreach</div><div class="sub">by Powerhouse</div></div>
+    </div>
+    <div class="nav-sec">Workspace</div>
+    <button type="button" class="nav-item active" data-view="overview"><span class="dot">▦</span> Overview</button>
+    <button type="button" class="nav-item" data-view="pipeline"><span class="dot">↗</span> Pipeline</button>
+    <button type="button" class="nav-item" data-view="sends"><span class="dot">✉</span> Sends &amp; cap</button>
+    <button type="button" class="nav-item" data-view="followups"><span class="dot">↻</span> Follow-ups</button>
+    <button type="button" class="nav-item" data-view="triage"><span class="dot">✓</span> Reply triage <span class="cnt" id="nav-warm">8</span></button>
+    <button type="button" class="nav-item" data-view="deliverability"><span class="dot">🛡</span> Deliverability</button>
+    <button type="button" class="nav-item" data-view="activity"><span class="dot">☰</span> Activity</button>
+    <div class="side-foot"><a href="/portal">← All services</a><br>Sample data · Northline SaaS</div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1 id="view-title">Overview</h1>
+        <div class="sub" id="view-sub">Northline SaaS · cold outreach engine</div>
+      </div>
+      <div class="top-actions">
+        <span class="chip chip-demo">Demo data</span>
+        <button type="button" class="btn btn-sm" id="btn-tour">Tour</button>
+        <a class="btn btn-primary btn-sm" href="/contact.html#book">Book a call</a>
+      </div>
+    </div>
+
+    <section class="view active" id="overview">
+      <div class="banner">
+        <div>
+          <div class="b-t">Sending is ON · day 12 of ramp</div>
+          <div class="b-d">42 / 60 daily cap used · 8 warm replies waiting with drafts</div>
+        </div>
+      </div>
+      <div class="kpis" id="kpi-overview">
+        <div class="kpi"><div class="label">Prospects validated</div><div class="val">1,284</div><div class="foot up">+186 this week</div></div>
+        <div class="kpi"><div class="label">Emails sent (30d)</div><div class="val">3,902</div><div class="foot">Under safe ramp</div></div>
+        <div class="kpi"><div class="label">Reply rate</div><div class="val">11.4%</div><div class="foot up">+3.1 pts vs baseline</div></div>
+        <div class="kpi"><div class="label">Warm / interested</div><div class="val">48</div><div class="foot warn">8 need a human reply</div></div>
+        <div class="kpi"><div class="label">Follow-ups fired</div><div class="val">1,117</div><div class="foot">Auto after no-reply</div></div>
+        <div class="kpi"><div class="label">Suppressed</div><div class="val">63</div><div class="foot">Bounces + complaints</div></div>
+      </div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-head"><div><h3>Seven-stage pipeline</h3><p class="hint">Every prospect has a stage — nothing stalls.</p></div></div>
+          <div class="stages" id="pipeline-bars"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><h3>Needs you now</h3><p class="hint">Warm replies with a suggested draft ready.</p></div></div>
+          <table>
+            <thead><tr><th>Prospect</th><th>Class</th><th></th></tr></thead>
+            <tbody id="warm-mini"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="pipeline">
+      <div class="card">
+        <div class="card-head"><div><h3>Prospect pipeline</h3><p class="hint">Intake → personalize → send → follow-up → triage.</p></div></div>
+        <table>
+          <thead><tr><th>Prospect</th><th>Company</th><th>Stage</th><th>Last touch</th></tr></thead>
+          <tbody id="pipeline-table"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="view" id="sends">
+      <div class="kpis">
+        <div class="kpi"><div class="label">Daily cap</div><div class="val">60</div><div class="foot">Ramping +5 / day</div></div>
+        <div class="kpi"><div class="label">Sent today</div><div class="val">42</div><div class="foot up">18 left</div></div>
+        <div class="kpi"><div class="label">Personalization queue</div><div class="val">214</div><div class="foot">Ready to send</div></div>
+      </div>
+      <div class="card">
+        <h3>Send control</h3>
+        <p class="hint">Volume ramps under a daily cap so the domain stays out of spam. Toggle sending anytime.</p>
+        <button type="button" class="btn btn-primary" id="btn-toggle-send">Sending is ON — click to pause</button>
+      </div>
+    </section>
+
+    <section class="view" id="followups">
+      <div class="card">
+        <div class="card-head"><div><h3>Follow-up cadence</h3><p class="hint">No-reply prospects get a timed, contextual nudge.</p></div></div>
+        <div class="seq">
+          <div class="seq-step"><b>Day 0</b><strong>Intro sent</strong><span>1,842 prospects</span></div>
+          <div class="seq-step"><b>Day 3</b><strong>Follow-up #1</strong><span>906 fired · 211 skipped (replied)</span></div>
+          <div class="seq-step"><b>Day 7</b><strong>Follow-up #2</strong><span>211 fired · rest closed or warm</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="triage">
+      <div class="card">
+        <div class="card-head"><div><h3>Reply triage</h3><p class="hint">Interested / not now / OOO / unsubscribe — with a draft for the ones that matter.</p></div></div>
+        <table>
+          <thead><tr><th>From</th><th>Class</th><th>Snippet</th><th>Draft</th><th></th></tr></thead>
+          <tbody id="triage-table"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="view" id="deliverability">
+      <div class="kpis">
+        <div class="kpi"><div class="label">Bounce rate</div><div class="val">1.2%</div><div class="foot up">Healthy</div></div>
+        <div class="kpi"><div class="label">Complaints</div><div class="val">0.08%</div><div class="foot">Auto-suppressed</div></div>
+        <div class="kpi"><div class="label">Suppression list</div><div class="val">63</div><div class="foot">Never contacted again</div></div>
+      </div>
+      <div class="card">
+        <h3>Guardian</h3>
+        <p class="hint">Bad addresses are caught and suppressed so sender reputation stays intact.</p>
+        <table>
+          <thead><tr><th>Address</th><th>Reason</th><th>When</th></tr></thead>
+          <tbody>
+            <tr><td>info@oldco.example</td><td>Hard bounce</td><td class="mono">2h ago</td></tr>
+            <tr><td>noreply@vendor.io</td><td>Role address rejected</td><td class="mono">Yesterday</td></tr>
+            <tr><td>sam@agency.test</td><td>Complaint</td><td class="mono">3d ago</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="view" id="activity">
+      <div class="card">
+        <div class="card-head"><div><h3>Activity log</h3><p class="hint">Every intake, send, follow-up, and classification.</p></div></div>
+        <table>
+          <thead><tr><th>When</th><th>Event</th><th>Detail</th></tr></thead>
+          <tbody id="activity-table"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="/js/dashboard-tour.js"></script>
+<script>
+(function () {
+  var STAGES = [
+    { lab: '01 Intake', n: 1284, max: 1284 },
+    { lab: '02 Personalized', n: 1102, max: 1284 },
+    { lab: '03 Sent', n: 942, max: 1284 },
+    { lab: '04 Follow-up', n: 611, max: 1284 },
+    { lab: '05 Reply scan', n: 188, max: 1284 },
+    { lab: '06 Triage', n: 188, max: 1284 },
+    { lab: '07 Suppressed', n: 63, max: 1284 }
+  ];
+  var WARM = [
+    { name: 'Priya Nair', co: 'Orbit Ops', cls: 'Interested', snip: 'Can we talk Thursday?', draft: 'Ready' },
+    { name: 'Marcus Lee', co: 'Fieldkit', cls: 'Interested', snip: 'Send pricing for 12 seats', draft: 'Ready' },
+    { name: 'Elena Vogt', co: 'Northbay', cls: 'Not now', snip: 'Q3 revisit — keep me posted', draft: 'Snooze' },
+    { name: 'Jonah Park', co: 'Helix CRM', cls: 'OOO', snip: 'Back Monday', draft: 'Wait' }
+  ];
+  var PIPE = [
+    { name: 'Aisha Khan', co: 'Lumen Freight', stage: 'Personalized', touch: '12m ago' },
+    { name: 'Tom Richter', co: 'Basin AI', stage: 'Sent', touch: '1h ago' },
+    { name: 'Sofia Alvarez', co: 'CargoStack', stage: 'Follow-up #1', touch: '3h ago' },
+    { name: 'Kenji Mori', co: 'Parceline', stage: 'Intake', touch: 'Today' },
+    { name: 'Hannah Cole', co: 'Waveform', stage: 'Triage', touch: '2h ago' }
+  ];
+  var ACT = [
+    { when: '09:14', event: 'Reply classified', detail: 'Priya Nair → Interested + draft' },
+    { when: '09:02', event: 'Follow-up sent', detail: 'Sofia Alvarez · Day 3 nudge' },
+    { when: '08:41', event: 'Batch personalized', detail: '40 openers generated' },
+    { when: '08:12', event: 'Intake validated', detail: '62 prospects · 4 rejected' },
+    { when: '07:55', event: 'Suppressed', detail: 'info@oldco.example · hard bounce' }
+  ];
+
+  function clsPill(c) {
+    if (c === 'Interested') return 'p-hot';
+    if (c === 'Not now') return 'p-cool';
+    if (c === 'OOO') return 'p-warm';
+    return 'p-dead';
+  }
+
+  document.getElementById('pipeline-bars').innerHTML = STAGES.map(function (s) {
+    var pct = Math.round((s.n / s.max) * 100);
+    return '<div class="stage-row"><span class="lab">' + s.lab + '</span><div class="bar"><span style="width:' + pct + '%"></span></div><span class="amt">' + s.n + '</span></div>';
+  }).join('');
+
+  document.getElementById('warm-mini').innerHTML = WARM.slice(0, 3).map(function (w) {
+    return '<tr><td><b>' + w.name + '</b><div class="hint" style="margin:0">' + w.co + '</div></td><td><span class="pill ' + clsPill(w.cls) + '">' + w.cls + '</span></td><td><button type="button" class="btn btn-sm" data-go="triage">Open</button></td></tr>';
+  }).join('');
+
+  document.getElementById('pipeline-table').innerHTML = PIPE.map(function (p) {
+    return '<tr><td><b>' + p.name + '</b></td><td>' + p.co + '</td><td>' + p.stage + '</td><td class="mono">' + p.touch + '</td></tr>';
+  }).join('');
+
+  document.getElementById('triage-table').innerHTML = WARM.map(function (w) {
+    return '<tr><td><b>' + w.name + '</b><div class="hint" style="margin:0">' + w.co + '</div></td><td><span class="pill ' + clsPill(w.cls) + '">' + w.cls + '</span></td><td>' + w.snip + '</td><td>' + w.draft + '</td><td><button type="button" class="btn btn-sm btn-primary js-claim">Use draft</button></td></tr>';
+  }).join('');
+
+  document.getElementById('activity-table').innerHTML = ACT.map(function (a) {
+    return '<tr><td class="mono">' + a.when + '</td><td>' + a.event + '</td><td>' + a.detail + '</td></tr>';
+  }).join('');
+
+  var titles = {
+    overview: ['Overview', 'Northline SaaS · cold outreach engine'],
+    pipeline: ['Pipeline', 'Every prospect has a stage'],
+    sends: ['Sends & cap', 'Safe ramped schedule from your mailbox'],
+    followups: ['Follow-ups', 'Timed nudges when nobody replies'],
+    triage: ['Reply triage', 'Warm leads land classified with a draft'],
+    deliverability: ['Deliverability', 'Bounces and complaints stay suppressed'],
+    activity: ['Activity', 'Audit trail for the outreach engine']
+  };
+
+  function go(view) {
+    document.querySelectorAll('.view').forEach(function (el) { el.classList.toggle('active', el.id === view); });
+    document.querySelectorAll('.nav-item').forEach(function (el) {
+      el.classList.toggle('active', el.getAttribute('data-view') === view);
+    });
+    var t = titles[view] || titles.overview;
+    document.getElementById('view-title').textContent = t[0];
+    document.getElementById('view-sub').textContent = t[1];
+  }
+
+  document.querySelectorAll('.nav-item').forEach(function (btn) {
+    btn.addEventListener('click', function () { go(btn.getAttribute('data-view')); });
+  });
+  document.querySelectorAll('[data-go]').forEach(function (btn) {
+    btn.addEventListener('click', function () { go(btn.getAttribute('data-go')); });
+  });
+  document.getElementById('btn-toggle-send').addEventListener('click', function () {
+    var on = this.textContent.indexOf('ON') !== -1;
+    this.textContent = on ? 'Sending is OFF — click to resume' : 'Sending is ON — click to pause';
+    this.classList.toggle('btn-primary', !on);
+  });
+  document.querySelectorAll('.js-claim').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var tr = btn.closest('tr');
+      btn.textContent = 'Claimed';
+      btn.disabled = true;
+      if (tr) tr.classList.add('flash');
+      var n = document.getElementById('nav-warm');
+      var v = Math.max(0, parseInt(n.textContent, 10) - 1);
+      n.textContent = String(v);
+      if (!v) n.style.display = 'none';
+    });
+  });
+
+  var tourSteps = [
+    { selector: '#kpi-overview', title: 'Outreach KPIs', body: 'Validated prospects, safe sends, reply rate, and warm leads in one glance.' },
+    { selector: '#pipeline-bars', title: 'Seven-stage pipeline', body: 'Intake → personalize → send → follow-up → scan → triage → suppress.' },
+    { selector: '[data-view="triage"]', title: 'Reply triage', body: 'Open triage to claim warm replies with drafts ready.' },
+    { selector: '[data-view="deliverability"]', title: 'Deliverability', body: 'Bounces and complaints are suppressed automatically.' }
+  ];
+  document.getElementById('btn-tour').addEventListener('click', function () {
+    window.phTour && window.phTour.start({ id: 'outreach-demo', steps: tourSteps });
+  });
+})();
+</script>
+</body>
+</html>
