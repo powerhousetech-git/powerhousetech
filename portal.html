@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Client Portal — Powerhouse Tech</title>
-  <meta name="description" content="Sign in to open your Powerhouse dashboards — Invoice Radar, Med Spa ROI, and more.">
+  <title>Portal — Powerhouse Tech</title>
+  <meta name="description" content="Sign in to Powerhouse and open AI Sales Outreach, Card Capture, or Invoice Radar demos.">
   <meta name="robots" content="noindex">
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/portal.css">
 </head>
 <body>
@@ -48,7 +48,7 @@
       <section id="auth-view" class="auth-panel" aria-labelledby="auth-title">
         <h1 id="auth-title">Sign in</h1>
         <p class="lead">
-          Sign in with Google to open your client portal and choose a dashboard.
+          Use Google to open your portal and try the product demos.
         </p>
         <button type="button" class="btn btn-google" id="google-signin">
           <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
@@ -64,51 +64,28 @@
           Continue with demo access
         </button>
         <p class="auth-hint">
-          <b>Google sign-in required.</b> Use the Google account your Powerhouse invite was sent to.
+          Prefer browsing first? <a href="/sample-automations">Open the public demos</a> — no sign-in required.
         </p>
         <p id="auth-error" class="auth-error hidden" role="alert"></p>
       </section>
 
       <section id="services-view" class="hidden" aria-labelledby="services-title">
         <div class="services-head">
-          <p class="eyebrow">Your workspace</p>
+          <p class="eyebrow">Powerhouse</p>
           <h1 id="services-title">Welcome back, <span id="greet-name">there</span></h1>
-          <p>Open a live service, try a public demo, or book a call — this is your home after sign-in.</p>
+          <p>Pick a product demo to open. Each one uses sample data so you can click through immediately.</p>
         </div>
 
-        <div class="service-grid">
-          <a class="service-card" href="/app/invoice-radar" data-gated-href="/app/invoice-radar">
-            <div class="service-icon" aria-hidden="true">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-            </div>
-            <h2>Invoice Radar</h2>
-            <p>Receivables, approvals, follow-ups, and capture — live from your Google Sheet.</p>
-            <div class="service-meta">
-              <span class="badge badge-live">Live dashboard</span>
-              <span class="cta-label">Open →</span>
-            </div>
-          </a>
-
-          <a class="service-card" href="/invoice-dashboard/">
-            <div class="service-icon" aria-hidden="true">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-            </div>
-            <h2>Invoice Radar · Sample</h2>
-            <p>Interactive sample dashboard with demo receivables data — open instantly, no wait.</p>
-            <div class="service-meta">
-              <span class="badge badge-demo">Public demo</span>
-              <span class="cta-label">Open →</span>
-            </div>
-          </a>
-
+        <p class="portal-section-label">Product demos</p>
+        <div class="service-grid service-grid--products">
           <a class="service-card" href="/demo/ai-sales-outreach">
             <div class="service-icon" aria-hidden="true">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H4z"/><path d="m22 7-10 7L2 7"/></svg>
             </div>
             <h2>AI Sales Outreach</h2>
-            <p>Prospect pipeline, safe sends, follow-ups, and reply triage with sample data.</p>
+            <p>Prospect pipeline, safe sends, follow-ups, and reply triage.</p>
             <div class="service-meta">
-              <span class="badge badge-demo">Public demo</span>
+              <span class="badge badge-demo">Demo</span>
               <span class="cta-label">Open →</span>
             </div>
           </a>
@@ -118,36 +95,30 @@
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/></svg>
             </div>
             <h2>Card Capture</h2>
-            <p>Booth photos to clean leads, then Day 0 / 3 / 7 follow-ups — zero leads lost.</p>
+            <p>Booth photos to clean leads, then Day 0 / 3 / 7 follow-ups.</p>
             <div class="service-meta">
-              <span class="badge badge-demo">Public demo</span>
+              <span class="badge badge-demo">Demo</span>
               <span class="cta-label">Open →</span>
             </div>
           </a>
 
-          <a class="service-card" href="/sample-automations">
+          <a class="service-card" href="/invoice-dashboard/">
             <div class="service-icon" aria-hidden="true">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
             </div>
-            <h2>All product demos</h2>
-            <p>Click through live sample workspaces on the demos page.</p>
+            <h2>Invoice Radar</h2>
+            <p>Approvals, aging, capture, and mark-paid with sample receivables.</p>
             <div class="service-meta">
-              <span class="badge badge-demo">Try instantly</span>
+              <span class="badge badge-demo">Demo</span>
               <span class="cta-label">Open →</span>
             </div>
           </a>
+        </div>
 
-          <a class="service-card" href="/contact.html#book">
-            <div class="service-icon" aria-hidden="true">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 0L7 19l-4 1 1-4Z"/></svg>
-            </div>
-            <h2>Need another system?</h2>
-            <p>Card Capture, AI Sales Outreach, or a custom workflow mapped to your stack.</p>
-            <div class="service-meta">
-              <span class="badge badge-live">Book a call</span>
-              <span class="cta-label">Talk to us →</span>
-            </div>
-          </a>
+        <div class="portal-secondary">
+          <a class="portal-text-link" href="/sample-automations">View all demos side-by-side →</a>
+          <span class="portal-dot" aria-hidden="true">·</span>
+          <a class="portal-text-link" href="/contact.html#book">Book a call</a>
         </div>
       </section>
     </main>

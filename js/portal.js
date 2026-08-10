@@ -14,7 +14,7 @@
   const greetName = document.getElementById('greet-name');
   const adminLink = document.getElementById('admin-link');
 
-  // Sample demos are public on /sample-automations — portal is for client / live access.
+  // Public demos don't need the portal — keep sign-in focused.
   if (demoBtn) {
     demoBtn.classList.add('hidden');
     demoBtn.style.display = 'none';
@@ -24,7 +24,7 @@
   const authHint = document.querySelector('.auth-hint');
   if (authHint) {
     authHint.innerHTML =
-      '<b>Client sign-in.</b> Use the Google account on your Powerhouse invite for live Invoice Radar. Prefer a quick look? <a href="/sample-automations">Try the public demos</a>.';
+      'Prefer browsing first? <a href="/sample-automations">Open the public demos</a> — no sign-in required.';
   }
 
   function showError(msg) {
