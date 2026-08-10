@@ -26,7 +26,7 @@ export function Nav() {
     >
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6 md:h-16 md:px-8">
         <a href="#" className="text-[15px] font-semibold tracking-tight text-white">
-          Powerhouse
+          PowerhouseTech
         </a>
         <nav className="hidden items-center gap-8 text-[13px] text-white/55 md:flex">
           <a href="#capabilities" className="transition-colors hover:text-white">

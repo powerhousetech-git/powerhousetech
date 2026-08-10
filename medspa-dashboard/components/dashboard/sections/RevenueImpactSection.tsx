@@ -170,7 +170,7 @@ export function RevenueImpactSection({ data }: { data: DashboardData }) {
         <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-lg font-semibold tracking-tight">
-              Continue growing with Powerhouse Tech
+              Continue growing with PowerhouseTech
             </p>
             <p className="mt-1 text-sm text-text-secondary">
               Schedule a strategy call to discuss expanding your automation →

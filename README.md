@@ -1,6 +1,6 @@
-# Powerhouse Tech
+# PowerhouseTech
 
-Marketing site and client workspace for **Powerhouse Tech** — custom workflow automation for international teams (ops, sales, finance, AI).
+Marketing site and client workspace for **PowerhouseTech** — custom workflow automation for international teams (ops, sales, finance, AI).
 
 ## What’s live
 

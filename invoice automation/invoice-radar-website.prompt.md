@@ -1,6 +1,6 @@
 # Cursor Prompt — Invoice Radar "How it works" section
 
-Build a self-contained "How Invoice Radar works" section for the Powerhouse Tech
+Build a self-contained "How Invoice Radar works" section for the PowerhouseTech
 website, matching the existing AI Sales Outreach solution page.
 
 ## Design tokens (reuse from site)

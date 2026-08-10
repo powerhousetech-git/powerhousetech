@@ -13,11 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Powerhouse — AI Automation Studio for B2B SaaS",
+  title: "PowerhouseTech — AI Automation Studio for B2B SaaS",
   description:
     "We automate the ops. You scale the company. AI automation infrastructure for India's sharpest B2B SaaS founders.",
   openGraph: {
-    title: "Powerhouse — AI Automation Studio",
+    title: "PowerhouseTech — AI Automation Studio",
     description: "High-leverage automation infrastructure. Working demo in 7 days.",
     type: "website",
   },

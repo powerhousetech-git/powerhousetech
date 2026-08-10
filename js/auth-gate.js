@@ -1,5 +1,5 @@
 /**
- * Shared Firebase auth gate for Powerhouse dashboards.
+ * Shared Firebase auth gate for PowerhouseTech dashboards.
  * - requireAuth / guardPage: redirect unsigned users to /portal?returnTo=…
  * - safeReturnTo: allowlist relative paths only
  * - recordSession: upsert portal user + event via Edge Function

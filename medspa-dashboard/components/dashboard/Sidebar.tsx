@@ -42,7 +42,7 @@ export function Sidebar({
             <Zap className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-sm font-semibold tracking-tight">Powerhouse Tech</p>
+            <p className="text-sm font-semibold tracking-tight">PowerhouseTech</p>
             <p className="text-[11px] text-text-muted">Client ROI</p>
           </div>
         </div>
@@ -77,7 +77,7 @@ export function Sidebar({
             <Shield className="h-3 w-3" />
             HIPAA Compliant
           </div>
-          <p className="text-[11px] text-text-muted">Powered by Powerhouse Tech</p>
+          <p className="text-[11px] text-text-muted">Powered by PowerhouseTech</p>
         </div>
       </aside>
 

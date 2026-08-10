@@ -9,7 +9,7 @@ import { jsonResponse, optionsResponse } from '../_shared/cors.ts';
 const UPSELL = {
   href: '/invoice-radar',
   contact: '/contact.html#book',
-  message: 'Invoice Radar is not enabled for this account. Talk to Powerhouse to get started.',
+  message: 'Invoice Radar is not enabled for this account. Talk to PowerhouseTech to get started.',
 };
 
 function forbiddenResponse() {

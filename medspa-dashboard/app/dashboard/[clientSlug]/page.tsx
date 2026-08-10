@@ -16,7 +16,7 @@ export function generateStaticParams() {
 export function generateMetadata({ params }: PageProps) {
   const data = getMockDashboardData(params.clientSlug, "30d");
   return {
-    title: `${data.spa.name} — Performance Dashboard | Powerhouse Tech`,
+    title: `${data.spa.name} — Performance Dashboard | PowerhouseTech`,
     description: `Automation ROI dashboard for ${data.spa.name}`,
   };
 }

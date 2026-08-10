@@ -16,10 +16,10 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Med Spa ROI Dashboard | Powerhouse Tech",
+  title: "Med Spa ROI Dashboard | PowerhouseTech",
   description:
     "Automation ROI dashboard for med spa clients — leads, appointments, reactivation, reviews, and revenue impact.",
-  applicationName: "Powerhouse Tech Dashboard",
+  applicationName: "PowerhouseTech Dashboard",
 };
 
 export const viewport: Viewport = {

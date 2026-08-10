@@ -13,7 +13,7 @@ const config: Config = {
         surface: "#13131A",
         "surface-hover": "#1C1C28",
         border: "#2A2A3A",
-        // Powerhouse brand indigo (site primary), not generic AI purple
+        // PowerhouseTech brand indigo (site primary), not generic AI purple
         primary: "#424FD1",
         "primary-light": "#6B7AE8",
         "text-primary": "#F8F8FF",

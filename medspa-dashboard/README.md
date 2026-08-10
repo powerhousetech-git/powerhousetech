@@ -1,6 +1,6 @@
 # Med Spa ROI Dashboard
 
-Next.js 14 App Router dashboard for Powerhouse Tech med spa clients.
+Next.js 14 App Router dashboard for PowerhouseTech med spa clients.
 
 ## Live
 

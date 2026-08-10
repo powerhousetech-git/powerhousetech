@@ -96,7 +96,7 @@ for (const item of $input.all()) {
     '',
     'Reply to this message if you need clarification.',
     '',
-    '— Sent via Powerhouse',
+    '— Sent via PowerhouseTech',
   ].join('\\n');
 
   results.push({
@@ -192,7 +192,7 @@ const sendWhatsapp = node({
   output: [{ sid: 'SMxxxxxxxx', status: 'queued' }],
 });
 
-export default workflow('ca-filing-reminder-whatsapp', 'CA Filing Reminder — WhatsApp (Powerhouse)')
+export default workflow('ca-filing-reminder-whatsapp', 'CA Filing Reminder — WhatsApp (PowerhouseTech)')
   .add(webhookTrigger)
   .to(parsePayload)
   .to(buildWhatsapp)

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Invoice Radar — Powerhouse</title>
+<title>Invoice Radar — PowerhouseTech</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -180,7 +180,7 @@ tbody tr:hover{background:#FAFAFE}
   <aside class="side">
     <div class="brand">
       <svg viewBox="0 0 48 48"><line x1="8" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="40" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="24" y1="21.5" x2="24" y2="40" stroke="#fff" stroke-width="3"/><circle cx="8" cy="9.5" r="5.2" fill="#fff"/><circle cx="40" cy="9.5" r="5.2" fill="#fff"/><circle cx="24" cy="40" r="5" fill="#fff"/><circle cx="24" cy="21.5" r="6.3" fill="#424FD1"/></svg>
-      <div><div class="name">Invoice Radar</div><div class="sub">by Powerhouse</div></div>
+      <div><div class="name">Invoice Radar</div><div class="sub">by PowerhouseTech</div></div>
     </div>
     <div class="nav-sec">Overview</div>
     <div class="nav-item active" data-view="overview"><span class="dot">▦</span> Dashboard</div>
@@ -507,7 +507,7 @@ function markPaid(id){const inv=AR.find(x=>x.id===id);if(inv)inv.paid=true;close
 function closeDrawer(){document.getElementById('drawer').classList.remove('open');document.getElementById('drawer-bg').classList.remove('open');}
 
 const DEMOS={
-  photo:{cap:'Photo of paper invoice',raw:'[ blurry phone photo ]\n\nSUNRISE DENTAL\nInvoice #1052\nTo: Powerhouse Tech\nDate: 08/07/2026\nService: Monthly retainer\nAmount due: Rs. 2,400\nPay by: 22/07/2026',fields:[['Type','Receivable','high'],['Party','Sunrise Dental','high'],['Reference','INV-1052','high'],['Amount','₹2,400','high'],['Due','22 Jul 2026','high']],commit:{ref:'INV-1052',party:'Sunrise Dental',type:'Receivable',src:'photo',amount:2400}},
+  photo:{cap:'Photo of paper invoice',raw:'[ blurry phone photo ]\n\nSUNRISE DENTAL\nInvoice #1052\nTo: PowerhouseTech\nDate: 08/07/2026\nService: Monthly retainer\nAmount due: Rs. 2,400\nPay by: 22/07/2026',fields:[['Type','Receivable','high'],['Party','Sunrise Dental','high'],['Reference','INV-1052','high'],['Amount','₹2,400','high'],['Due','22 Jul 2026','high']],commit:{ref:'INV-1052',party:'Sunrise Dental',type:'Receivable',src:'photo',amount:2400}},
   email:{cap:'Gmail: forwarded invoice + PDF',raw:'From: billing@rao-contractors.in\nSubject: Invoice for July works\n\nHi, please find attached invoice\n#RC-2207 for ₹1,500, payable by\n18 July 2026. Bank details in PDF.',fields:[['Type','Payable','high'],['Party','Rao Contractors','high'],['Reference','BILL-561','high'],['Amount','₹1,500','high'],['Due','18 Jul 2026','high']],commit:{ref:'BILL-561',party:'Rao Contractors',type:'Payable',src:'email',amount:1500}},
   manual:{cap:'Pasted from a payments app',raw:'Nova Studios | design sprint\n1,150 | raised 06 Jul | net-14',fields:[['Type','Receivable','high'],['Party','Nova Studios','high'],['Reference','INV-1053','high'],['Amount','₹1,150','high'],['Due','20 Jul 2026','low']],commit:{ref:'INV-1053',party:'Nova Studios',type:'Receivable',src:'manual',amount:1150},lowconf:true}};
 let pending=null,pendingLow=false;

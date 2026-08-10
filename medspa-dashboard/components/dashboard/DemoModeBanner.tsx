@@ -8,7 +8,7 @@ export function DemoModeBanner({ bookingUrl }: { bookingUrl?: string }) {
   return (
     <div className="relative z-50 flex items-center justify-between gap-3 bg-primary px-4 py-2 text-xs text-white sm:text-sm">
       <p className="min-w-0 truncate font-medium">
-        Demo Mode — Showing sample data for Luxe Glow Med Spa | Powerhouse Tech
+        Demo Mode — Showing sample data for Luxe Glow Med Spa | PowerhouseTech
       </p>
       <Button
         asChild

@@ -81,7 +81,7 @@ export function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.18, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
         >
-          Powerhouse
+          PowerhouseTech
         </motion.p>
 
         <motion.h1

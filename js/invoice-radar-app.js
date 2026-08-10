@@ -71,7 +71,7 @@
     $('ir-gate-msg').textContent = message || (
       kind === 'signin'
         ? 'Use your Google account to open your receivables dashboard.'
-        : 'This service is not on your account yet. Talk to Powerhouse to get Invoice Radar watching your invoices.'
+        : 'This service is not on your account yet. Talk to PowerhouseTech to get Invoice Radar watching your invoices.'
     );
     $('ir-gate-signin').classList.toggle('ir-hidden', kind !== 'signin');
     $('ir-gate-upsell').classList.toggle('ir-hidden', kind !== 'upsell');
