@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Instrument+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/demo-dashboard.css">
-<link rel="stylesheet" href="/css/dashboard-tour.css">
+<link rel="stylesheet" href="/css/dashboard-tour.css?v=2">
 </head>
 <body>
 <div class="app" id="cc-app">
@@ -155,7 +155,7 @@
   </main>
 </div>
 
-<script src="/js/dashboard-tour.js"></script>
+<script src="/js/dashboard-tour.js?v=2"></script>
 <script>
 (function () {
   var QUEUE = [
@@ -235,12 +235,13 @@
   });
 
   var tourSteps = [
-    { selector: '.kpis', title: 'Show-floor KPIs', body: 'Throughput, OCR quality, database writes, and zero leads lost.' },
+    { selector: '#overview .kpis', title: 'Show-floor KPIs', body: 'Throughput, OCR quality, database writes, and zero leads lost.' },
+    { selector: '#overview .stages', title: 'Booth → inbox', body: 'Capture queue through sequence-active — watch the pipeline fill.' },
     { selector: '[data-view="capture"]', title: 'Capture', body: 'Snap, bulk upload, or PDF — everything lands in the hopper.' },
-    { selector: '[data-view="ocr"]', title: 'OCR review', body: 'Confirm low-confidence fields before they hit the DB.' },
     { selector: '[data-view="mail"]', title: 'Follow-ups', body: 'Day 0 / 3 / 7 sequences with an already-contacted guard.' }
   ];
   document.getElementById('btn-tour').addEventListener('click', function () {
+    go('overview');
     window.phTour && window.phTour.start({ id: 'card-capture-demo', steps: tourSteps });
   });
 })();

@@ -84,8 +84,8 @@ export function DashboardTour() {
     let cancelled = false;
     (async () => {
       try {
-        loadCss("/css/dashboard-tour.css");
-        await loadScript("/js/dashboard-tour.js");
+        loadCss("/css/dashboard-tour.css?v=2");
+        await loadScript("/js/dashboard-tour.js?v=2");
         if (cancelled || !window.phTour) return;
         // Manual tour only — auto-start dark overlay looked like a black screen on demos.
       } catch (err) {

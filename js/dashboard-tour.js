@@ -3,18 +3,21 @@
  * Usage: phTour.start({ id, steps: [{ selector, title, body }], onDone })
  */
 (function (global) {
-  var overlay, card, current = null, index = 0;
+  var overlay = null;
+  var current = null;
+  var index = 0;
 
   function ensureDom() {
-    if (overlay) return;
+    if (overlay) return overlay;
     overlay = document.createElement('div');
     overlay.id = 'ph-tour-root';
+    overlay.setAttribute('aria-live', 'polite');
     overlay.innerHTML =
-      '<div class="ph-tour-backdrop"></div>' +
+      '<div class="ph-tour-backdrop" data-tour-dismiss></div>' +
       '<div class="ph-tour-highlight" hidden></div>' +
-      '<div class="ph-tour-card" role="dialog" aria-modal="true">' +
+      '<div class="ph-tour-card" role="dialog" aria-modal="true" aria-labelledby="ph-tour-title">' +
       '<p class="ph-tour-step"></p>' +
-      '<h3 class="ph-tour-title"></h3>' +
+      '<h3 class="ph-tour-title" id="ph-tour-title"></h3>' +
       '<p class="ph-tour-body"></p>' +
       '<div class="ph-tour-actions">' +
       '<button type="button" class="ph-tour-skip">Skip</button>' +
@@ -23,22 +26,30 @@
       '<button type="button" class="ph-tour-next">Next</button>' +
       '</div></div></div>';
     document.body.appendChild(overlay);
-    overlay.querySelector('.ph-tour-skip').onclick = function () {
+
+    overlay.querySelector('.ph-tour-skip').addEventListener('click', function () {
       finish(true);
-    };
-    overlay.querySelector('.ph-tour-backdrop').onclick = function () {
-      finish(true);
-    };
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && current) finish(true);
     });
-    overlay.querySelector('.ph-tour-back').onclick = function () {
+    overlay.querySelector('[data-tour-dismiss]').addEventListener('click', function () {
+      finish(true);
+    });
+    overlay.querySelector('.ph-tour-back').addEventListener('click', function () {
       go(index - 1);
-    };
-    overlay.querySelector('.ph-tour-next').onclick = function () {
+    });
+    overlay.querySelector('.ph-tour-next').addEventListener('click', function () {
       if (index >= current.steps.length - 1) finish(false);
       else go(index + 1);
-    };
+    });
+    document.addEventListener('keydown', function (e) {
+      if (!current) return;
+      if (e.key === 'Escape') finish(true);
+      if (e.key === 'ArrowRight') {
+        if (index >= current.steps.length - 1) finish(false);
+        else go(index + 1);
+      }
+      if (e.key === 'ArrowLeft') go(index - 1);
+    });
+    return overlay;
   }
 
   function storageKey(id) {
@@ -46,24 +57,76 @@
   }
 
   function finish(skipped) {
-    if (!current) return;
+    if (!current || !overlay) return;
     try {
       localStorage.setItem(storageKey(current.id), skipped ? 'skipped' : 'done');
     } catch (_) {}
     overlay.classList.remove('is-open');
     document.body.classList.remove('ph-tour-active');
+    var hl = overlay.querySelector('.ph-tour-highlight');
+    if (hl) hl.hidden = true;
     var cb = current.onDone;
     current = null;
-    if (typeof cb === 'function') cb({ skipped: skipped });
+    if (typeof cb === 'function') cb({ skipped: !!skipped });
+  }
+
+  function placeCard(cardEl, anchorRect) {
+    var margin = 16;
+    var cardW = Math.min(340, window.innerWidth - margin * 2);
+    var cardH = Math.min(220, window.innerHeight - margin * 2);
+    var left;
+    var top;
+
+    if (anchorRect) {
+      left = Math.min(
+        window.innerWidth - cardW - margin,
+        Math.max(margin, anchorRect.left)
+      );
+      // Prefer below the target; flip above if not enough room.
+      if (anchorRect.bottom + 16 + cardH < window.innerHeight - margin) {
+        top = anchorRect.bottom + 16;
+      } else if (anchorRect.top - 16 - cardH > margin) {
+        top = anchorRect.top - 16 - cardH;
+      } else {
+        top = Math.max(margin, (window.innerHeight - cardH) / 2);
+      }
+    } else {
+      left = Math.max(margin, (window.innerWidth - cardW) / 2);
+      top = Math.max(margin, Math.min(120, (window.innerHeight - cardH) / 3));
+    }
+
+    cardEl.style.transform = 'none';
+    cardEl.style.width = cardW + 'px';
+    cardEl.style.left = left + 'px';
+    cardEl.style.top = top + 'px';
   }
 
   function go(i) {
-    if (!current) return;
+    if (!current || !overlay) return;
     index = Math.max(0, Math.min(i, current.steps.length - 1));
-    var step = current.steps[index];
-    var el = step.selector ? document.querySelector(step.selector) : null;
+    var step = current.steps[index] || {};
     var hl = overlay.querySelector('.ph-tour-highlight');
     var cardEl = overlay.querySelector('.ph-tour-card');
+    var el = null;
+    try {
+      if (step.selector) el = document.querySelector(step.selector);
+    } catch (_) {
+      el = null;
+    }
+
+    // Only highlight targets that are currently visible (active view).
+    if (el) {
+      var view = el.closest('.view');
+      if (view && !view.classList.contains('active') && view.style.display === 'none') {
+        el = null;
+      }
+      // Hidden sections in invoice sample use .hidden / .view.hidden
+      if (el && (el.offsetParent === null && getComputedStyle(el).position !== 'fixed')) {
+        // Try scrolling/nav — but if truly not visible, fall back to centered card
+        var cs = getComputedStyle(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden') el = null;
+      }
+    }
 
     overlay.querySelector('.ph-tour-step').textContent =
       'Step ' + (index + 1) + ' of ' + current.steps.length;
@@ -74,27 +137,35 @@
       index >= current.steps.length - 1 ? 'Done' : 'Next';
 
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      var r = el.getBoundingClientRect();
-      hl.hidden = false;
-      hl.style.top = r.top + window.scrollY - 8 + 'px';
-      hl.style.left = r.left + window.scrollX - 8 + 'px';
-      hl.style.width = r.width + 16 + 'px';
-      hl.style.height = r.height + 16 + 'px';
-      var top = r.bottom + window.scrollY + 16;
-      if (r.bottom > window.innerHeight * 0.55) {
-        top = r.top + window.scrollY - 16 - 180;
-      }
-      cardEl.style.top = Math.max(16, top) + 'px';
-      cardEl.style.left = Math.min(
-        window.scrollX + window.innerWidth - 360,
-        Math.max(16, r.left + window.scrollX)
-      ) + 'px';
+      try {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+      } catch (_) {}
+      // Wait a tick for scroll/layout, then measure in viewport coords.
+      requestAnimationFrame(function () {
+        if (!current || !overlay) return;
+        var backdrop = overlay.querySelector('.ph-tour-backdrop');
+        var r = el.getBoundingClientRect();
+        // If target collapsed or off-screen, center the card only.
+        if (r.width < 4 || r.height < 4) {
+          hl.hidden = true;
+          if (backdrop) backdrop.style.opacity = '1';
+          placeCard(cardEl, null);
+          return;
+        }
+        hl.hidden = false;
+        // Highlight ring carries the dimming — hide flat backdrop to avoid double black.
+        if (backdrop) backdrop.style.opacity = '0';
+        hl.style.top = Math.max(8, r.top - 8) + 'px';
+        hl.style.left = Math.max(8, r.left - 8) + 'px';
+        hl.style.width = Math.min(window.innerWidth - 16, r.width + 16) + 'px';
+        hl.style.height = Math.min(window.innerHeight - 16, r.height + 16) + 'px';
+        placeCard(cardEl, r);
+      });
     } else {
       hl.hidden = true;
-      cardEl.style.top = window.scrollY + 80 + 'px';
-      cardEl.style.left = '50%';
-      cardEl.style.transform = 'translateX(-50%)';
+      var backdrop = overlay.querySelector('.ph-tour-backdrop');
+      if (backdrop) backdrop.style.opacity = '1';
+      placeCard(cardEl, null);
     }
   }
 
@@ -105,22 +176,16 @@
     index = 0;
     overlay.classList.add('is-open');
     document.body.classList.add('ph-tour-active');
-    overlay.querySelector('.ph-tour-card').style.transform = '';
     go(0);
+    // Focus next for keyboard users
+    try {
+      overlay.querySelector('.ph-tour-next').focus();
+    } catch (_) {}
   }
 
-  function shouldAutoStart(id) {
-    // Never auto-start inside demos iframes — dark overlay reads as a black screen.
-    try {
-      if (window.self !== window.top) return false;
-    } catch (_) {
-      return false;
-    }
-    try {
-      return !localStorage.getItem(storageKey(id));
-    } catch (_) {
-      return false;
-    }
+  function shouldAutoStart() {
+    // Never auto-start — demos were covered by a dark overlay.
+    return false;
   }
 
   function reset(id) {

@@ -571,10 +571,10 @@ function renderAll(){renderBadges();renderBanner();renderKPIs();renderAging();re
 renderAll();
 </script>
 
-<link rel="stylesheet" href="/css/dashboard-tour.css">
+<link rel="stylesheet" href="/css/dashboard-tour.css?v=2">
 <script type="module" src="/js/firebase-boot.js"></script>
 <script src="/js/auth-gate.js"></script>
-<script src="/js/dashboard-tour.js"></script>
+<script src="/js/dashboard-tour.js?v=2"></script>
 <script>
 (async function(){
   // Public sample demo — no hard auth wall (sign-in only soft-records engagement).
@@ -592,9 +592,9 @@ renderAll();
   }catch(_){}
 
   const tourSteps=[
-    {selector:'#overview',title:'Dashboard overview',body:'KPIs and aging show what is owed to you right now.'},
+    {selector:'#kpi-overview',title:'Dashboard overview',body:'KPIs show what is owed to you, overdue, and collected — at a glance.'},
+    {selector:'.aging',title:'Receivables aging',body:'See how far invoices have aged so you know what to chase first.'},
     {selector:'[data-view="approvals"]',title:'Approvals',body:'Open Approvals to edit and approve reminders before they send.'},
-    {selector:'[data-view="receivables"]',title:'Receivables',body:'Mark invoices paid to stop chasing automatically.'},
     {selector:'[data-view="capture"]',title:'Capture',body:'Demo the three capture doors — photo, email, or manual.'},
     {selector:'[data-view="activity"]',title:'Sheet log',body:'Every action is recorded in the Activity / Sheet log.'},
   ];

@@ -1,38 +1,43 @@
+/* Coach-mark tour — fixed overlay so the card is never off-screen */
 #ph-tour-root {
-  position: relative;
-  z-index: 9999;
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
   pointer-events: none;
 }
 #ph-tour-root.is-open {
+  display: block;
   pointer-events: auto;
 }
-#ph-tour-root:not(.is-open) {
-  display: none;
-}
 .ph-tour-backdrop {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  background: rgba(5, 5, 10, 0.55);
-  z-index: 1;
+  background: rgba(10, 10, 18, 0.48);
+  cursor: pointer;
 }
 .ph-tour-highlight {
-  position: absolute;
-  z-index: 2;
+  position: fixed;
+  z-index: 100001;
   border-radius: 12px;
-  box-shadow: 0 0 0 9999px rgba(5, 5, 10, 0.55), 0 0 0 2px #424fd1;
+  box-shadow: 0 0 0 2px #424fd1, 0 0 0 9999px rgba(10, 10, 18, 0.48);
   pointer-events: none;
+  transition: top 0.2s ease, left 0.2s ease, width 0.2s ease, height 0.2s ease;
 }
 .ph-tour-card {
-  position: absolute;
-  z-index: 3;
+  position: fixed;
+  z-index: 100002;
   width: min(340px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
   background: #13131a;
   color: #f8f8ff;
   border: 1px solid #2a2a3a;
   border-radius: 16px;
   padding: 16px 18px;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
-  font-family: Inter, system-ui, sans-serif;
+  font-family: 'Instrument Sans', Inter, system-ui, sans-serif;
+  pointer-events: auto;
 }
 .ph-tour-step {
   margin: 0 0 6px;
@@ -82,6 +87,10 @@
 .ph-tour-back:disabled {
   opacity: 0.4;
   cursor: default;
+}
+.ph-tour-skip:hover {
+  color: #fff;
+  border-color: #555;
 }
 body.ph-tour-active {
   overflow: hidden;

@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Instrument+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/demo-dashboard.css">
-<link rel="stylesheet" href="/css/dashboard-tour.css">
+<link rel="stylesheet" href="/css/dashboard-tour.css?v=2">
 </head>
 <body>
 <div class="app" id="ao-app">
@@ -149,7 +149,7 @@
   </main>
 </div>
 
-<script src="/js/dashboard-tour.js"></script>
+<script src="/js/dashboard-tour.js?v=2"></script>
 <script>
 (function () {
   var STAGES = [
@@ -257,10 +257,11 @@
   var tourSteps = [
     { selector: '#kpi-overview', title: 'Outreach KPIs', body: 'Validated prospects, safe sends, reply rate, and warm leads in one glance.' },
     { selector: '#pipeline-bars', title: 'Seven-stage pipeline', body: 'Intake → personalize → send → follow-up → scan → triage → suppress.' },
-    { selector: '[data-view="triage"]', title: 'Reply triage', body: 'Open triage to claim warm replies with drafts ready.' },
-    { selector: '[data-view="deliverability"]', title: 'Deliverability', body: 'Bounces and complaints are suppressed automatically.' }
+    { selector: '#warm-mini', title: 'Needs you now', body: 'Warm replies land here with a draft ready for you to claim.' },
+    { selector: '[data-view="triage"]', title: 'Reply triage', body: 'Open triage in the sidebar to work the full reply queue.' }
   ];
   document.getElementById('btn-tour').addEventListener('click', function () {
+    go('overview');
     window.phTour && window.phTour.start({ id: 'outreach-demo', steps: tourSteps });
   });
 })();
