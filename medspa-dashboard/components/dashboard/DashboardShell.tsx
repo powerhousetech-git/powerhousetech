@@ -28,6 +28,7 @@ export function DashboardShell({
       "reactivation",
       "reviews",
       "revenue-impact",
+      "activity-log",
     ];
     const observers: IntersectionObserver[] = [];
 

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Powerhouse Tech</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div id="admin-gate" class="gate">
+    <div class="gate-card">
+      <h1>Admin access</h1>
+      <p class="muted" id="gate-msg">Checking your Google session…</p>
+      <p style="margin-top:16px"><a class="btn btn-primary" href="/portal?returnTo=%2Fadmin">Sign in</a></p>
+    </div>
+  </div>
+
+  <div id="admin-shell" class="admin-shell hidden">
+    <aside class="admin-side">
+      <div class="brand">Powerhouse Admin</div>
+      <button type="button" class="active" data-panel="overview">Overview</button>
+      <button type="button" data-panel="users">Users &amp; contacts</button>
+      <button type="button" data-panel="events">Event feed</button>
+      <button type="button" data-panel="entitlements">Entitlements</button>
+      <button type="button" data-panel="credits">Credits</button>
+      <div style="margin-top:auto;padding:12px 10px;font-size:.78rem;color:#777">
+        <div id="admin-email" class="muted"></div>
+        <button type="button" id="admin-signout" style="margin-top:8px;width:100%">Sign out</button>
+        <a class="btn" href="/portal" style="margin-top:8px;width:100%;justify-content:center">Portal</a>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <div class="admin-top">
+        <div>
+          <h1>Admin console</h1>
+          <p class="sub">Monitor sign-ins, demo engagement, and service access.</p>
+        </div>
+        <button type="button" class="btn btn-primary" id="export-btn">Export users CSV</button>
+      </div>
+
+      <section class="panel active" id="panel-overview">
+        <div class="kpis">
+          <div class="kpi"><div class="lbl">Total users</div><div class="val" id="kpi-users">—</div></div>
+          <div class="kpi"><div class="lbl">Active (7d)</div><div class="val" id="kpi-active">—</div></div>
+          <div class="kpi"><div class="lbl">Admins</div><div class="val" id="kpi-admins">—</div></div>
+          <div class="kpi"><div class="lbl">Demo/dashboard events</div><div class="val" id="kpi-events">—</div></div>
+        </div>
+        <p class="muted">Use the sidebar to manage users, entitlements, and recent activity.</p>
+      </section>
+
+      <section class="panel" id="panel-users">
+        <div class="table-wrap">
+          <table id="users-table">
+            <thead>
+              <tr>
+                <th>User</th><th>Company / phone</th><th>Logins</th><th>Last seen</th><th>Last path</th><th>Role</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-events">
+        <div class="table-wrap">
+          <table id="events-table">
+            <thead>
+              <tr><th>When</th><th>Email</th><th>Event</th><th>Path</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-entitlements">
+        <p class="muted" style="margin-bottom:12px">Toggle Invoice Radar live access. Client keys are never shown in the browser.</p>
+        <div class="table-wrap">
+          <table id="ent-table">
+            <thead>
+              <tr><th>Email</th><th>Status</th><th>Web app</th><th>Toggle</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-credits">
+        <div class="table-wrap">
+          <table id="credits-table">
+            <thead>
+              <tr><th>Email</th><th>Remaining</th><th>Used</th><th>Last tool</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
+    import {
+      getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
+    } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
+    const firebaseConfig = {
+      apiKey: 'AIzaSyD9fHOILnFLauZqd-C2AZwm-vrkpQk-sV4',
+      authDomain: 'powerhouse-tech-f6da1.firebaseapp.com',
+      projectId: 'powerhouse-tech-f6da1',
+      storageBucket: 'powerhouse-tech-f6da1.firebasestorage.app',
+      messagingSenderId: '946732625664',
+      appId: '1:946732625664:web:627677c716fcf7c16b0de5',
+      measurementId: 'G-QRZLG84GYV',
+    };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    window.phFirebaseAuth = {
+      auth,
+      googleProvider: new GoogleAuthProvider(),
+      signInWithPopup,
+      signOut,
+      onAuthStateChanged,
+    };
+    window.dispatchEvent(new CustomEvent('ph-firebase-ready'));
+  </script>
+  <script src="/js/auth-gate.js"></script>
+  <script src="/js/admin.js" defer></script>
+</body>
+</html>

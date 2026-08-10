@@ -125,16 +125,34 @@
     var root = document.getElementById(mount || 'loom-demos');
     if (!root || !window.PH_SITE) return;
     root.innerHTML = window.PH_SITE.demos.map(function (d, i) {
-      var id = loomEmbedId(d.loomUrl || '');
-      var media = id
-        ? '<div class="loom-embed-wrap"><iframe src="https://www.loom.com/embed/' + id + '" allowfullscreen title="' + d.title + '"></iframe></div>'
-        : '<div class="loom-embed-wrap"><div class="loom-placeholder"><div class="play" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></div><p>Video walkthrough coming soon</p></div></div>';
-      var bullets = d.bullets.map(function (b) { return '<li>' + b + '</li>'; }).join('');
-      return '<article class="loom-card" id="' + d.id + '"><div class="loom-card-head">' +
-        '<span class="badge">' + d.duration + '</span><h2>' + d.title + '</h2><p>' + d.summary + '</p><ul>' + bullets + '</ul></div>' +
+      var href = d.href || '#';
+      var badge = d.badge || d.duration || 'Demo';
+      var bullets = (d.bullets || []).map(function (b) { return '<li>' + b + '</li>'; }).join('');
+      var media =
+        '<div class="loom-embed-wrap"><div class="loom-placeholder demo-dash-preview">' +
+        '<div class="play" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></div>' +
+        '<p>' + (d.cta || 'Open interactive dashboard') + '</p></div></div>';
+      return (
+        '<article class="loom-card" id="' + d.id + '"><div class="loom-card-head">' +
+        '<span class="badge">' + badge + '</span><h2>' + d.title + '</h2><p>' + d.summary + '</p><ul>' + bullets + '</ul></div>' +
         media +
-        '<div class="loom-card-foot"><span class="loom-meta">Sample automation ' + (i + 1) + '</span></div></article>';
+        '<div class="loom-card-foot">' +
+        '<span class="loom-meta">Demo dashboard ' + (i + 1) + '</span>' +
+        '<button type="button" class="btn btn-primary demo-open-btn" data-gated-href="' + href + '">' +
+        (d.cta || 'Open demo') + '</button></div></article>'
+      );
     }).join('');
+
+    root.querySelectorAll('[data-gated-href]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var target = btn.getAttribute('data-gated-href');
+        if (window.phAuthGate && target) {
+          window.phAuthGate.openGated(target);
+        } else if (target) {
+          window.location.href = '/portal?returnTo=' + encodeURIComponent(target);
+        }
+      });
+    });
   };
 
   window.phRenderContacts = function (mount) {

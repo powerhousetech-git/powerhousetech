@@ -2,28 +2,46 @@ window.PH_SITE = {
   calendlyUrl: 'https://calendly.com/shreyas-powerhousetech/30min',
   demos: [
     {
-      id: 'demo-1',
-      title: 'Spreadsheet → automated pipeline',
-      duration: '~3 min',
-      summary: 'How we turn a manual ops/finance workflow into a reliable, hands-off pipeline.',
+      id: 'demo-medspa',
+      title: 'Med Spa ROI Dashboard',
+      duration: 'Interactive',
+      summary: 'See how automation recovers revenue from leads, no-shows, reactivation, and reviews.',
       bullets: [
-        'Raw spreadsheet or export as the input',
-        'Validation, transforms, and routing in the middle',
-        'Clean output delivered to your team or tools'
+        'KPI overview with before/after automation',
+        'Lead pipeline, appointments, and reactivation',
+        'Payback period and ROI waterfall'
       ],
-      loomUrl: '' // paste Loom share URL when ready
+      href: '/dashboard/demo/',
+      badge: 'Demo · Luxe Glow',
+      cta: 'Open dashboard'
     },
     {
-      id: 'demo-2',
-      title: 'AI triage inside your existing tools',
-      duration: '~3 min',
-      summary: 'LLM-powered extraction and routing embedded in Slack, email, or docs — no new app.',
+      id: 'demo-invoice-sample',
+      title: 'Invoice Radar · Sample',
+      duration: 'Interactive',
+      summary: 'Walk the approve-to-send loop with sample receivables, capture, and follow-ups.',
       bullets: [
-        'Incoming requests classified automatically',
-        'Key fields extracted into your systems',
-        'Human review only where it matters'
+        'Approvals with editable draft reminders',
+        'Receivables aging and mark-paid flow',
+        'Capture review and activity log'
       ],
-      loomUrl: ''
+      href: '/invoice-dashboard/',
+      badge: 'Demo data',
+      cta: 'Open dashboard'
+    },
+    {
+      id: 'demo-invoice-live',
+      title: 'Invoice Radar · Live',
+      duration: 'Entitled clients',
+      summary: 'Production dashboard connected to your Google Sheet (invite + entitlement required).',
+      bullets: [
+        'Live KPIs from your Master Sheet',
+        'Approve, snooze, skip, mark paid',
+        'Sheet Log activity feed'
+      ],
+      href: '/app/invoice-radar',
+      badge: 'Live',
+      cta: 'Open live app'
     }
   ],
   contacts: [

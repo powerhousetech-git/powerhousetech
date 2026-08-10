@@ -1,0 +1,88 @@
+#ph-tour-root {
+  position: relative;
+  z-index: 9999;
+  pointer-events: none;
+}
+#ph-tour-root.is-open {
+  pointer-events: auto;
+}
+#ph-tour-root:not(.is-open) {
+  display: none;
+}
+.ph-tour-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 5, 10, 0.55);
+  z-index: 1;
+}
+.ph-tour-highlight {
+  position: absolute;
+  z-index: 2;
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(5, 5, 10, 0.55), 0 0 0 2px #424fd1;
+  pointer-events: none;
+}
+.ph-tour-card {
+  position: absolute;
+  z-index: 3;
+  width: min(340px, calc(100vw - 32px));
+  background: #13131a;
+  color: #f8f8ff;
+  border: 1px solid #2a2a3a;
+  border-radius: 16px;
+  padding: 16px 18px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  font-family: Inter, system-ui, sans-serif;
+}
+.ph-tour-step {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7ae8;
+}
+.ph-tour-title {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.ph-tour-body {
+  margin: 0 0 14px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #9999aa;
+}
+.ph-tour-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ph-tour-actions button {
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.82rem;
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border: 1px solid #2a2a3a;
+  background: transparent;
+  color: #9999aa;
+}
+.ph-tour-next {
+  background: #424fd1 !important;
+  border-color: #424fd1 !important;
+  color: #fff !important;
+}
+.ph-tour-nav {
+  display: flex;
+  gap: 8px;
+}
+.ph-tour-back:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+body.ph-tour-active {
+  overflow: hidden;
+}

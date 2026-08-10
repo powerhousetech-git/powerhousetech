@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
+import { AuthGate } from "@/components/dashboard/AuthGate";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AppointmentsSection } from "@/components/dashboard/sections/AppointmentsSection";
 import { LeadPipelineSection } from "@/components/dashboard/sections/LeadPipelineSection";
@@ -9,6 +10,7 @@ import { OverviewSection } from "@/components/dashboard/sections/OverviewSection
 import { ReactivationSection } from "@/components/dashboard/sections/ReactivationSection";
 import { RevenueImpactSection } from "@/components/dashboard/sections/RevenueImpactSection";
 import { ReviewsSection } from "@/components/dashboard/sections/ReviewsSection";
+import { ActivityLogSection } from "@/components/dashboard/sections/ActivityLogSection";
 import { getMockDashboardData } from "@/lib/mock-data";
 import type { DateRange } from "@/types/dashboard";
 
@@ -27,13 +29,16 @@ export function DashboardClient({ clientSlug }: { clientSlug: string }) {
   );
 
   return (
-    <DashboardShell data={data}>
-      <OverviewSection data={data} />
-      <LeadPipelineSection data={data} />
-      <AppointmentsSection data={data} />
-      <ReactivationSection data={data} />
-      <ReviewsSection data={data} />
-      <RevenueImpactSection data={data} />
-    </DashboardShell>
+    <AuthGate>
+      <DashboardShell data={data}>
+        <OverviewSection data={data} />
+        <LeadPipelineSection data={data} />
+        <AppointmentsSection data={data} />
+        <ReactivationSection data={data} />
+        <ReviewsSection data={data} />
+        <RevenueImpactSection data={data} />
+        <ActivityLogSection data={data} />
+      </DashboardShell>
+    </AuthGate>
   );
 }

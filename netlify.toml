@@ -41,6 +41,16 @@
   to = "/portal.html"
   status = 200
 
+[[redirects]]
+  from = "/admin"
+  to = "/admin.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin/"
+  to = "/admin.html"
+  status = 200
+
 # Invoice Radar sample dashboard (interactive demo data)
 [[redirects]]
   from = "/invoice-dashboard"

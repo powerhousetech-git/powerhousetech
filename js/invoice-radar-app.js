@@ -12,6 +12,7 @@
     reminders: ['Follow-ups', 'Reminder sequences — auto for gentle, approval for firm.'],
     payables: ['Payables', 'Bills you need to pay, captured automatically.'],
     capture: ['Capture', 'Turn any invoice into clean data.'],
+    activity: ['Activity / Sheet', 'Audit trail from your Master Sheet Log tab.'],
     integrations: ['Integrations', 'How invoices come in and reminders go out.']
   };
 
@@ -290,10 +291,21 @@
 
   function renderActivity() {
     var rows = (state.snapshot && state.snapshot.activity) || [];
-    $('activity-list').innerHTML = rows.length ? rows.map(function (a) {
-      return '<div class="ir-field"><span class="k">' + esc(a.timestamp) + '</span><span class="v">' +
-        esc(a.ref) + ' · ' + esc(a.event) + (a.detail ? ' — ' + esc(a.detail) : '') + '</span></div>';
-    }).join('') : '<div class="ir-empty">No recent activity.</div>';
+    var list = $('activity-list');
+    if (list) {
+      list.innerHTML = rows.length ? rows.map(function (a) {
+        return '<div class="ir-field"><span class="k">' + esc(a.timestamp) + '</span><span class="v">' +
+          esc(a.ref) + ' · ' + esc(a.event) + (a.detail ? ' — ' + esc(a.detail) : '') + '</span></div>';
+      }).join('') : '<div class="ir-empty">No recent activity.</div>';
+    }
+    var tb = $('activity-rows');
+    if (tb) {
+      tb.innerHTML = rows.length ? rows.map(function (a) {
+        return '<tr><td class="ir-mono">' + esc(a.timestamp) + '</td><td>' + esc(a.ref) +
+          '</td><td>' + esc(a.event) + '</td><td>' + esc(a.channel || '—') +
+          '</td><td>' + esc(a.detail || '') + '</td></tr>';
+      }).join('') : '<tr><td colspan="5" class="ir-empty">No log rows yet.</td></tr>';
+    }
   }
 
   function renderAll() {

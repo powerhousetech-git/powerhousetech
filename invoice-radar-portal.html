@@ -176,7 +176,16 @@ tbody tr:hover{background:#FAFAFE}
 </style>
 </head>
 <body>
-<div class="app">
+
+<div id="ir-auth-gate" style="min-height:100vh;display:grid;place-items:center;background:#F5F6FA;font-family:Inter,system-ui,sans-serif;padding:24px">
+  <div style="max-width:420px;width:100%;background:#fff;border:1px solid #E7E8F0;border-radius:16px;padding:28px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.06)">
+    <h1 style="font-family:'DM Serif Display',serif;font-weight:400;font-size:1.6rem;margin:0 0 8px">Sign in required</h1>
+    <p id="ir-auth-msg" style="color:#7A7A88;font-size:.92rem;line-height:1.5;margin:0 0 18px">Checking your Google session…</p>
+    <a href="/portal?returnTo=%2Finvoice-dashboard%2F" style="display:inline-block;background:#424FD1;color:#fff;text-decoration:none;font-weight:600;padding:10px 16px;border-radius:10px">Sign in to continue</a>
+  </div>
+</div>
+
+<div class="app" id="ir-app" hidden>
   <aside class="side">
     <div class="brand">
       <svg viewBox="0 0 48 48"><line x1="8" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="40" y1="9.5" x2="24" y2="21.5" stroke="#fff" stroke-width="3"/><line x1="24" y1="21.5" x2="24" y2="40" stroke="#fff" stroke-width="3"/><circle cx="8" cy="9.5" r="5.2" fill="#fff"/><circle cx="40" cy="9.5" r="5.2" fill="#fff"/><circle cx="24" cy="40" r="5" fill="#fff"/><circle cx="24" cy="21.5" r="6.3" fill="#424FD1"/></svg>
@@ -192,6 +201,7 @@ tbody tr:hover{background:#FAFAFE}
     <div class="nav-item" data-view="payables"><span class="dot">↗</span> Payables</div>
     <div class="nav-sec">Data &amp; setup</div>
     <div class="nav-item" data-view="capture"><span class="dot">＋</span> Capture <span class="cnt" id="nav-rev" style="background:#C77700">0</span></div>
+    <div class="nav-item" data-view="activity"><span class="dot">☰</span> Activity / Sheet</div>
     <div class="nav-item" data-view="integrations"><span class="dot">⚙</span> Integrations</div>
     <div class="side-foot"><a href="/portal" style="color:#9B9DB0;text-decoration:none">← All services</a><br>Interactive prototype · sample data</div>
   </aside>
@@ -202,7 +212,7 @@ tbody tr:hover{background:#FAFAFE}
         <h1 id="view-title">Dashboard</h1>
         <div class="sub" id="view-sub">Everything owed to you and by you, in one place.</div>
       </div>
-      <div class="top-actions">
+      <div class="top-actions"><button type="button" class="btn btn-sm" id="btn-tour">Tour</button>
         <span class="chip chip-gate">🔒 Approve-to-send</span>
         <span class="chip chip-plan"><b id="plan-num">1,204</b>/2,000 invoices <span class="meter"><span style="width:60%"></span></span></span>
         <button class="btn" onclick="go('capture')">+ Capture</button>
@@ -539,7 +549,7 @@ function toggleZoho(){
   renderAll();
 }
 
-const TITLES={overview:['Dashboard','Everything owed to you and by you, in one place.'],receivables:['Receivables','Invoices your customers still owe you.'],approvals:['Approvals','Verify reminders before they reach your customers.'],payables:['Payables','Bills you need to pay, captured automatically.'],reminders:['Follow-ups','Reminder sequences — auto for gentle, approval for firm.'],capture:['Capture','Turn any invoice — paper, email, or app — into clean data.'],integrations:['Integrations','How invoices come in and reminders go out.']};
+const TITLES={overview:['Dashboard','Everything owed to you and by you, in one place.'],receivables:['Receivables','Invoices your customers still owe you.'],approvals:['Approvals','Verify reminders before they reach your customers.'],payables:['Payables','Bills you need to pay, captured automatically.'],reminders:['Follow-ups','Reminder sequences — auto for gentle, approval for firm.'],capture:['Capture','Turn any invoice — paper, email, or app — into clean data.'],activity:['Activity / Sheet','Audit trail of captures, reminders, and payments.'],integrations:['Integrations','How invoices come in and reminders go out.']};
 function go(v){
   document.querySelectorAll('.view').forEach(el=>el.classList.add('hidden'));
   document.getElementById(v).classList.remove('hidden');
@@ -550,8 +560,64 @@ function go(v){
 }
 document.querySelectorAll('.nav-item').forEach(n=>n.addEventListener('click',()=>go(n.dataset.view)));
 
-function renderAll(){renderBadges();renderBanner();renderKPIs();renderAging();renderAttention();renderAR();renderAP();renderFollowups();renderCaptured();renderReview();renderApprovals();}
+
+const ACTIVITY=[
+  {when:'2026-06-28 10:14',ref:'INV-1042',event:'reminder_approved',channel:'whatsapp',detail:'Gentle nudge approved and queued'},
+  {when:'2026-06-28 09:02',ref:'INV-1038',event:'marked_paid',channel:'manual',detail:'Payment confirmed — chase stopped'},
+  {when:'2026-06-27 18:41',ref:'CAP-019',event:'captured',channel:'email',detail:'Forwarded invoice extracted (high confidence)'},
+  {when:'2026-06-27 16:05',ref:'INV-1031',event:'needs_approval',channel:'email',detail:'Firm reminder awaiting review'},
+  {when:'2026-06-26 11:22',ref:'BILL-220',event:'payable_captured',channel:'photo',detail:'Vendor bill from camera capture'},
+  {when:'2026-06-25 14:08',ref:'INV-1029',event:'reminder_sent',channel:'email',detail:'Day-3 gentle reminder delivered'},
+];
+function renderActivity(){
+  const tb=document.getElementById('activity-rows');
+  if(!tb)return;
+  tb.innerHTML=ACTIVITY.map(a=>`<tr><td class="mono">${a.when}</td><td>${a.ref}</td><td>${a.event}</td><td>${a.channel}</td><td>${a.detail}</td></tr>`).join('');
+}
+
+function renderAll(){renderBadges();renderBanner();renderKPIs();renderAging();renderAttention();renderAR();renderAP();renderFollowups();renderCaptured();renderReview();renderApprovals();renderActivity();}
 renderAll();
 </script>
+
+<link rel="stylesheet" href="/css/dashboard-tour.css">
+<script type="module" src="/js/firebase-boot.js"></script>
+<script src="/js/auth-gate.js"></script>
+<script src="/js/dashboard-tour.js"></script>
+<script>
+(async function(){
+  const gate=document.getElementById('ir-auth-gate');
+  const app=document.getElementById('ir-app')||document.querySelector('.app');
+  try{
+    await new Promise(r=>{
+      if(window.phFirebaseAuth) return r();
+      window.addEventListener('ph-firebase-ready',r,{once:true});
+      setTimeout(r,8000);
+    });
+    const user=await window.phAuthGate.guardPage({eventType:'dashboard_view',title:'Invoice Radar Sample'});
+    if(!user) return;
+    if(gate) gate.style.display='none';
+    if(app){ app.hidden=false; app.removeAttribute('hidden'); }
+    const tourSteps=[
+      {selector:'#overview',title:'Dashboard overview',body:'KPIs and aging show what is owed to you right now.'},
+      {selector:'[data-view="approvals"]',title:'Approvals',body:'Open Approvals to edit and approve reminders before they send.'},
+      {selector:'[data-view="receivables"]',title:'Receivables',body:'Mark invoices paid to stop chasing automatically.'},
+      {selector:'[data-view="capture"]',title:'Capture',body:'Demo the three capture doors — photo, email, or manual.'},
+      {selector:'[data-view="activity"]',title:'Sheet log',body:'Every action is recorded in the Activity / Sheet log.'},
+    ];
+    document.getElementById('btn-tour')?.addEventListener('click',()=>{
+      window.phTour?.reset('invoice-sample');
+      window.phTour?.start({id:'invoice-sample',steps:tourSteps});
+    });
+    if(window.phTour?.shouldAutoStart('invoice-sample')){
+      setTimeout(()=>window.phTour.start({id:'invoice-sample',steps:tourSteps}),700);
+    }
+  }catch(err){
+    console.error(err);
+    const msg=document.getElementById('ir-auth-msg');
+    if(msg) msg.textContent='Could not verify sign-in. Use the button below.';
+  }
+})();
+</script>
+
 </body>
 </html>

@@ -53,6 +53,7 @@
       <button type="button" class="ir-nav-item" data-view="payables" aria-selected="false"><span class="dot" aria-hidden="true">↗</span> Payables</button>
       <div class="ir-nav-sec">Data &amp; setup</div>
       <button type="button" class="ir-nav-item" data-view="capture" aria-selected="false"><span class="dot" aria-hidden="true">＋</span> Capture <span class="cnt" id="nav-rev" style="display:none;background:#C77700">0</span></button>
+      <button type="button" class="ir-nav-item" data-view="activity" aria-selected="false"><span class="dot" aria-hidden="true">☰</span> Activity / Sheet</button>
       <button type="button" class="ir-nav-item" data-view="integrations" aria-selected="false"><span class="dot" aria-hidden="true">⚙</span> Integrations</button>
       <div class="ir-side-user">
         <div class="ir-avatar" id="user-avatar" aria-hidden="true">U</div>
@@ -140,6 +141,19 @@
             <table class="ir-table"><thead><tr><th scope="col">Ref</th><th scope="col">Party</th><th scope="col">Type</th><th scope="col">Source</th><th scope="col">Amount</th><th scope="col">Captured</th></tr></thead>
             <tbody id="cap-rows"></tbody></table>
           </div>
+        </div>
+      </section>
+
+      <section id="view-activity" class="ir-view ir-hidden">
+        <div class="ir-card">
+          <div class="ir-card-head"><div><h3>Sheet / activity log</h3><p class="hint">Live rows from your Master Sheet Log tab — captures, reminders, approvals, and payments.</p></div></div>
+          <div class="ir-table-wrap">
+            <table class="ir-table">
+              <thead><tr><th>When</th><th>Ref</th><th>Event</th><th>Channel</th><th>Detail</th></tr></thead>
+              <tbody id="activity-rows"></tbody>
+            </table>
+          </div>
+          <div id="activity-list" class="ir-hidden"></div>
         </div>
       </section>
 

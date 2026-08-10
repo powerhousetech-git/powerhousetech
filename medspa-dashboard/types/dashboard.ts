@@ -169,6 +169,15 @@ export interface RevenueImpactData {
 
 export type DateRange = "30d" | "60d" | "90d";
 
+export interface ActivityLogEntry {
+  id: string;
+  timestamp: string;
+  ref: string;
+  event: string;
+  channel: string;
+  detail: string;
+}
+
 export interface DashboardData {
   spa: SpaInfo;
   kpis: KPIData;
@@ -177,6 +186,7 @@ export interface DashboardData {
   reactivation: ReactivationData;
   reviews: ReviewData;
   revenueImpact: RevenueImpactData;
+  activityLog: ActivityLogEntry[];
   lastUpdated: string;
   dateRange: DateRange;
 }

@@ -149,6 +149,23 @@ export function RevenueImpactSection({ data }: { data: DashboardData }) {
         </CardContent>
       </Card>
 
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="space-y-2 p-5 text-sm leading-relaxed text-text-secondary">
+          <p className="font-semibold text-text-primary">How this is calculated</p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              No-show recovery = appointments × (previous − current no-show rate) ×
+              avg ticket
+            </li>
+            <li>Reactivation = booked campaign revenue from recall / win-back sends</li>
+            <li>
+              After-hours = after-hours leads × booking rate × avg ticket
+            </li>
+            <li>Payback days = build cost ÷ (monthly no-show recovery / 30)</li>
+          </ul>
+        </CardContent>
+      </Card>
+
       <Card className="border-primary/30 bg-gradient-to-br from-primary/15 to-transparent">
         <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
           <div>

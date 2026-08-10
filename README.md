@@ -7,12 +7,15 @@ Marketing site and client workspace for **Powerhouse Tech** — custom workflow 
 Static HTML/CSS/JS published via Netlify (`netlify.toml` → publish `.`).
 
 - Marketing: `index.html`, `services.html`, `industries.html`, `about.html`, `contact.html`
-- Ready systems: `invoice-radar.html`, `exhibition-leads.html`, `ai-sales-outreach.html`
-- **Client portal**: `/portal` — sign in, then pick a service dashboard
+- **Demos:** `/sample-automations` — interactive dashboard cards (sign-in required to open)
+- **Client portal:** `/portal` — Google sign-in, then pick a service
+- **Admin:** `/admin` — opens automatically for `shreyas@powerhousetech.in` (Supabase `is_admin`)
 - Invoice Radar live: `/app/invoice-radar`
 - Invoice Radar sample: `/invoice-dashboard/`
 - Med spa ROI dashboard: `/dashboard/demo/`
 - Workspace shell: `/workspace`, `/app`
+
+See `docs/SECURITY_PORTAL.md` for auth/admin security notes. Apply Supabase migration `20260810120000_portal_users_events.sql` and deploy Edge Functions `portal-session` + `admin-api`.
 
 ## Legacy note
 

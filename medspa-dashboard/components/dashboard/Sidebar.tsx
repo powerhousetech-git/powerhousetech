@@ -19,6 +19,7 @@ export const NAV_ITEMS = [
   { id: "reactivation", label: "Reactivation", icon: RefreshCw },
   { id: "reviews", label: "Reviews", icon: Star },
   { id: "revenue-impact", label: "Revenue Impact", icon: DollarSign },
+  { id: "activity-log", label: "Activity / Sheet", icon: Zap },
 ] as const;
 
 export type NavId = (typeof NAV_ITEMS)[number]["id"];

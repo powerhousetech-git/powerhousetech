@@ -4,6 +4,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Download, LayoutGrid, RefreshCw, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/dashboard/DateRangePicker";
+import { DashboardTour } from "@/components/dashboard/DashboardTour";
 import type { DateRange } from "@/types/dashboard";
 
 export function TopBar({
@@ -45,6 +46,7 @@ export function TopBar({
             <RefreshCw className="h-3.5 w-3.5" />
             Last synced {synced}
           </span>
+          <DashboardTour />
           <Button
             type="button"
             variant="ghost"
