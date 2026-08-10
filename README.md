@@ -13,7 +13,10 @@ Static HTML/CSS/JS published via Netlify (`netlify.toml` → publish `.`).
 - Invoice Radar live: `/app/invoice-radar`
 - Invoice Radar sample: `/invoice-dashboard/`
 - Med spa ROI dashboard: `/dashboard/demo/`
-- Workspace shell: `/workspace`, `/app`
+- Client portal (post sign-in home): `/portal`
+- Live Invoice Radar: `/app/invoice-radar`
+- Public demos: `/sample-automations`, `/dashboard/demo/`, `/invoice-dashboard/`
+- Legacy Overview shell (opt-in only): `/app/workspace`
 
 See `docs/SECURITY_PORTAL.md` for auth/admin security notes. Apply Supabase migration `20260810120000_portal_users_events.sql` and deploy Edge Functions `portal-session` + `admin-api`.
 
