@@ -26,7 +26,7 @@
       <button type="button" class="active" data-panel="overview">Overview</button>
       <button type="button" data-panel="users">Users &amp; contacts</button>
       <button type="button" data-panel="events">Event feed</button>
-      <button type="button" data-panel="entitlements">Entitlements</button>
+      <button type="button" data-panel="entitlements">Live access</button>
       <button type="button" data-panel="credits">Credits</button>
       <div style="margin-top:auto;padding:12px 10px;font-size:.78rem;color:#777">
         <div id="admin-email" class="muted"></div>
@@ -51,7 +51,7 @@
           <div class="kpi"><div class="lbl">Admins</div><div class="val" id="kpi-admins">—</div></div>
           <div class="kpi"><div class="lbl">Demo/dashboard events</div><div class="val" id="kpi-events">—</div></div>
         </div>
-        <p class="muted">Use the sidebar to manage users, entitlements, and recent activity.</p>
+        <p class="muted">Open <strong>Live access</strong> to see every signed-in user and toggle live dashboard access per service. Demos stay available to all.</p>
       </section>
 
       <section class="panel" id="panel-users">
@@ -79,11 +79,23 @@
       </section>
 
       <section class="panel" id="panel-entitlements">
-        <p class="muted" style="margin-bottom:12px">Toggle Invoice Radar live access. Client keys are never shown in the browser.</p>
-        <div class="table-wrap">
-          <table id="ent-table">
+        <div class="access-legend">
+          <p>
+            <strong>General access</strong> — every signed-in user can open all product demos.
+            Toggle <strong>live dashboard</strong> access per service below. Add more services later without changing this layout.
+          </p>
+        </div>
+        <div class="table-wrap table-wrap--access">
+          <table id="ent-table" class="access-table">
             <thead>
-              <tr><th>Email</th><th>Status</th><th>Web app</th><th>Toggle</th></tr>
+              <tr>
+                <th>User</th>
+                <th>General</th>
+                <th data-svc-head="ai_sales_outreach">Outreach live</th>
+                <th data-svc-head="card_capture">Cards live</th>
+                <th data-svc-head="invoice_radar">Radar live</th>
+                <th>Radar web app</th>
+              </tr>
             </thead>
             <tbody></tbody>
           </table>
@@ -131,6 +143,6 @@
     window.dispatchEvent(new CustomEvent('ph-firebase-ready'));
   </script>
   <script src="/js/auth-gate.js?v=3"></script>
-  <script src="/js/admin.js?v=2" defer></script>
+  <script src="/js/admin.js?v=4" defer></script>
 </body>
 </html>

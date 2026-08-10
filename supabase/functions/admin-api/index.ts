@@ -2,6 +2,12 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { bearerToken, verifyFirebaseIdToken } from '../_shared/firebase-auth.ts';
 import { jsonResponse, optionsResponse } from '../_shared/cors.ts';
 import { adminClient, requireAdmin } from '../_shared/portal-users.ts';
+import {
+  GENERAL_ACCESS,
+  LIVE_SERVICES,
+  accessFromRow,
+  serviceById,
+} from '../_shared/live-services.ts';
 
 async function authedAdmin(req: Request) {
   const token = bearerToken(req);
@@ -75,26 +81,62 @@ Deno.serve(async (req) => {
     }
 
     if (req.method === 'GET' && op === 'entitlements') {
-      const { data, error } = await db
-        .from('user_service_entitlements')
-        .select(
-          'email, invoice_radar_enabled, invoice_radar_web_app_url, created_at, updated_at'
-        )
-        .order('updated_at', { ascending: false })
-        .limit(500);
-      if (error) throw error;
-      // Never return client keys
-      const rows = (data || []).map((r) => ({
-        ...r,
-        has_client_key: Boolean(
-          (r as { invoice_radar_client_key?: string }).invoice_radar_client_key
-        ),
-        invoice_radar_web_app_configured: Boolean(r.invoice_radar_web_app_url),
-        invoice_radar_web_app_url: r.invoice_radar_web_app_url
-          ? String(r.invoice_radar_web_app_url).slice(0, 48) + '…'
-          : null,
+      const [{ data: users, error: usersErr }, { data: ents, error: entsErr }] =
+        await Promise.all([
+          db
+            .from('portal_users')
+            .select(
+              'email, display_name, company, phone, is_admin, login_count, last_seen_at, last_path'
+            )
+            .order('last_seen_at', { ascending: false })
+            .limit(500),
+          db
+            .from('user_service_entitlements')
+            .select(
+              'email, ai_sales_outreach_enabled, card_capture_enabled, invoice_radar_enabled, invoice_radar_web_app_url, created_at, updated_at'
+            )
+            .limit(500),
+        ]);
+      if (usersErr) throw usersErr;
+      if (entsErr) throw entsErr;
+
+      const entByEmail = new Map(
+        (ents || []).map((r) => [String(r.email).toLowerCase(), r])
+      );
+
+      const catalog = LIVE_SERVICES.map(({ id, label, short }) => ({
+        id,
+        label,
+        short,
       }));
-      return jsonResponse(200, { entitlements: rows });
+
+      const rows = (users || []).map((u) => {
+        const email = String(u.email).toLowerCase();
+        const ent = entByEmail.get(email) as Record<string, unknown> | undefined;
+        const access = accessFromRow(ent);
+        return {
+          email,
+          display_name: u.display_name || '',
+          company: u.company || '',
+          phone: u.phone || '',
+          is_admin: Boolean(u.is_admin),
+          login_count: u.login_count ?? 0,
+          last_seen_at: u.last_seen_at,
+          last_path: u.last_path || '',
+          general_access: true,
+          access,
+          invoice_radar_web_app_configured: Boolean(ent?.invoice_radar_web_app_url),
+          // Back-compat for older admin UI
+          invoice_radar_enabled: access.invoice_radar,
+        };
+      });
+
+      return jsonResponse(200, {
+        general_access: GENERAL_ACCESS,
+        services: catalog,
+        entitlements: rows,
+        users: rows,
+      });
     }
 
     if (req.method === 'GET' && op === 'credits') {
@@ -149,23 +191,55 @@ Deno.serve(async (req) => {
       if (!email || !email.includes('@')) {
         return jsonResponse(400, { error: 'Valid email required' });
       }
-      const enabled = Boolean(body.invoice_radar_enabled);
-      const { error } = await db.from('user_service_entitlements').upsert(
-        {
-          email,
-          invoice_radar_enabled: enabled,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'email' }
-      );
+
+      // Prefer service id; keep invoice_radar_enabled for older clients.
+      let serviceId = String(body.service || '').trim();
+      let enabled: boolean;
+      if (serviceId) {
+        enabled = Boolean(body.enabled);
+      } else if (body.invoice_radar_enabled !== undefined) {
+        serviceId = 'invoice_radar';
+        enabled = Boolean(body.invoice_radar_enabled);
+      } else {
+        return jsonResponse(400, {
+          error: 'service + enabled required (or invoice_radar_enabled)',
+        });
+      }
+
+      const def = serviceById(serviceId);
+      if (!def) {
+        return jsonResponse(400, {
+          error: 'Unknown service. Use: ' + LIVE_SERVICES.map((s) => s.id).join(', '),
+        });
+      }
+
+      const patch: Record<string, unknown> = {
+        email,
+        [def.column]: enabled,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await db.from('user_service_entitlements').upsert(patch, {
+        onConflict: 'email',
+      });
       if (error) throw error;
+
       await db.from('portal_events').insert({
         email: admin.email,
         event_type: 'admin_entitlement_update',
         path: '/admin',
-        meta: { target: email, invoice_radar_enabled: enabled },
+        meta: { target: email, service: def.id, enabled },
       });
-      return jsonResponse(200, { ok: true, email, invoice_radar_enabled: enabled });
+
+      return jsonResponse(200, {
+        ok: true,
+        email,
+        service: def.id,
+        enabled,
+        // Back-compat
+        invoice_radar_enabled:
+          def.id === 'invoice_radar' ? enabled : undefined,
+      });
     }
 
     if (req.method === 'POST' && op === 'set_admin') {

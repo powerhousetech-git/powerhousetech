@@ -17,6 +17,13 @@
 - Client never trusts a local admin flag alone.
 - Invoice Radar `client_key` never returned to browsers (entitlement APIs redact it).
 
+## Admin live access
+
+- Panel **Live access** lists every distinct signed-in user (`portal_users`).
+- **General access:** demos for all three products — always on for signed-in users.
+- **Live toggles:** AI Sales Outreach, Card Capture, Invoice Radar (`user_service_entitlements.*_enabled`).
+- Add a future live service by extending `LIVE_SERVICES` in `supabase/functions/_shared/live-services.ts` + a boolean column migration; admin UI reads the catalog from the API.
+
 ## Server rules
 
 - Tables `portal_users`, `portal_events`, entitlements, credits: **RLS on, no anon policies** — Edge Functions use service role after Firebase verify.

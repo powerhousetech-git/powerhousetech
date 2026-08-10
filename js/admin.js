@@ -4,6 +4,15 @@
   const shellEl = document.getElementById('admin-shell');
   const gateMsg = document.getElementById('gate-msg');
 
+  // Keep in sync with supabase/functions/_shared/live-services.ts
+  const FALLBACK_SERVICES = [
+    { id: 'ai_sales_outreach', label: 'AI Sales Outreach', short: 'Outreach' },
+    { id: 'card_capture', label: 'Card Capture', short: 'Cards' },
+    { id: 'invoice_radar', label: 'Invoice Radar', short: 'Radar' },
+  ];
+
+  let liveServices = FALLBACK_SERVICES.slice();
+
   async function api(op, opts) {
     opts = opts || {};
     const token = await window.phAuthGate.getIdToken();
@@ -84,19 +93,60 @@
     return events;
   }
 
-  async function loadEntitlements() {
-    const { entitlements } = await api('entitlements');
-    const body = document.querySelector('#ent-table tbody');
-    body.innerHTML = entitlements
+  function renderAccessHeader() {
+    const thead = document.querySelector('#ent-table thead tr');
+    if (!thead) return;
+    const serviceHeads = liveServices
       .map(
-        (e) => `<tr data-email="${escapeAttr(e.email)}">
-        <td>${escapeHtml(e.email)}</td>
-        <td class="ent-status">${e.invoice_radar_enabled ? '<span class="badge badge-on">Enabled</span>' : '<span class="badge badge-off">Off</span>'}</td>
-        <td>${e.invoice_radar_web_app_configured ? 'Configured' : 'Missing URL'}</td>
-        <td><button type="button" class="toggle ${e.invoice_radar_enabled ? 'on' : ''}" data-email="${escapeAttr(e.email)}" data-on="${e.invoice_radar_enabled ? 'true' : 'false'}" aria-pressed="${e.invoice_radar_enabled ? 'true' : 'false'}" aria-label="Toggle Invoice Radar for ${escapeAttr(e.email)}"></button></td>
-      </tr>`
+        (s) =>
+          `<th data-svc-head="${escapeAttr(s.id)}" title="${escapeAttr(s.label)} live dashboard">${escapeHtml(s.short)} live</th>`
       )
       .join('');
+    thead.innerHTML =
+      '<th>User</th><th title="Public product demos — always on">General</th>' +
+      serviceHeads +
+      '<th>Radar web app</th>';
+  }
+
+  function toggleHtml(email, serviceId, on) {
+    return `<button type="button" class="toggle ${on ? 'on' : ''}" data-email="${escapeAttr(email)}" data-service="${escapeAttr(serviceId)}" data-on="${on ? 'true' : 'false'}" aria-pressed="${on ? 'true' : 'false'}" aria-label="Toggle ${escapeAttr(serviceId)} for ${escapeAttr(email)}"></button>`;
+  }
+
+  async function loadEntitlements() {
+    const data = await api('entitlements');
+    if (Array.isArray(data.services) && data.services.length) {
+      liveServices = data.services;
+    }
+    renderAccessHeader();
+
+    const rows = data.entitlements || data.users || [];
+    const body = document.querySelector('#ent-table tbody');
+    body.innerHTML = rows
+      .map((u) => {
+        const access = u.access || {};
+        const serviceCells = liveServices
+          .map((s) => {
+            const on = Boolean(access[s.id]);
+            return `<td class="access-cell" data-service="${escapeAttr(s.id)}">${toggleHtml(u.email, s.id, on)}</td>`;
+          })
+          .join('');
+        return `<tr data-email="${escapeAttr(u.email)}">
+          <td>
+            <strong>${escapeHtml(u.email)}</strong>
+            <div class="muted">${escapeHtml(u.display_name || '')}${u.is_admin ? ' · Admin' : ''}</div>
+            <div class="muted">${fmt(u.last_seen_at)}</div>
+          </td>
+          <td><span class="badge badge-on" title="Demos for all products">Demos</span></td>
+          ${serviceCells}
+          <td class="muted">${u.invoice_radar_web_app_configured ? 'Configured' : '—'}</td>
+        </tr>`;
+      })
+      .join('');
+
+    if (!rows.length) {
+      body.innerHTML =
+        '<tr><td colspan="8" class="muted" style="padding:24px;text-align:center">No signed-in users yet.</td></tr>';
+    }
 
     body.querySelectorAll('.toggle').forEach((btn) => {
       btn.addEventListener('click', onToggleEntitlement);
@@ -107,37 +157,25 @@
     const btn = ev.currentTarget;
     if (!btn || btn.dataset.busy === '1') return;
     const email = btn.getAttribute('data-email');
+    const service = btn.getAttribute('data-service');
     const next = btn.getAttribute('data-on') !== 'true';
-    const row = btn.closest('tr');
-    const statusCell = row?.querySelector('.ent-status');
     const prevOn = btn.getAttribute('data-on') === 'true';
 
-    // Optimistic UI — flip immediately, sync in background.
     btn.dataset.busy = '1';
     btn.classList.toggle('on', next);
     btn.setAttribute('data-on', next ? 'true' : 'false');
     btn.setAttribute('aria-pressed', next ? 'true' : 'false');
-    if (statusCell) {
-      statusCell.innerHTML = next
-        ? '<span class="badge badge-on">Enabled</span>'
-        : '<span class="badge badge-off">Off</span>';
-    }
 
     try {
       await api('entitlement', {
         method: 'POST',
-        body: { email, invoice_radar_enabled: next },
+        body: { email, service, enabled: next },
       });
     } catch (err) {
       btn.classList.toggle('on', prevOn);
       btn.setAttribute('data-on', prevOn ? 'true' : 'false');
       btn.setAttribute('aria-pressed', prevOn ? 'true' : 'false');
-      if (statusCell) {
-        statusCell.innerHTML = prevOn
-          ? '<span class="badge badge-on">Enabled</span>'
-          : '<span class="badge badge-off">Off</span>';
-      }
-      alert(err.message || 'Could not update entitlement');
+      alert(err.message || 'Could not update access');
     } finally {
       btn.dataset.busy = '0';
     }
