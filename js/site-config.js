@@ -56,14 +56,14 @@ window.PH_SITE = {
   contacts: [
     {
       name: 'Shreyas Sinha',
-      role: 'Co-founder',
+      role: 'Founder',
       email: 'shreyas@powerhousetech.in',
       phone: '+919119188492',
       phoneDisplay: '+91 9119188492'
     },
     {
       name: 'Yash Sinha',
-      role: 'Co-founder',
+      role: 'Founding member',
       email: 'yash@powerhousetech.in',
       phone: '+918529744806',
       phoneDisplay: '+91 8529744806'
