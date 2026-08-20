@@ -20,6 +20,9 @@ Authorization: Bearer 2e5559ab3d6c6c520534ad11841227924392e7a6d97f9bfb
 
 Admin dashboard (Google as `shreyas@powerhousetech.in`): https://powerhousetech.in/outreach/
 
+**Controls** (manual n8n triggers): https://powerhousetech.in/outreach/controls  
+Requires workflows 01 & 03 **active** with webhook paths `outreach-discover` and `outreach-mail`.
+
 Full endpoint list: `n8n/PRODUCTION.md`.
 
 ## You still do in n8n (manual)
