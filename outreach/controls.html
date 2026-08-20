@@ -74,23 +74,51 @@
         </section>
 
         <section class="card control-card">
-          <h2>Email Sequence Cadence</h2>
-          <p class="muted">Configure when follow-up emails are sent. n8n reads this on every mail run.</p>
-          <div class="cadence-grid">
+          <h2>
+            Email Sequence Cadence
+            <span class="steps-badge" id="steps-active">0 steps active</span>
+          </h2>
+          <p class="muted">Set the day number for each outreach step. Leave empty to stop.</p>
+          <div class="cadence-grid" id="cadence-grid">
             <div class="cadence-field">
-              <label for="cadence-day1">Day 1 (initial)</label>
-              <input id="cadence-day1" type="number" value="1" disabled readonly>
-              <div class="hint">Initial outreach (always immediate)</div>
+              <label for="cadence-day-0">Step 1 — Initial</label>
+              <input id="cadence-day-0" type="number" min="1" value="1" disabled readonly>
             </div>
             <div class="cadence-field">
-              <label for="cadence-day2">Day 2 (follow-up)</label>
-              <input id="cadence-day2" type="number" min="2" step="1" value="4">
-              <div class="hint">Days after Day 1 before first follow-up</div>
+              <label for="cadence-day-1">Step 2 — Follow 1</label>
+              <input id="cadence-day-1" type="number" min="1" step="1">
             </div>
             <div class="cadence-field">
-              <label for="cadence-day3">Day 3 (final)</label>
-              <input id="cadence-day3" type="number" min="3" step="1" value="9">
-              <div class="hint">Total days before final follow-up</div>
+              <label for="cadence-day-2">Step 3 — Follow 2</label>
+              <input id="cadence-day-2" type="number" min="1" step="1">
+            </div>
+            <div class="cadence-field">
+              <label for="cadence-day-3">Step 4 — Follow 3</label>
+              <input id="cadence-day-3" type="number" min="1" step="1">
+            </div>
+            <div class="cadence-field">
+              <label for="cadence-day-4">Step 5 — Follow 4</label>
+              <input id="cadence-day-4" type="number" min="1" step="1">
+            </div>
+            <div class="cadence-field">
+              <label for="cadence-day-5">Step 6 — Follow 5</label>
+              <input id="cadence-day-5" type="number" min="1" step="1">
+            </div>
+            <div class="cadence-field">
+              <label for="cadence-day-6">Step 7 — Follow 6</label>
+              <input id="cadence-day-6" type="number" min="1" step="1">
+            </div>
+            <div class="cadence-field">
+              <label for="cadence-day-7">Step 8 — Follow 7</label>
+              <input id="cadence-day-7" type="number" min="1" step="1">
+            </div>
+            <div class="cadence-field">
+              <label for="cadence-day-8">Step 9 — Follow 8</label>
+              <input id="cadence-day-8" type="number" min="1" step="1">
+            </div>
+            <div class="cadence-field">
+              <label for="cadence-day-9">Step 10 — Follow 9</label>
+              <input id="cadence-day-9" type="number" min="1" step="1">
             </div>
           </div>
           <div class="control-row">
@@ -104,27 +132,32 @@
   </div>
 
   <script type="module" src="/js/firebase-boot.js"></script>
-  <script src="/outreach/app.js?v=3"></script>
+  <script src="/outreach/app.js?v=4"></script>
   <script>
     (async () => {
       const ui = window.OutreachUI;
       if (!(await ui.requireAdminShell())) return;
       ui.navActive('controls');
 
-      const day1El = document.getElementById('cadence-day1');
-      const day2El = document.getElementById('cadence-day2');
-      const day3El = document.getElementById('cadence-day3');
+      const dayInputs = Array.from({ length: 10 }, (_, i) =>
+        document.getElementById('cadence-day-' + i),
+      );
       const saveBtn = document.getElementById('btn-save-cadence');
       const statusCadence = document.getElementById('status-cadence');
       const lastCadence = document.getElementById('lastrun-cadence');
+      const stepsActive = document.getElementById('steps-active');
 
       function showCadenceStatus(msg, ok) {
         statusCadence.textContent = msg;
         statusCadence.style.color = ok ? '#4ade80' : '#f87171';
-        setTimeout(() => {
-          statusCadence.textContent = '';
-          statusCadence.style.color = '';
-        }, 3000);
+        if (ok) {
+          setTimeout(() => {
+            if (statusCadence.textContent === msg) {
+              statusCadence.textContent = '';
+              statusCadence.style.color = '';
+            }
+          }, 3000);
+        }
       }
 
       function setCadenceLastSaved(iso) {
@@ -139,28 +172,99 @@
         }
       }
 
+      function readSlot(i) {
+        const raw = String(dayInputs[i].value || '').trim();
+        if (!raw) return null;
+        const n = Number.parseInt(raw, 10);
+        if (!Number.isInteger(n)) return { bad: true };
+        return n;
+      }
+
+      function updateStepsBadge() {
+        const n = dayInputs.filter((el) => String(el.value || '').trim() !== '').length;
+        stepsActive.textContent = n + ' step' + (n === 1 ? '' : 's') + ' active';
+      }
+
+      function applyContiguityFrom(index) {
+        const raw = String(dayInputs[index].value || '').trim();
+        if (raw === '') {
+          for (let j = index + 1; j < 10; j++) dayInputs[j].value = '';
+        }
+        updateStepsBadge();
+      }
+
+      function populateCadence(days) {
+        const arr = Array.isArray(days) ? days : [];
+        for (let i = 0; i < 10; i++) {
+          if (i === 0) {
+            dayInputs[0].value = 1;
+            continue;
+          }
+          const v = arr[i];
+          dayInputs[i].value = v === null || v === undefined || v === '' ? '' : String(v);
+        }
+        updateStepsBadge();
+      }
+
+      function validateCadenceDays(days) {
+        if (!Array.isArray(days) || days.length !== 10) {
+          return 'cadenceDays must be an array of exactly 10 elements.';
+        }
+        for (const v of days) {
+          if (v === null) continue;
+          if (!Number.isInteger(v) || v < 1) {
+            return 'Each element must be null or a positive integer > 0.';
+          }
+        }
+        let seenNull = false;
+        for (const d of days) {
+          if (d === null) seenNull = true;
+          else if (seenNull) {
+            return 'Non-null values must all come before null values (no gaps).';
+          }
+        }
+        const active = days.filter((d) => d !== null);
+        for (let i = 1; i < active.length; i++) {
+          if (!(active[i - 1] < active[i])) {
+            return 'Days must be strictly ascending.';
+          }
+        }
+        return null;
+      }
+
       async function loadCadence() {
         try {
           const cfg = await ui.api('/api/config');
-          day1El.value = cfg.sequenceDay1 ?? 1;
-          day2El.value = cfg.sequenceDay2 ?? 4;
-          day3El.value = cfg.sequenceDay3 ?? 9;
+          populateCadence(cfg.cadenceDays);
           setCadenceLastSaved(cfg.updatedAt);
         } catch (err) {
           showCadenceStatus(err.message || 'Failed to load cadence', false);
         }
       }
 
+      for (let i = 1; i < 10; i++) {
+        dayInputs[i].addEventListener('input', () => applyContiguityFrom(i));
+        dayInputs[i].addEventListener('change', () => applyContiguityFrom(i));
+      }
+
       saveBtn.addEventListener('click', async () => {
-        const d1 = 1;
-        const d2 = Number.parseInt(day2El.value, 10);
-        const d3 = Number.parseInt(day3El.value, 10);
-        if (!Number.isInteger(d2) || !Number.isInteger(d3)) {
-          showCadenceStatus('All values must be integers.', false);
-          return;
+        const days = [];
+        for (let i = 0; i < 10; i++) {
+          if (i === 0) {
+            days.push(1);
+            continue;
+          }
+          const v = readSlot(i);
+          if (v && typeof v === 'object' && v.bad) {
+            showCadenceStatus('Each element must be null or a positive integer > 0.', false);
+            return;
+          }
+          days.push(v);
         }
-        if (!(d1 < d2 && d2 < d3)) {
-          showCadenceStatus('Day 2 must be > Day 1 and Day 3 > Day 2.', false);
+
+        const errMsg = validateCadenceDays(days);
+        if (errMsg) {
+          showCadenceStatus(errMsg, false);
           return;
         }
 
@@ -169,10 +273,9 @@
         try {
           const cfg = await ui.api('/api/config', {
             method: 'PUT',
-            body: { sequenceDay1: d1, sequenceDay2: d2, sequenceDay3: d3 },
+            body: { cadenceDays: days },
           });
-          day2El.value = cfg.sequenceDay2;
-          day3El.value = cfg.sequenceDay3;
+          populateCadence(cfg.cadenceDays);
           setCadenceLastSaved(cfg.updatedAt);
           showCadenceStatus('Saved', true);
         } catch (err) {
