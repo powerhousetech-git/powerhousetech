@@ -4,52 +4,103 @@ const { asyncHandler } = require('../middleware/errorHandler');
 
 const router = express.Router();
 
-function startOfUtcDay(d = new Date()) {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+function groupByFollowUp(logs) {
+  const out = {};
+  for (const log of logs) {
+    out[log.followUpNum] = (out[log.followUpNum] || 0) + 1;
+  }
+  return out;
 }
 
-function startOfUtcWeek(d = new Date()) {
-  const day = d.getUTCDay(); // 0 Sun
-  const diff = (day + 6) % 7; // Monday start
-  const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  monday.setUTCDate(monday.getUTCDate() - diff);
-  return monday;
+function trackBreakdown(logs) {
+  return {
+    A: logs.filter((l) => (l.track || '').includes('Startups')).length,
+    B: logs.filter((l) => (l.track || '').includes('EMS')).length,
+  };
 }
 
+/** GET /api/stats — dashboard metrics */
 router.get(
   '/',
   asyncHandler(async (_req, res) => {
-    const today = startOfUtcDay();
-    const week = startOfUtcWeek();
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - 7);
 
-    const [byStatus, byTrack, total, day1Today, day4Today, day9Today, repliesWeek] =
+    const [statusCounts, todayLogs, weekLogs, allTimeLogs, recent, total] =
       await Promise.all([
-        prisma.contact.groupBy({ by: ['status'], _count: { _all: true } }),
-        prisma.contact.groupBy({ by: ['track'], _count: { _all: true } }),
+        prisma.contact.groupBy({ by: ['status'], _count: { id: true } }),
+        prisma.emailLog.findMany({ where: { sentAt: { gte: startOfToday } } }),
+        prisma.emailLog.findMany({ where: { sentAt: { gte: startOfWeek } } }),
+        prisma.emailLog.findMany({}),
+        prisma.emailLog.findMany({
+          orderBy: { sentAt: 'desc' },
+          take: 20,
+          include: {
+            contact: { select: { name: true, company: true, track: true } },
+          },
+        }),
         prisma.contact.count(),
-        prisma.contact.count({ where: { day1SentAt: { gte: today } } }),
-        prisma.contact.count({ where: { day4SentAt: { gte: today } } }),
-        prisma.contact.count({ where: { day9SentAt: { gte: today } } }),
-        prisma.contact.count({ where: { repliedAt: { gte: week } } }),
       ]);
+
+    const pipeline = Object.fromEntries(
+      statusCounts.map((s) => [s.status, s._count.id]),
+    );
+    const replied = pipeline.Replied || 0;
+    const follow1All = allTimeLogs.filter((l) => l.followUpNum === 1).length;
+    const replyRate = follow1All > 0 ? replied / follow1All : 0;
+
+    const byTrack = await prisma.contact.groupBy({
+      by: ['track'],
+      _count: { id: true },
+    });
 
     res.json({
       total,
-      byStatus: byStatus.map((r) => ({
-        status: r.status,
-        count: r._count._all,
+      pipeline,
+      byStatus: statusCounts.map((s) => ({
+        status: s.status,
+        count: s._count.id,
       })),
       byTrack: byTrack.map((r) => ({
         track: r.track || 'Unspecified',
-        count: r._count._all,
+        count: r._count.id,
       })),
-      emailsSentToday: {
-        day1: day1Today,
-        day4: day4Today,
-        day9: day9Today,
-        total: day1Today + day4Today + day9Today,
+      replyRate,
+      emailVolume: {
+        today: {
+          byFollowUp: groupByFollowUp(todayLogs),
+          total: todayLogs.length,
+          byTrack: trackBreakdown(todayLogs),
+        },
+        thisWeek: {
+          byFollowUp: groupByFollowUp(weekLogs),
+          total: weekLogs.length,
+          byTrack: trackBreakdown(weekLogs),
+        },
+        allTime: {
+          byFollowUp: groupByFollowUp(allTimeLogs),
+          total: allTimeLogs.length,
+          byTrack: trackBreakdown(allTimeLogs),
+        },
       },
-      repliesThisWeek: repliesWeek,
+      recentSends: recent.map((l) => ({
+        contactName: l.contact?.name || '—',
+        company: l.contact?.company || null,
+        track: l.contact?.track || l.track || null,
+        followUpNum: l.followUpNum,
+        sentAt: l.sentAt.toISOString(),
+      })),
+      // Back-compat for older stats page snippets
+      emailsSentToday: {
+        total: todayLogs.length,
+        day1: todayLogs.filter((l) => l.followUpNum === 1).length,
+        day4: todayLogs.filter((l) => l.followUpNum === 2).length,
+        day9: todayLogs.filter((l) => l.followUpNum === 3).length,
+      },
+      repliesThisWeek: replied,
     });
   }),
 );

@@ -3,18 +3,18 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { bearerToken, verifyFirebaseIdToken } from '../_shared/firebase-auth.ts';
 import { jsonResponse, optionsResponse } from '../_shared/cors.ts';
 
+const FOLLOW_STATUSES = Array.from({ length: 10 }, (_, i) => `Follow${i + 1} Sent`);
 const STATUSES = [
   'Queue',
   'Email Found',
-  'Day1 Sent',
-  'Day4 Sent',
-  'Day9 Sent',
+  ...FOLLOW_STATUSES,
   'Replied',
   'Bounced',
   'Unsubscribed',
 ] as const;
-
 type Status = (typeof STATUSES)[number];
+
+const DEFAULT_CADENCE: (number | null)[] = [1, 4, 9, null, null, null, null, null, null, null];
 
 function adminDb() {
   const url = Deno.env.get('SUPABASE_URL');
@@ -39,12 +39,29 @@ function toApi(row: Record<string, unknown>) {
     status: row.status,
     source: row.source ?? null,
     allPermutations: row.all_permutations ?? null,
+    followUpDates: row.follow_up_dates ?? null,
     day1SentAt: iso(row.day1_sent_at),
     day4SentAt: iso(row.day4_sent_at),
     day9SentAt: iso(row.day9_sent_at),
     repliedAt: iso(row.replied_at),
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
+  };
+}
+
+function toSeqContact(row: Record<string, unknown>) {
+  return {
+    id: row.id,
+    name: row.name,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email ?? null,
+    company: row.company ?? null,
+    domain: row.domain,
+    title: row.title ?? null,
+    country: row.country ?? null,
+    track: row.track ?? null,
+    status: row.status,
   };
 }
 
@@ -67,7 +84,6 @@ async function requireAuth(req: Request) {
     return { type: 'api_key' as const, email: 'n8n@system', db };
   }
 
-  // Firebase admin for dashboard
   const user = await verifyFirebaseIdToken(token);
   const adminEmails = (Deno.env.get('ADMIN_EMAILS') || 'shreyas@powerhousetech.in')
     .split(',')
@@ -131,9 +147,46 @@ function coerceDate(value: unknown): string | null | undefined {
   return d.toISOString();
 }
 
-async function getConfigMap(
-  db: ReturnType<typeof adminDb>,
-): Promise<Record<string, string>> {
+function normalizeCadence(value: unknown): (number | null)[] {
+  if (Array.isArray(value) && value.length === 10) {
+    return value.map((v) => (v === null || v === undefined ? null : Number(v)));
+  }
+  return DEFAULT_CADENCE.slice();
+}
+
+function parseCadenceDays(raw: unknown) {
+  if (!Array.isArray(raw) || raw.length !== 10) {
+    return { error: 'cadenceDays must be an array of exactly 10 elements.' };
+  }
+  const days: (number | null)[] = [];
+  for (const v of raw) {
+    if (v === null || v === undefined || v === '') {
+      days.push(null);
+      continue;
+    }
+    const n = Number.parseInt(String(v), 10);
+    if (!Number.isInteger(n) || n < 1) {
+      return { error: 'Each element must be null or a positive integer > 0.' };
+    }
+    days.push(n);
+  }
+  let seenNull = false;
+  for (const d of days) {
+    if (d === null) seenNull = true;
+    else if (seenNull) {
+      return { error: 'Non-null values must all come before null values (no gaps).' };
+    }
+  }
+  const active = days.filter((d): d is number => d !== null);
+  for (let i = 1; i < active.length; i++) {
+    if (!(active[i - 1] < active[i])) {
+      return { error: 'Days must be strictly ascending.' };
+    }
+  }
+  return { days };
+}
+
+async function getConfigMap(db: ReturnType<typeof adminDb>) {
   const { data } = await db.from('outreach_portal_config').select('key,value');
   const map: Record<string, string> = {};
   for (const row of data || []) {
@@ -148,25 +201,15 @@ async function fireN8nWebhook(
   body: Record<string, unknown> = {},
 ) {
   const cfg = await getConfigMap(db);
-  const base =
-    Deno.env.get('N8N_WEBHOOK_BASE_URL') ||
-    cfg.n8n_webhook_base_url ||
-    '';
+  const base = Deno.env.get('N8N_WEBHOOK_BASE_URL') || cfg.n8n_webhook_base_url || '';
   const discoverPath =
-    Deno.env.get('N8N_DISCOVER_PATH') ||
-    cfg.n8n_discover_path ||
-    'outreach-discover';
-  const mailPath =
-    Deno.env.get('N8N_MAIL_PATH') ||
-    cfg.n8n_mail_path ||
-    'outreach-mail';
-
+    Deno.env.get('N8N_DISCOVER_PATH') || cfg.n8n_discover_path || 'outreach-discover';
+  const mailPath = Deno.env.get('N8N_MAIL_PATH') || cfg.n8n_mail_path || 'outreach-mail';
   if (!base) {
     const err = new Error('N8N_WEBHOOK_BASE_URL is not configured');
     (err as Error & { status: number }).status = 503;
     throw err;
   }
-
   const path = kind === 'discover' ? discoverPath : mailPath;
   const url = `${base.replace(/\/$/, '')}/${String(path).replace(/^\//, '')}`;
   const res = await fetch(url, {
@@ -187,68 +230,54 @@ async function fireN8nWebhook(
   }
 }
 
-function serializeCadence(row: Record<string, unknown>) {
-  return {
-    sequenceDay1: Number(row.sequence_day1),
-    sequenceDay2: Number(row.sequence_day2),
-    sequenceDay3: Number(row.sequence_day3),
-    updatedAt: row.updated_at
-      ? new Date(String(row.updated_at)).toISOString()
-      : new Date().toISOString(),
-  };
-}
-
-function parseCadence(body: Record<string, unknown>) {
-  const d1 = Number.parseInt(String(body.sequenceDay1), 10);
-  const d2 = Number.parseInt(String(body.sequenceDay2), 10);
-  const d3 = Number.parseInt(String(body.sequenceDay3), 10);
-
-  if (!Number.isInteger(d1) || !Number.isInteger(d2) || !Number.isInteger(d3)) {
-    return { error: 'All values must be integers.' };
-  }
-  if (d1 < 1 || d2 < 1 || d3 < 1) {
-    return { error: 'All values must be positive.' };
-  }
-  if (d1 !== 1) {
-    return { error: 'sequenceDay1 must equal 1 (initial send is always Day 1).' };
-  }
-  if (!(d1 < d2 && d2 < d3)) {
-    return {
-      error: 'Days must be in strictly ascending order (Day 1 < Day 2 < Day 3).',
-    };
-  }
-  return { d1, d2, d3 };
-}
-
 async function ensureCadence(db: ReturnType<typeof adminDb>) {
-  const { data, error } = await db
-    .from('outreach_config')
-    .select('*')
-    .eq('id', 1)
-    .maybeSingle();
+  const { data, error } = await db.from('outreach_config').select('*').eq('id', 1).maybeSingle();
   if (error) throw error;
   if (data) return data;
-
   const { data: created, error: insertErr } = await db
     .from('outreach_config')
-    .insert({
-      id: 1,
-      sequence_day1: 1,
-      sequence_day2: 4,
-      sequence_day3: 9,
-    })
+    .insert({ id: 1, cadence_days: DEFAULT_CADENCE })
     .select('*')
     .single();
   if (insertErr) throw insertErr;
   return created;
 }
 
+function prevSentAt(row: Record<string, unknown>, prevFollowUpNum: number): Date | null {
+  const dates =
+    row.follow_up_dates && typeof row.follow_up_dates === 'object'
+      ? (row.follow_up_dates as Record<string, string>)
+      : {};
+  const key = String(prevFollowUpNum);
+  if (dates[key]) return new Date(dates[key]);
+  if (prevFollowUpNum === 1 && row.day1_sent_at) return new Date(String(row.day1_sent_at));
+  if (prevFollowUpNum === 2 && row.day4_sent_at) return new Date(String(row.day4_sent_at));
+  if (prevFollowUpNum === 3 && row.day9_sent_at) return new Date(String(row.day9_sent_at));
+  return null;
+}
+
+function groupByFollowUp(logs: { follow_up_num: number }[]) {
+  const out: Record<number, number> = {};
+  for (const log of logs) {
+    out[log.follow_up_num] = (out[log.follow_up_num] || 0) + 1;
+  }
+  return out;
+}
+
+function trackBreakdown(logs: { track?: string | null }[]) {
+  return {
+    A: logs.filter((l) => (l.track || '').includes('Startups')).length,
+    B: logs.filter((l) => (l.track || '').includes('EMS')).length,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return optionsResponse();
 
   const url = new URL(req.url);
-  // Paths look like /outreach-api/... or /functions/v1/outreach-api/...
-  const path = url.pathname.replace(/^\/functions\/v1\/outreach-api/, '').replace(/^\/outreach-api/, '') || '/';
+  const path =
+    url.pathname.replace(/^\/functions\/v1\/outreach-api/, '').replace(/^\/outreach-api/, '') ||
+    '/';
 
   try {
     if (req.method === 'GET' && (path === '/health' || path === '/api/health')) {
@@ -258,70 +287,176 @@ Deno.serve(async (req) => {
     const auth = await requireAuth(req);
     const db = auth.db;
 
-    // GET /api/config — email cadence for n8n workflow 03
+    // GET /api/config
     if (req.method === 'GET' && (path === '/api/config' || path === '/config')) {
       const row = await ensureCadence(db);
-      return jsonResponse(200, serializeCadence(row));
+      return jsonResponse(200, {
+        cadenceDays: normalizeCadence(row.cadence_days),
+        updatedAt: row.updated_at
+          ? new Date(String(row.updated_at)).toISOString()
+          : new Date().toISOString(),
+      });
     }
 
-    // PUT /api/config — update cadence from Controls UI
+    // PUT /api/config
     if (req.method === 'PUT' && (path === '/api/config' || path === '/config')) {
       const body = await req.json().catch(() => ({}));
-      const parsed = parseCadence(body as Record<string, unknown>);
+      const parsed = parseCadenceDays(body?.cadenceDays);
       if ('error' in parsed && parsed.error) {
         return jsonResponse(400, { error: parsed.error });
       }
-      const { d1, d2, d3 } = parsed as { d1: number; d2: number; d3: number };
       const { data, error } = await db
         .from('outreach_config')
         .upsert({
           id: 1,
-          sequence_day1: d1,
-          sequence_day2: d2,
-          sequence_day3: d3,
+          cadence_days: parsed.days,
           updated_at: new Date().toISOString(),
         })
         .select('*')
         .single();
       if (error) throw error;
-      return jsonResponse(200, serializeCadence(data));
-    }
-
-    // GET /api/stats or /stats
-    if (req.method === 'GET' && (path === '/api/stats' || path === '/stats')) {
-      const { data: rows, error } = await db.from('outreach_contacts').select('*');
-      if (error) throw error;
-      const list = rows || [];
-      const byStatusMap = new Map<string, number>();
-      const byTrackMap = new Map<string, number>();
-      const startDay = new Date();
-      startDay.setUTCHours(0, 0, 0, 0);
-      const dayMs = startDay.getTime();
-      const week = new Date(startDay);
-      week.setUTCDate(week.getUTCDate() - ((week.getUTCDay() + 6) % 7));
-      const weekMs = week.getTime();
-
-      let day1 = 0, day4 = 0, day9 = 0, repliesWeek = 0;
-      for (const r of list) {
-        byStatusMap.set(r.status, (byStatusMap.get(r.status) || 0) + 1);
-        const track = r.track || 'Unspecified';
-        byTrackMap.set(track, (byTrackMap.get(track) || 0) + 1);
-        if (r.day1_sent_at && new Date(r.day1_sent_at).getTime() >= dayMs) day1++;
-        if (r.day4_sent_at && new Date(r.day4_sent_at).getTime() >= dayMs) day4++;
-        if (r.day9_sent_at && new Date(r.day9_sent_at).getTime() >= dayMs) day9++;
-        if (r.replied_at && new Date(r.replied_at).getTime() >= weekMs) repliesWeek++;
-      }
-
       return jsonResponse(200, {
-        total: list.length,
-        byStatus: [...byStatusMap.entries()].map(([status, count]) => ({ status, count })),
-        byTrack: [...byTrackMap.entries()].map(([track, count]) => ({ track, count })),
-        emailsSentToday: { day1, day4, day9, total: day1 + day4 + day9 },
-        repliesThisWeek: repliesWeek,
+        cadenceDays: normalizeCadence(data.cadence_days),
+        updatedAt: new Date(String(data.updated_at)).toISOString(),
       });
     }
 
-    // GET /api/contacts or /contacts
+    // GET /api/stats
+    if (req.method === 'GET' && (path === '/api/stats' || path === '/stats')) {
+      const now = new Date();
+      const startOfToday = new Date(now);
+      startOfToday.setHours(0, 0, 0, 0);
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - 7);
+
+      const [{ data: contacts }, { data: todayLogs }, { data: weekLogs }, { data: allLogs }, { data: recent }] =
+        await Promise.all([
+          db.from('outreach_contacts').select('status, track'),
+          db.from('outreach_email_logs').select('*').gte('sent_at', startOfToday.toISOString()),
+          db.from('outreach_email_logs').select('*').gte('sent_at', startOfWeek.toISOString()),
+          db.from('outreach_email_logs').select('*'),
+          db
+            .from('outreach_email_logs')
+            .select('follow_up_num, track, sent_at, contact:outreach_contacts(name, company, track)')
+            .order('sent_at', { ascending: false })
+            .limit(20),
+        ]);
+
+      const list = contacts || [];
+      const pipeline: Record<string, number> = {};
+      const byTrackMap = new Map<string, number>();
+      for (const r of list) {
+        pipeline[r.status] = (pipeline[r.status] || 0) + 1;
+        const t = r.track || 'Unspecified';
+        byTrackMap.set(t, (byTrackMap.get(t) || 0) + 1);
+      }
+      const today = todayLogs || [];
+      const week = weekLogs || [];
+      const all = allLogs || [];
+      const replied = pipeline.Replied || 0;
+      const follow1All = all.filter((l) => l.follow_up_num === 1).length;
+
+      return jsonResponse(200, {
+        total: list.length,
+        pipeline,
+        byStatus: Object.entries(pipeline).map(([status, count]) => ({ status, count })),
+        byTrack: [...byTrackMap.entries()].map(([track, count]) => ({ track, count })),
+        replyRate: follow1All > 0 ? replied / follow1All : 0,
+        emailVolume: {
+          today: {
+            byFollowUp: groupByFollowUp(today),
+            total: today.length,
+            byTrack: trackBreakdown(today),
+          },
+          thisWeek: {
+            byFollowUp: groupByFollowUp(week),
+            total: week.length,
+            byTrack: trackBreakdown(week),
+          },
+          allTime: {
+            byFollowUp: groupByFollowUp(all),
+            total: all.length,
+            byTrack: trackBreakdown(all),
+          },
+        },
+        recentSends: (recent || []).map((l) => {
+          const c = Array.isArray(l.contact) ? l.contact[0] : l.contact;
+          return {
+            contactName: c?.name || '—',
+            company: c?.company || null,
+            track: c?.track || l.track || null,
+            followUpNum: l.follow_up_num,
+            sentAt: l.sent_at ? new Date(String(l.sent_at)).toISOString() : null,
+          };
+        }),
+        emailsSentToday: {
+          total: today.length,
+          day1: today.filter((l) => l.follow_up_num === 1).length,
+          day4: today.filter((l) => l.follow_up_num === 2).length,
+          day9: today.filter((l) => l.follow_up_num === 3).length,
+        },
+        repliesThisWeek: replied,
+      });
+    }
+
+    // GET /api/contacts/sequence-ready
+    if (
+      req.method === 'GET' &&
+      (path === '/api/contacts/sequence-ready' || path === '/contacts/sequence-ready')
+    ) {
+      const track = url.searchParams.get('track');
+      const cfg = await ensureCadence(db);
+      const cadenceDays = normalizeCadence(cfg.cadence_days);
+      const activeDays = cadenceDays.filter((d): d is number => d !== null);
+      const now = new Date();
+      const groups: {
+        followUpNum: number;
+        dayInSequence: number;
+        contacts: ReturnType<typeof toSeqContact>[];
+      }[] = [];
+
+      for (let i = 0; i < activeDays.length; i++) {
+        const followUpNum = i + 1;
+        const dayInSequence = activeDays[i];
+        let rows: Record<string, unknown>[] = [];
+
+        if (i === 0) {
+          let q = db.from('outreach_contacts').select('*').eq('status', 'Email Found').limit(60);
+          if (track) q = q.eq('track', track);
+          const { data, error } = await q;
+          if (error) throw error;
+          rows = data || [];
+        } else {
+          const prevStatus = `Follow${i} Sent`;
+          const gapDays = activeDays[i] - activeDays[i - 1];
+          const cutoffDate = new Date(now.getTime() - gapDays * 24 * 60 * 60 * 1000);
+          let q = db.from('outreach_contacts').select('*').eq('status', prevStatus).limit(60);
+          if (track) q = q.eq('track', track);
+          const { data, error } = await q;
+          if (error) throw error;
+          rows = (data || []).filter((c) => {
+            const sentAt = prevSentAt(c, i);
+            return sentAt !== null && sentAt <= cutoffDate;
+          });
+        }
+
+        if (rows.length > 0) {
+          groups.push({
+            followUpNum,
+            dayInSequence,
+            contacts: rows.map(toSeqContact),
+          });
+        }
+      }
+
+      return jsonResponse(200, {
+        groups,
+        activeDays,
+        totalContacts: groups.reduce((sum, g) => sum + g.contacts.length, 0),
+      });
+    }
+
+    // GET /api/contacts
     if (req.method === 'GET' && (path === '/api/contacts' || path === '/contacts')) {
       let q = db.from('outreach_contacts').select('*', { count: 'exact' });
       const status = url.searchParams.get('status');
@@ -330,20 +465,26 @@ Deno.serve(async (req) => {
       const domain = url.searchParams.get('domain');
       const name = url.searchParams.get('name');
       const track = url.searchParams.get('track');
-      const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '100', 10) || 100, 1), 1000);
+      const limit = Math.min(
+        Math.max(parseInt(url.searchParams.get('limit') || '100', 10) || 100, 1),
+        1000,
+      );
       const { column, ascending } = parseSort(url.searchParams.get('sort'));
 
-      if (status) q = q.eq('status', status);
+      if (status === 'all_followups') q = q.in('status', FOLLOW_STATUSES);
+      else if (status) q = q.eq('status', status);
       if (statusIn) {
         q = q.in(
           'status',
-          statusIn.split(',').map((s) => s.trim()).filter(Boolean),
+          statusIn
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
         );
       }
       if (email) q = q.eq('email', email.trim().toLowerCase());
       if (domain) q = q.eq('domain', domain.trim().toLowerCase());
       if (name) q = q.eq('name', name.trim());
-      // Partial match so ?track=Track+A matches "Track A - Startups"
       if (track) q = q.ilike('track', `%${track}%`);
 
       q = q.order(column, { ascending }).limit(limit);
@@ -357,7 +498,7 @@ Deno.serve(async (req) => {
 
     // GET /api/contacts/:id
     const getOne = path.match(/^\/(?:api\/)?contacts\/([^/]+)$/);
-    if (req.method === 'GET' && getOne) {
+    if (req.method === 'GET' && getOne && getOne[1] !== 'sequence-ready') {
       const { data, error } = await db
         .from('outreach_contacts')
         .select('*')
@@ -397,18 +538,14 @@ Deno.serve(async (req) => {
         status,
         source: body.source != null ? String(body.source).trim() : 'Apollo',
         all_permutations: body.allPermutations != null ? String(body.allPermutations) : null,
+        follow_up_dates: body.followUpDates ?? null,
         day1_sent_at: coerceDate(body.day1SentAt) ?? null,
         day4_sent_at: coerceDate(body.day4SentAt) ?? null,
         day9_sent_at: coerceDate(body.day9SentAt) ?? null,
         replied_at: coerceDate(body.repliedAt) ?? null,
       };
 
-      const { data, error } = await db
-        .from('outreach_contacts')
-        .insert(payload)
-        .select('*')
-        .single();
-
+      const { data, error } = await db.from('outreach_contacts').insert(payload).select('*').single();
       if (error) {
         if (error.code === '23505') {
           return jsonResponse(409, {
@@ -425,6 +562,57 @@ Deno.serve(async (req) => {
     const patchOne = path.match(/^\/(?:api\/)?contacts\/([^/]+)$/);
     if (req.method === 'PATCH' && patchOne) {
       const body = await req.json().catch(() => ({}));
+      const { data: existing, error: findErr } = await db
+        .from('outreach_contacts')
+        .select('*')
+        .eq('id', patchOne[1])
+        .maybeSingle();
+      if (findErr) throw findErr;
+      if (!existing) return jsonResponse(404, { error: 'Contact not found' });
+
+      const followUpNum =
+        body.followUpNum != null ? Number.parseInt(String(body.followUpNum), 10) : null;
+
+      if (Number.isInteger(followUpNum) && followUpNum! >= 1 && body.sentAt) {
+        const sentAt = coerceDate(body.sentAt);
+        if (!sentAt) return jsonResponse(400, { error: 'Invalid sentAt' });
+        const dates =
+          existing.follow_up_dates && typeof existing.follow_up_dates === 'object'
+            ? { ...(existing.follow_up_dates as Record<string, string>) }
+            : {};
+        dates[String(followUpNum)] = sentAt;
+        const data: Record<string, unknown> = { follow_up_dates: dates };
+        if (followUpNum === 1) data.day1_sent_at = sentAt;
+        if (followUpNum === 2) data.day4_sent_at = sentAt;
+        if (followUpNum === 3) data.day9_sent_at = sentAt;
+        if (body.status != null) {
+          const st = String(body.status);
+          if (!STATUSES.includes(st as Status)) {
+            return jsonResponse(400, { error: 'Invalid status. Use: ' + STATUSES.join(', ') });
+          }
+          data.status = st;
+        } else {
+          data.status = `Follow${followUpNum} Sent`;
+        }
+
+        const { data: row, error } = await db
+          .from('outreach_contacts')
+          .update(data)
+          .eq('id', patchOne[1])
+          .select('*')
+          .single();
+        if (error) throw error;
+
+        await db.from('outreach_email_logs').insert({
+          contact_id: patchOne[1],
+          follow_up_num: followUpNum,
+          track: row.track,
+          sent_at: sentAt,
+        });
+
+        return jsonResponse(200, { contact: toApi(row) });
+      }
+
       const data: Record<string, unknown> = {};
       const map: Record<string, string> = {
         name: 'name',
@@ -439,6 +627,7 @@ Deno.serve(async (req) => {
         status: 'status',
         source: 'source',
         allPermutations: 'all_permutations',
+        followUpDates: 'follow_up_dates',
         day1SentAt: 'day1_sent_at',
         day4SentAt: 'day4_sent_at',
         day9SentAt: 'day9_sent_at',
@@ -452,6 +641,10 @@ Deno.serve(async (req) => {
           if (d !== undefined) data[col] = d;
           continue;
         }
+        if (k === 'followUpDates') {
+          data[col] = body[k];
+          continue;
+        }
         if (k === 'status') {
           if (!STATUSES.includes(String(body[k]) as Status)) {
             return jsonResponse(400, { error: 'Invalid status. Use: ' + STATUSES.join(', ') });
@@ -460,9 +653,8 @@ Deno.serve(async (req) => {
           continue;
         }
         if (k === 'email') {
-          data[col] = body[k] == null || body[k] === ''
-            ? null
-            : String(body[k]).trim().toLowerCase();
+          data[col] =
+            body[k] == null || body[k] === '' ? null : String(body[k]).trim().toLowerCase();
           continue;
         }
         if (k === 'domain') {
@@ -482,7 +674,6 @@ Deno.serve(async (req) => {
         .eq('id', patchOne[1])
         .select('*')
         .maybeSingle();
-
       if (error) {
         if (error.code === '23505') {
           return jsonResponse(409, {
@@ -496,7 +687,7 @@ Deno.serve(async (req) => {
       return jsonResponse(200, { contact: toApi(row) });
     }
 
-    // POST /api/triggers/discover — fire n8n workflow 01 (both tracks)
+    // Triggers
     if (
       req.method === 'POST' &&
       (path === '/api/triggers/discover' || path === '/triggers/discover')
@@ -513,11 +704,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // POST /api/triggers/mail — fire n8n workflow 03 for track A|B
-    if (
-      req.method === 'POST' &&
-      (path === '/api/triggers/mail' || path === '/triggers/mail')
-    ) {
+    if (req.method === 'POST' && (path === '/api/triggers/mail' || path === '/triggers/mail')) {
       const body = await req.json().catch(() => ({}));
       const track = body?.track;
       if (!['A', 'B'].includes(track)) {

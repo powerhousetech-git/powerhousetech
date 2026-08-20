@@ -8,7 +8,7 @@ datasource db {
 }
 
 model Contact {
-  id              String    @id @default(uuid())
+  id              String     @id @default(uuid())
   name            String
   firstName       String
   lastName        String
@@ -18,26 +18,41 @@ model Contact {
   title           String?
   country         String?
   track           String? // "Track A - Startups" | "Track B - EMS"
-  status          String    @default("Queue")
-  source          String?   @default("Apollo")
+  status          String     @default("Queue")
+  source          String?    @default("Apollo")
   allPermutations String?
+  // Legacy timestamps kept for backwards compatibility
   day1SentAt      DateTime?
   day4SentAt      DateTime?
   day9SentAt      DateTime?
+  /// Map of follow-up number → ISO timestamp, e.g. {"1":"...","2":"..."}
+  followUpDates   Json?
   repliedAt       DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  emailLogs       EmailLog[]
 
   @@unique([domain, name])
   @@index([status])
   @@index([email])
 }
 
-/// Single-row cadence config (id = 1). Day numbers relative to first send.
+/// Single-row cadence config (id = 1). Exactly 10 slots; null = inactive.
 model OutreachConfig {
-  id           Int      @id @default(1)
-  sequenceDay1 Int      @default(1)
-  sequenceDay2 Int      @default(4)
-  sequenceDay3 Int      @default(9)
-  updatedAt    DateTime @updatedAt
+  id          Int      @id @default(1)
+  cadenceDays Json     @default("[1,4,9,null,null,null,null,null,null,null]")
+  updatedAt   DateTime @updatedAt
+}
+
+model EmailLog {
+  id          Int      @id @default(autoincrement())
+  contactId   String
+  followUpNum Int // 1 = initial, 2 = first follow-up, …
+  track       String?
+  sentAt      DateTime @default(now())
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([sentAt])
+  @@index([followUpNum])
+  @@index([track])
 }

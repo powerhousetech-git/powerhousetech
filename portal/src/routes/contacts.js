@@ -1,19 +1,14 @@
 const express = require('express');
 const { prisma } = require('../db');
 const { asyncHandler, jsonError } = require('../middleware/errorHandler');
+const {
+  STATUSES,
+  FOLLOW_STATUSES,
+  DEFAULT_CADENCE,
+  normalizeCadence,
+} = require('../lib/outreach');
 
 const router = express.Router();
-
-const STATUSES = [
-  'Queue',
-  'Email Found',
-  'Day1 Sent',
-  'Day4 Sent',
-  'Day9 Sent',
-  'Replied',
-  'Bounced',
-  'Unsubscribed',
-];
 
 const UPDATABLE = new Set([
   'name',
@@ -31,6 +26,7 @@ const UPDATABLE = new Set([
   'day1SentAt',
   'day4SentAt',
   'day9SentAt',
+  'followUpDates',
   'repliedAt',
 ]);
 
@@ -70,6 +66,7 @@ function serialize(contact) {
   if (!contact) return null;
   return {
     ...contact,
+    followUpDates: contact.followUpDates || null,
     day1SentAt: contact.day1SentAt ? contact.day1SentAt.toISOString() : null,
     day4SentAt: contact.day4SentAt ? contact.day4SentAt.toISOString() : null,
     day9SentAt: contact.day9SentAt ? contact.day9SentAt.toISOString() : null,
@@ -78,6 +75,94 @@ function serialize(contact) {
     updatedAt: contact.updatedAt.toISOString(),
   };
 }
+
+function serializeSeqContact(contact) {
+  return {
+    id: contact.id,
+    name: contact.name,
+    firstName: contact.firstName,
+    lastName: contact.lastName,
+    email: contact.email,
+    company: contact.company,
+    domain: contact.domain,
+    title: contact.title,
+    country: contact.country,
+    track: contact.track,
+    status: contact.status,
+  };
+}
+
+function prevSentAt(contact, prevFollowUpNum) {
+  const dates =
+    contact.followUpDates && typeof contact.followUpDates === 'object'
+      ? contact.followUpDates
+      : {};
+  const key = String(prevFollowUpNum);
+  if (dates[key]) return new Date(dates[key]);
+  if (prevFollowUpNum === 1 && contact.day1SentAt) return contact.day1SentAt;
+  if (prevFollowUpNum === 2 && contact.day4SentAt) return contact.day4SentAt;
+  if (prevFollowUpNum === 3 && contact.day9SentAt) return contact.day9SentAt;
+  return null;
+}
+
+/** GET /api/contacts/sequence-ready — n8n batching for workflow 03 */
+router.get(
+  '/sequence-ready',
+  asyncHandler(async (req, res) => {
+    const track = req.query.track ? String(req.query.track) : null;
+    const config = await prisma.outreachConfig.findUnique({ where: { id: 1 } });
+    const cadenceDays = normalizeCadence(config?.cadenceDays ?? DEFAULT_CADENCE);
+    const activeDays = cadenceDays.filter((d) => d !== null);
+    const now = new Date();
+    const groups = [];
+
+    for (let i = 0; i < activeDays.length; i++) {
+      const followUpNum = i + 1;
+      const dayInSequence = activeDays[i];
+      let contacts = [];
+
+      if (i === 0) {
+        contacts = await prisma.contact.findMany({
+          where: {
+            status: 'Email Found',
+            ...(track ? { track } : {}),
+          },
+          take: 60,
+        });
+      } else {
+        const prevStatus = `Follow${i} Sent`;
+        const gapDays = activeDays[i] - activeDays[i - 1];
+        const cutoffDate = new Date(now.getTime() - gapDays * 24 * 60 * 60 * 1000);
+        const candidates = await prisma.contact.findMany({
+          where: {
+            status: prevStatus,
+            ...(track ? { track } : {}),
+          },
+          take: 60,
+        });
+        contacts = candidates.filter((c) => {
+          const sentAt = prevSentAt(c, i);
+          if (!sentAt) return false;
+          return sentAt <= cutoffDate;
+        });
+      }
+
+      if (contacts.length > 0) {
+        groups.push({
+          followUpNum,
+          dayInSequence,
+          contacts: contacts.map(serializeSeqContact),
+        });
+      }
+    }
+
+    res.json({
+      groups,
+      activeDays,
+      totalContacts: groups.reduce((sum, g) => sum + g.contacts.length, 0),
+    });
+  }),
+);
 
 /** GET /api/contacts */
 router.get(
@@ -95,7 +180,11 @@ router.get(
     } = req.query;
 
     const where = {};
-    if (status) where.status = String(status);
+    if (status === 'all_followups') {
+      where.status = { in: FOLLOW_STATUSES };
+    } else if (status) {
+      where.status = String(status);
+    }
     if (statusIn) {
       where.status = {
         in: String(statusIn)
@@ -107,7 +196,6 @@ router.get(
     if (email) where.email = String(email).trim().toLowerCase();
     if (domain) where.domain = String(domain).trim().toLowerCase();
     if (name) where.name = String(name).trim();
-    // Partial match so ?track=Track+A matches "Track A - Startups"
     if (track) where.track = { contains: String(track) };
 
     const take = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 1000);
@@ -174,6 +262,7 @@ router.post(
         source: body.source != null ? String(body.source).trim() : 'Apollo',
         allPermutations:
           body.allPermutations != null ? String(body.allPermutations) : null,
+        followUpDates: body.followUpDates || undefined,
         day1SentAt: coerceDate(body.day1SentAt),
         day4SentAt: coerceDate(body.day4SentAt),
         day9SentAt: coerceDate(body.day9SentAt),
@@ -190,7 +279,56 @@ router.patch(
   '/:id',
   asyncHandler(async (req, res) => {
     const body = req.body || {};
+    const existing = await prisma.contact.findUnique({
+      where: { id: req.params.id },
+    });
+    if (!existing) return jsonError(res, 404, 'Contact not found');
+
     const data = {};
+
+    // n8n V2 send update: { status, followUpNum, sentAt }
+    const followUpNum = body.followUpNum != null ? Number.parseInt(body.followUpNum, 10) : null;
+    if (Number.isInteger(followUpNum) && followUpNum >= 1 && body.sentAt) {
+      const sentAt = coerceDate(body.sentAt);
+      if (!sentAt) return jsonError(res, 400, 'Invalid sentAt');
+
+      const dates =
+        existing.followUpDates && typeof existing.followUpDates === 'object'
+          ? { ...existing.followUpDates }
+          : {};
+      dates[String(followUpNum)] = sentAt.toISOString();
+      data.followUpDates = dates;
+
+      if (followUpNum === 1) data.day1SentAt = sentAt;
+      if (followUpNum === 2) data.day4SentAt = sentAt;
+      if (followUpNum === 3) data.day9SentAt = sentAt;
+
+      if (body.status != null) {
+        const st = String(body.status);
+        if (!STATUSES.includes(st)) {
+          return jsonError(res, 400, 'Invalid status. Use: ' + STATUSES.join(', '));
+        }
+        data.status = st;
+      } else {
+        data.status = `Follow${followUpNum} Sent`;
+      }
+
+      const contact = await prisma.contact.update({
+        where: { id: req.params.id },
+        data,
+      });
+
+      await prisma.emailLog.create({
+        data: {
+          contactId: contact.id,
+          followUpNum,
+          track: contact.track,
+          sentAt,
+        },
+      });
+
+      return res.json({ contact: serialize(contact) });
+    }
 
     for (const [key, value] of Object.entries(body)) {
       if (!UPDATABLE.has(key)) continue;
@@ -204,6 +342,10 @@ router.patch(
         if (d !== undefined) data[key] = d;
         continue;
       }
+      if (key === 'followUpDates') {
+        data.followUpDates = value;
+        continue;
+      }
       if (key === 'status') {
         if (!STATUSES.includes(String(value))) {
           return jsonError(res, 400, 'Invalid status. Use: ' + STATUSES.join(', '));
@@ -212,8 +354,8 @@ router.patch(
         continue;
       }
       if (key === 'email') {
-        const e = value == null || value === '' ? null : String(value).trim().toLowerCase();
-        data.email = e;
+        data.email =
+          value == null || value === '' ? null : String(value).trim().toLowerCase();
         continue;
       }
       if (key === 'domain') {

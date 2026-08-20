@@ -5,13 +5,21 @@
   const STATUSES = [
     'Queue',
     'Email Found',
-    'Day1 Sent',
-    'Day4 Sent',
-    'Day9 Sent',
+    'Follow1 Sent',
+    'Follow2 Sent',
+    'Follow3 Sent',
+    'Follow4 Sent',
+    'Follow5 Sent',
+    'Follow6 Sent',
+    'Follow7 Sent',
+    'Follow8 Sent',
+    'Follow9 Sent',
+    'Follow10 Sent',
     'Replied',
     'Bounced',
     'Unsubscribed',
   ];
+  const FOLLOW_STATUSES = STATUSES.filter((s) => s.startsWith('Follow'));
   const TRACKS = ['Track A - Startups', 'Track B - EMS'];
 
   function esc(s) {
@@ -23,7 +31,9 @@
   }
 
   function statusClass(status) {
-    return 's-' + String(status || '').replace(/\s+/g, '-');
+    const s = String(status || '');
+    if (/^Follow([4-9]|10) Sent$/.test(s)) return 's-FollowN-Sent';
+    return 's-' + s.replace(/\s+/g, '-');
   }
 
   function badge(status) {
@@ -185,6 +195,7 @@
     API_BASE,
     MAIN_SITE,
     STATUSES,
+    FOLLOW_STATUSES,
     TRACKS,
     esc,
     badge,
