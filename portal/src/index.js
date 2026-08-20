@@ -8,6 +8,7 @@ const { errorHandler } = require('./middleware/errorHandler');
 const contactsRouter = require('./routes/contacts');
 const statsRouter = require('./routes/stats');
 const triggersRouter = require('./routes/triggers');
+const configRouter = require('./routes/config');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -25,6 +26,7 @@ app.use('/api', requireAuth);
 app.use('/api/contacts', contactsRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/triggers', triggersRouter);
+app.use('/api/config', configRouter);
 
 // Dashboard static files (shell HTML; API still gated)
 app.use(express.static(path.join(__dirname, '..', 'public'), {
@@ -45,6 +47,6 @@ app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Outreach portal listening on http://localhost:${PORT}`);
-  console.log('API: contacts, stats, triggers (discover / mail)');
+  console.log('API: contacts, stats, config, triggers (discover / mail)');
   console.log('Auth: Bearer PORTAL_API_KEY (n8n) or Firebase admin ID token (dashboard)');
 });

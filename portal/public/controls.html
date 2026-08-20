@@ -54,7 +54,7 @@
 
         <section class="card control-card">
           <h2>Track A — Software/AI Startups</h2>
-          <p class="muted">Sends Day 1 / Day 4 / Day 9 emails for all Track A contacts currently due.</p>
+          <p class="muted">Sends Day 1 / follow-up emails for all Track A contacts currently due.</p>
           <div class="control-row">
             <button type="button" class="btn btn-primary" id="btn-mailA" data-label="Send Track A Emails">Send Track A Emails</button>
             <span class="control-status" id="status-mailA"></span>
@@ -64,11 +64,38 @@
 
         <section class="card control-card">
           <h2>Track B — EMS / Electronics Manufacturing</h2>
-          <p class="muted">Sends Day 1 / Day 4 / Day 9 emails for all Track B contacts currently due.</p>
+          <p class="muted">Sends Day 1 / follow-up emails for all Track B contacts currently due.</p>
           <div class="control-row">
             <button type="button" class="btn btn-primary" id="btn-mailB" data-label="Send Track B Emails">Send Track B Emails</button>
             <span class="control-status" id="status-mailB"></span>
             <span class="muted" id="lastrun-mailB">Last run: —</span>
+          </div>
+        </section>
+
+        <section class="card control-card">
+          <h2>Email Sequence Cadence</h2>
+          <p class="muted">Configure when follow-up emails are sent. n8n reads this on every mail run.</p>
+          <div class="cadence-grid">
+            <div class="cadence-field">
+              <label for="cadence-day1">Day 1 (initial)</label>
+              <input id="cadence-day1" type="number" value="1" disabled readonly>
+              <div class="hint">Initial outreach (always immediate)</div>
+            </div>
+            <div class="cadence-field">
+              <label for="cadence-day2">Day 2 (follow-up)</label>
+              <input id="cadence-day2" type="number" min="2" step="1" value="4">
+              <div class="hint">Days after Day 1 before first follow-up</div>
+            </div>
+            <div class="cadence-field">
+              <label for="cadence-day3">Day 3 (final)</label>
+              <input id="cadence-day3" type="number" min="3" step="1" value="9">
+              <div class="hint">Total days before final follow-up</div>
+            </div>
+          </div>
+          <div class="control-row">
+            <button type="button" class="btn btn-primary" id="btn-save-cadence" data-label="Save Cadence">Save Cadence</button>
+            <span class="control-status" id="status-cadence"></span>
+            <span class="muted" id="lastrun-cadence">Last saved: —</span>
           </div>
         </section>
       </div>
@@ -82,6 +109,78 @@
       const ui = window.OutreachUI;
       if (!(await ui.requireAdminShell())) return;
       ui.navActive('controls');
+
+      const day1El = document.getElementById('cadence-day1');
+      const day2El = document.getElementById('cadence-day2');
+      const day3El = document.getElementById('cadence-day3');
+      const saveBtn = document.getElementById('btn-save-cadence');
+      const statusCadence = document.getElementById('status-cadence');
+      const lastCadence = document.getElementById('lastrun-cadence');
+
+      function showCadenceStatus(msg, ok) {
+        statusCadence.textContent = msg;
+        statusCadence.style.color = ok ? '#4ade80' : '#f87171';
+        setTimeout(() => {
+          statusCadence.textContent = '';
+          statusCadence.style.color = '';
+        }, 3000);
+      }
+
+      function setCadenceLastSaved(iso) {
+        if (!iso) {
+          lastCadence.textContent = 'Last saved: —';
+          return;
+        }
+        try {
+          lastCadence.textContent = 'Last saved: ' + new Date(iso).toLocaleString();
+        } catch {
+          lastCadence.textContent = 'Last saved: ' + iso;
+        }
+      }
+
+      async function loadCadence() {
+        try {
+          const cfg = await ui.api('/api/config');
+          day1El.value = cfg.sequenceDay1 ?? 1;
+          day2El.value = cfg.sequenceDay2 ?? 4;
+          day3El.value = cfg.sequenceDay3 ?? 9;
+          setCadenceLastSaved(cfg.updatedAt);
+        } catch (err) {
+          showCadenceStatus(err.message || 'Failed to load cadence', false);
+        }
+      }
+
+      saveBtn.addEventListener('click', async () => {
+        const d1 = 1;
+        const d2 = Number.parseInt(day2El.value, 10);
+        const d3 = Number.parseInt(day3El.value, 10);
+        if (!Number.isInteger(d2) || !Number.isInteger(d3)) {
+          showCadenceStatus('All values must be integers.', false);
+          return;
+        }
+        if (!(d1 < d2 && d2 < d3)) {
+          showCadenceStatus('Day 2 must be > Day 1 and Day 3 > Day 2.', false);
+          return;
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+        try {
+          const cfg = await ui.api('/api/config', {
+            method: 'PUT',
+            body: { sequenceDay1: d1, sequenceDay2: d2, sequenceDay3: d3 },
+          });
+          day2El.value = cfg.sequenceDay2;
+          day3El.value = cfg.sequenceDay3;
+          setCadenceLastSaved(cfg.updatedAt);
+          showCadenceStatus('Saved', true);
+        } catch (err) {
+          showCadenceStatus(err.message || 'Save failed', false);
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = saveBtn.dataset.label;
+        }
+      });
 
       async function trigger(endpoint, body, buttonEl, statusEl, storageKey) {
         buttonEl.disabled = true;
@@ -161,6 +260,7 @@
 
       renderLastRuns();
       setInterval(renderLastRuns, 60000);
+      await loadCadence();
     })();
   </script>
 </body>

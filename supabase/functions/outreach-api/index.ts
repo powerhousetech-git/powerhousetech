@@ -187,6 +187,62 @@ async function fireN8nWebhook(
   }
 }
 
+function serializeCadence(row: Record<string, unknown>) {
+  return {
+    sequenceDay1: Number(row.sequence_day1),
+    sequenceDay2: Number(row.sequence_day2),
+    sequenceDay3: Number(row.sequence_day3),
+    updatedAt: row.updated_at
+      ? new Date(String(row.updated_at)).toISOString()
+      : new Date().toISOString(),
+  };
+}
+
+function parseCadence(body: Record<string, unknown>) {
+  const d1 = Number.parseInt(String(body.sequenceDay1), 10);
+  const d2 = Number.parseInt(String(body.sequenceDay2), 10);
+  const d3 = Number.parseInt(String(body.sequenceDay3), 10);
+
+  if (!Number.isInteger(d1) || !Number.isInteger(d2) || !Number.isInteger(d3)) {
+    return { error: 'All values must be integers.' };
+  }
+  if (d1 < 1 || d2 < 1 || d3 < 1) {
+    return { error: 'All values must be positive.' };
+  }
+  if (d1 !== 1) {
+    return { error: 'sequenceDay1 must equal 1 (initial send is always Day 1).' };
+  }
+  if (!(d1 < d2 && d2 < d3)) {
+    return {
+      error: 'Days must be in strictly ascending order (Day 1 < Day 2 < Day 3).',
+    };
+  }
+  return { d1, d2, d3 };
+}
+
+async function ensureCadence(db: ReturnType<typeof adminDb>) {
+  const { data, error } = await db
+    .from('outreach_config')
+    .select('*')
+    .eq('id', 1)
+    .maybeSingle();
+  if (error) throw error;
+  if (data) return data;
+
+  const { data: created, error: insertErr } = await db
+    .from('outreach_config')
+    .insert({
+      id: 1,
+      sequence_day1: 1,
+      sequence_day2: 4,
+      sequence_day3: 9,
+    })
+    .select('*')
+    .single();
+  if (insertErr) throw insertErr;
+  return created;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return optionsResponse();
 
@@ -201,6 +257,35 @@ Deno.serve(async (req) => {
 
     const auth = await requireAuth(req);
     const db = auth.db;
+
+    // GET /api/config — email cadence for n8n workflow 03
+    if (req.method === 'GET' && (path === '/api/config' || path === '/config')) {
+      const row = await ensureCadence(db);
+      return jsonResponse(200, serializeCadence(row));
+    }
+
+    // PUT /api/config — update cadence from Controls UI
+    if (req.method === 'PUT' && (path === '/api/config' || path === '/config')) {
+      const body = await req.json().catch(() => ({}));
+      const parsed = parseCadence(body as Record<string, unknown>);
+      if ('error' in parsed && parsed.error) {
+        return jsonResponse(400, { error: parsed.error });
+      }
+      const { d1, d2, d3 } = parsed as { d1: number; d2: number; d3: number };
+      const { data, error } = await db
+        .from('outreach_config')
+        .upsert({
+          id: 1,
+          sequence_day1: d1,
+          sequence_day2: d2,
+          sequence_day3: d3,
+          updated_at: new Date().toISOString(),
+        })
+        .select('*')
+        .single();
+      if (error) throw error;
+      return jsonResponse(200, serializeCadence(data));
+    }
 
     // GET /api/stats or /stats
     if (req.method === 'GET' && (path === '/api/stats' || path === '/stats')) {

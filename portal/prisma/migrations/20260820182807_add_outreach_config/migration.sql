@@ -1,0 +1,8 @@
+-- CreateTable
+CREATE TABLE "OutreachConfig" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT DEFAULT 1,
+    "sequenceDay1" INTEGER NOT NULL DEFAULT 1,
+    "sequenceDay2" INTEGER NOT NULL DEFAULT 4,
+    "sequenceDay3" INTEGER NOT NULL DEFAULT 9,
+    "updatedAt" DATETIME NOT NULL
+);

@@ -32,3 +32,12 @@ model Contact {
   @@index([status])
   @@index([email])
 }
+
+/// Single-row cadence config (id = 1). Day numbers relative to first send.
+model OutreachConfig {
+  id           Int      @id @default(1)
+  sequenceDay1 Int      @default(1)
+  sequenceDay2 Int      @default(4)
+  sequenceDay3 Int      @default(9)
+  updatedAt    DateTime @updatedAt
+}

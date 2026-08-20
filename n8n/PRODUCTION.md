@@ -24,10 +24,12 @@ Endpoints (same contract as local Express portal):
 - `POST {BASE}/api/contacts`
 - `PATCH {BASE}/api/contacts/:id`
 - `GET  {BASE}/api/stats`
+- `GET  {BASE}/api/config` — email cadence (`sequenceDay1/2/3`) for workflow 03
+- `PUT  {BASE}/api/config` — update cadence (admin)
 - `POST {BASE}/api/triggers/discover` (admin) — fire n8n workflow 01
 - `POST {BASE}/api/triggers/mail` body `{ "track": "A"|"B" }` (admin) — fire workflow 03
 
-`GET /api/contacts?track=` supports partial match (e.g. `Track A` → `Track A - Startups`).
+Default cadence: Day 1 = 1, Day 2 = 4, Day 3 = 9. Status labels (`Day1 Sent` / `Day4 Sent` / `Day9 Sent`) stay as sequence position names.
 
 n8n webhook URLs are stored in `outreach_portal_config` (`n8n_webhook_base_url`, `n8n_discover_path`, `n8n_mail_path`).
 
