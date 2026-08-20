@@ -2,6 +2,17 @@
 
 > For Claude Cowork / the n8n workspace. The portal already exists in the **powerhousetech** GitHub repo (built by Cursor). Do not rebuild it.
 
+## Permanent production URL (use this for n8n)
+
+```
+PORTAL_BASE_URL=https://msratyvmnuvozuthgkmi.supabase.co/functions/v1/outreach-api
+PORTAL_API_KEY=<same Bearer secret Cowork already has>
+```
+
+Admin dashboard: https://powerhousetech.in/outreach/ (Google admin login).
+
+See `n8n/PRODUCTION.md`. Local Express in `/portal` remains for offline/dev.
+
 ## Where things live
 
 | Thing | Location |

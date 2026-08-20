@@ -132,6 +132,32 @@
   to = "/admin.html"
   status = 200
 
+# Outreach portal dashboard (admin Google sign-in; API on Supabase)
+[[redirects]]
+  from = "/outreach"
+  to = "/outreach/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/outreach/"
+  to = "/outreach/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/outreach/stats"
+  to = "/outreach/stats.html"
+  status = 200
+
+[[redirects]]
+  from = "/outreach/stats/"
+  to = "/outreach/stats.html"
+  status = 200
+
+[[redirects]]
+  from = "/outreach/contact"
+  to = "/outreach/contact.html"
+  status = 200
+
 # Invoice Radar sample dashboard (interactive demo data)
 [[redirects]]
   from = "/invoice-dashboard"
