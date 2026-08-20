@@ -2,6 +2,12 @@
 
 Node.js + Express + Prisma (SQLite) REST API and admin dashboard for n8n outreach workflows.
 
+## Production (Railway)
+
+See **[RAILWAY.md](./RAILWAY.md)** for deploying a permanent HTTPS URL + volume-backed SQLite so cloud n8n can reach the API.
+
+Quick checklist: Root Directory `portal` → Volume mount `/data` → set `PORTAL_API_KEY` + `DATABASE_URL=file:/data/portal.db` → Generate Domain → update n8n base URL.
+
 ## Auth (admin-only)
 
 | Caller | Auth |

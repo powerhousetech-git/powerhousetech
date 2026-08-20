@@ -33,6 +33,8 @@ http://localhost:3000
 
 When deploying the Node app, replace the base URL everywhere and update `outreachPortalUrl`.
 
+**Permanent hosting:** deploy `/portal` to Railway — see `portal/RAILWAY.md`. Quick tunnels (`*.trycloudflare.com`) are temporary.
+
 **Note:** `powerhousetech.in` is static Netlify. The outreach API is this separate Express app — not the marketing site HTML.
 
 ## Placeholders to replace in the 4 workflow JSONs
