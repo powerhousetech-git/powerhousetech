@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controls — Outreach Admin</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/png" href="https://powerhousetech.in/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div id="admin-gate" class="gate">
+    <div class="gate-card">
+      <h1>Admin access</h1>
+      <p class="muted" id="gate-msg">Checking your Google session…</p>
+      <p style="margin-top:16px"><button type="button" class="btn btn-primary" id="google-signin-btn">Sign in with Google</button></p>
+    </div>
+  </div>
+
+  <div id="admin-shell" class="shell hidden">
+    <aside class="side">
+      <div class="brand">Outreach</div>
+      <a data-nav="contacts" href="/">Contacts</a>
+      <a class="active" data-nav="controls" href="/controls">Controls</a>
+      <a data-nav="stats" href="/stats">Stats</a>
+      <div style="margin-top:auto;padding:12px 10px;font-size:.78rem;color:#777">
+        <div id="admin-email" class="muted"></div>
+        <button type="button" id="admin-signout" style="margin-top:8px;width:100%">Sign out</button>
+        <a class="btn" href="https://powerhousetech.in/admin" style="margin-top:8px;width:100%;justify-content:center">← Admin</a>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="top">
+        <div>
+          <h1>Controls</h1>
+          <p class="sub">Manually trigger outreach workflows (schedules still run automatically)</p>
+        </div>
+      </div>
+
+      <div class="controls-stack">
+        <section class="card control-card">
+          <h2>Lead Discovery</h2>
+          <p class="muted">Finds new contacts via Apollo and adds them to the database (both tracks).</p>
+          <div class="control-row">
+            <button type="button" class="btn btn-primary" id="btn-discover" data-label="Run Discovery">Run Discovery</button>
+            <span class="control-status" id="status-discover"></span>
+            <span class="muted" id="lastrun-discover">Last run: —</span>
+          </div>
+        </section>
+
+        <section class="card control-card">
+          <h2>Track A — Software/AI Startups</h2>
+          <p class="muted">Sends Day 1 / Day 4 / Day 9 emails for all Track A contacts currently due.</p>
+          <div class="control-row">
+            <button type="button" class="btn btn-primary" id="btn-mailA" data-label="Send Track A Emails">Send Track A Emails</button>
+            <span class="control-status" id="status-mailA"></span>
+            <span class="muted" id="lastrun-mailA">Last run: —</span>
+          </div>
+        </section>
+
+        <section class="card control-card">
+          <h2>Track B — EMS / Electronics Manufacturing</h2>
+          <p class="muted">Sends Day 1 / Day 4 / Day 9 emails for all Track B contacts currently due.</p>
+          <div class="control-row">
+            <button type="button" class="btn btn-primary" id="btn-mailB" data-label="Send Track B Emails">Send Track B Emails</button>
+            <span class="control-status" id="status-mailB"></span>
+            <span class="muted" id="lastrun-mailB">Last run: —</span>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="https://powerhousetech.in/js/firebase-boot.js"></script>
+  <script src="/app.js"></script>
+  <script>
+    (async () => {
+      const ui = window.OutreachUI;
+      if (!(await ui.requireAdminShell())) return;
+      ui.navActive('controls');
+
+      async function trigger(endpoint, body, buttonEl, statusEl, storageKey) {
+        buttonEl.disabled = true;
+        buttonEl.textContent = 'Triggering…';
+        statusEl.textContent = '';
+        statusEl.style.color = '';
+
+        try {
+          await ui.api(endpoint, { method: 'POST', body: body || {} });
+          localStorage.setItem(storageKey, String(Date.now()));
+          statusEl.textContent = 'Triggered!';
+          statusEl.style.color = '#4ade80';
+        } catch (err) {
+          statusEl.textContent = 'Failed — check n8n';
+          if (err && err.message) statusEl.title = err.message;
+          statusEl.style.color = '#f87171';
+        } finally {
+          setTimeout(() => {
+            buttonEl.disabled = false;
+            buttonEl.textContent = buttonEl.dataset.label;
+            statusEl.textContent = '';
+            statusEl.title = '';
+            renderLastRuns();
+          }, 3000);
+        }
+      }
+
+      function renderLastRuns() {
+        const keys = {
+          lastRun_discover: 'lastrun-discover',
+          lastRun_mailA: 'lastrun-mailA',
+          lastRun_mailB: 'lastrun-mailB',
+        };
+        for (const [storageKey, domId] of Object.entries(keys)) {
+          const ts = localStorage.getItem(storageKey);
+          const el = document.getElementById(domId);
+          if (!el) continue;
+          if (!ts) {
+            el.textContent = 'Last run: —';
+            continue;
+          }
+          const mins = Math.round((Date.now() - Number(ts)) / 60000);
+          el.textContent =
+            mins < 1
+              ? 'Last run: just now'
+              : `Last run: ${mins} min${mins !== 1 ? 's' : ''} ago`;
+        }
+      }
+
+      document.getElementById('btn-discover').addEventListener('click', () =>
+        trigger(
+          '/api/triggers/discover',
+          {},
+          document.getElementById('btn-discover'),
+          document.getElementById('status-discover'),
+          'lastRun_discover',
+        ),
+      );
+      document.getElementById('btn-mailA').addEventListener('click', () =>
+        trigger(
+          '/api/triggers/mail',
+          { track: 'A' },
+          document.getElementById('btn-mailA'),
+          document.getElementById('status-mailA'),
+          'lastRun_mailA',
+        ),
+      );
+      document.getElementById('btn-mailB').addEventListener('click', () =>
+        trigger(
+          '/api/triggers/mail',
+          { track: 'B' },
+          document.getElementById('btn-mailB'),
+          document.getElementById('status-mailB'),
+          'lastRun_mailB',
+        ),
+      );
+
+      renderLastRuns();
+      setInterval(renderLastRuns, 60000);
+    })();
+  </script>
+</body>
+</html>

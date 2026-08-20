@@ -158,6 +158,16 @@
   to = "/outreach/contact.html"
   status = 200
 
+[[redirects]]
+  from = "/outreach/controls"
+  to = "/outreach/controls.html"
+  status = 200
+
+[[redirects]]
+  from = "/outreach/controls/"
+  to = "/outreach/controls.html"
+  status = 200
+
 # Invoice Radar sample dashboard (interactive demo data)
 [[redirects]]
   from = "/invoice-dashboard"

@@ -131,6 +131,62 @@ function coerceDate(value: unknown): string | null | undefined {
   return d.toISOString();
 }
 
+async function getConfigMap(
+  db: ReturnType<typeof adminDb>,
+): Promise<Record<string, string>> {
+  const { data } = await db.from('outreach_portal_config').select('key,value');
+  const map: Record<string, string> = {};
+  for (const row of data || []) {
+    if (row?.key) map[row.key] = String(row.value ?? '');
+  }
+  return map;
+}
+
+async function fireN8nWebhook(
+  db: ReturnType<typeof adminDb>,
+  kind: 'discover' | 'mail',
+  body: Record<string, unknown> = {},
+) {
+  const cfg = await getConfigMap(db);
+  const base =
+    Deno.env.get('N8N_WEBHOOK_BASE_URL') ||
+    cfg.n8n_webhook_base_url ||
+    '';
+  const discoverPath =
+    Deno.env.get('N8N_DISCOVER_PATH') ||
+    cfg.n8n_discover_path ||
+    'outreach-discover';
+  const mailPath =
+    Deno.env.get('N8N_MAIL_PATH') ||
+    cfg.n8n_mail_path ||
+    'outreach-mail';
+
+  if (!base) {
+    const err = new Error('N8N_WEBHOOK_BASE_URL is not configured');
+    (err as Error & { status: number }).status = 503;
+    throw err;
+  }
+
+  const path = kind === 'discover' ? discoverPath : mailPath;
+  const url = `${base.replace(/\/$/, '')}/${String(path).replace(/^\//, '')}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) {
+    const err = new Error(`n8n returned ${res.status}`);
+    (err as Error & { status: number }).status = 502;
+    throw err;
+  }
+  try {
+    return await res.json();
+  } catch {
+    return { ok: true };
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return optionsResponse();
 
@@ -202,7 +258,8 @@ Deno.serve(async (req) => {
       if (email) q = q.eq('email', email.trim().toLowerCase());
       if (domain) q = q.eq('domain', domain.trim().toLowerCase());
       if (name) q = q.eq('name', name.trim());
-      if (track) q = q.eq('track', track);
+      // Partial match so ?track=Track+A matches "Track A - Startups"
+      if (track) q = q.ilike('track', `%${track}%`);
 
       q = q.order(column, { ascending }).limit(limit);
       const { data, error, count } = await q;
@@ -352,6 +409,49 @@ Deno.serve(async (req) => {
       }
       if (!row) return jsonResponse(404, { error: 'Contact not found' });
       return jsonResponse(200, { contact: toApi(row) });
+    }
+
+    // POST /api/triggers/discover — fire n8n workflow 01 (both tracks)
+    if (
+      req.method === 'POST' &&
+      (path === '/api/triggers/discover' || path === '/triggers/discover')
+    ) {
+      try {
+        const n8n = await fireN8nWebhook(db, 'discover');
+        return jsonResponse(200, { ok: true, message: 'Discovery triggered', n8n });
+      } catch (err) {
+        const status = (err as { status?: number })?.status || 502;
+        return jsonResponse(status, {
+          ok: false,
+          error: err instanceof Error ? err.message : 'Trigger failed',
+        });
+      }
+    }
+
+    // POST /api/triggers/mail — fire n8n workflow 03 for track A|B
+    if (
+      req.method === 'POST' &&
+      (path === '/api/triggers/mail' || path === '/triggers/mail')
+    ) {
+      const body = await req.json().catch(() => ({}));
+      const track = body?.track;
+      if (!['A', 'B'].includes(track)) {
+        return jsonResponse(400, { ok: false, error: 'track must be A or B' });
+      }
+      try {
+        const n8n = await fireN8nWebhook(db, 'mail', { track });
+        return jsonResponse(200, {
+          ok: true,
+          message: `Mail sequence triggered for Track ${track}`,
+          n8n,
+        });
+      } catch (err) {
+        const status = (err as { status?: number })?.status || 502;
+        return jsonResponse(status, {
+          ok: false,
+          error: err instanceof Error ? err.message : 'Trigger failed',
+        });
+      }
     }
 
     return jsonResponse(404, { error: 'Not found' });

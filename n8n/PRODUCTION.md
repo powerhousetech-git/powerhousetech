@@ -24,6 +24,14 @@ Endpoints (same contract as local Express portal):
 - `POST {BASE}/api/contacts`
 - `PATCH {BASE}/api/contacts/:id`
 - `GET  {BASE}/api/stats`
+- `POST {BASE}/api/triggers/discover` (admin) — fire n8n workflow 01
+- `POST {BASE}/api/triggers/mail` body `{ "track": "A"|"B" }` (admin) — fire workflow 03
+
+`GET /api/contacts?track=` supports partial match (e.g. `Track A` → `Track A - Startups`).
+
+n8n webhook URLs are stored in `outreach_portal_config` (`n8n_webhook_base_url`, `n8n_discover_path`, `n8n_mail_path`).
+
+Controls UI: https://powerhousetech.in/outreach/controls
 
 Find-replace any `trycloudflare.com` / `localhost:3000` base URL to the Supabase URL above, keep the Bearer key, re-import workflows.
 
@@ -31,3 +39,4 @@ You still configure in n8n manually:
 
 1. Gmail OAuth2 → workflows 03 & 04  
 2. Anthropic key (HTTP Header Auth, `x-api-key`) → workflow 03  
+3. Activate workflows 01 & 03 so webhook triggers work from Controls  

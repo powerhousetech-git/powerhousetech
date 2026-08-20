@@ -107,7 +107,8 @@ router.get(
     if (email) where.email = String(email).trim().toLowerCase();
     if (domain) where.domain = String(domain).trim().toLowerCase();
     if (name) where.name = String(name).trim();
-    if (track) where.track = String(track);
+    // Partial match so ?track=Track+A matches "Track A - Startups"
+    if (track) where.track = { contains: String(track) };
 
     const take = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 1000);
     const orderBy = parseSort(sort);
