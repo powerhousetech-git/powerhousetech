@@ -1,33 +1,50 @@
 # n8n outreach workflows
 
-Drop the four workflow JSON files here (from the Claude build pack):
+## Status
 
-- `01_lead_discovery.json`
-- `02_email_resolver.json`
-- `03_sequence_engine.json`
-- `04_reply_monitor.json`
-
-They are not in this repo yet. When you add them:
-
-## Placeholders to replace
-
-| Placeholder | Value |
+| File | In this repo? |
 |---|---|
-| `REPLACE_PORTAL_BASE_URL` | Outreach portal origin, e.g. `http://localhost:3000` |
-| `REPLACE_APOLLO_KEY_1` … `4` | Apollo API keys |
-| `REPLACE_ANTHROPIC_API_KEY` | Anthropic key |
+| `01_lead_discovery.json` | Drop from Cowork when ready |
+| `02_email_resolver.json` | Drop from Cowork when ready |
+| `03_sequence_engine.json` | Drop from Cowork when ready |
+| `04_reply_monitor.json` | Drop from Cowork when ready |
 
-## Auth header for portal HTTP nodes
+**Portal is already built** in `/portal` (Cursor). Read **[COWORK_HANDOFF.md](./COWORK_HANDOFF.md)** first.
+
+## Placeholders
+
+| Placeholder | Replace with |
+|---|---|
+| `REPLACE_PORTAL_BASE_URL` | Portal origin, e.g. `http://localhost:3000` |
+| `REPLACE_PORTAL_API_KEY` | Same as `portal/.env` → `PORTAL_API_KEY` |
+| `REPLACE_APOLLO_KEY_1` … `4` | Apollo API keys (workflow 01) |
+| `REPLACE_ANTHROPIC_API_KEY` | Anthropic key (workflow 03) |
+
+## Auth header (required on every portal HTTP Request node)
 
 ```
-Authorization: Bearer <PORTAL_API_KEY>
+Authorization: Bearer REPLACE_PORTAL_API_KEY
 ```
 
-Use the same secret as `portal/.env` → `PORTAL_API_KEY`.
+Without this, the portal returns `401 Sign in required`.  
+Google admin login (`shreyas@powerhousetech.in`) is **only** for the dashboard UI — not for n8n.
 
-## Import
+## Patch helper
 
-1. Start the portal (`cd portal && npm start`).
-2. In n8n: Import from file for each JSON.
-3. Configure Gmail OAuth2 for workflows 03 and 04.
-4. Smoke-test `GET /api/contacts` with the API key before activating schedules.
+```bash
+# After copying the 4 JSON files into this folder:
+node n8n/patch-portal-auth.js
+
+# Or replace placeholders in one shot:
+PORTAL_BASE_URL=http://localhost:3000 \
+PORTAL_API_KEY=your-secret \
+node n8n/patch-portal-auth.js --apply
+```
+
+## Import / activate
+
+1. `cd portal && npm start` (API at `http://localhost:3000`).
+2. Patch + import each JSON into n8n.
+3. Gmail OAuth2 for workflows 03 and 04.
+4. Smoke-test: `curl -H "Authorization: Bearer $KEY" http://localhost:3000/api/contacts?limit=1`
+5. Then activate schedules (01 every 3h, 02 hourly, 03 daily 08:00 IST, 04 every 2h).
