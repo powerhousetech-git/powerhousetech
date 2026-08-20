@@ -1,5 +1,7 @@
 window.PH_SITE = {
   calendlyUrl: 'https://calendly.com/shreyas-powerhousetech/30min',
+  /** Standalone outreach API + dashboard (admin-only). Override in prod. */
+  outreachPortalUrl: 'http://localhost:3000',
   demos: [
     {
       id: 'demo-outreach',

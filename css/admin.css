@@ -40,9 +40,12 @@ body {
   cursor: pointer;
   touch-action: manipulation;
 }
-.admin-side button.active {
-  background: rgba(66, 79, 209, 0.15);
-  color: #fff;
+.admin-side a.btn {
+  text-align: center;
+  margin-top: 8px;
+  width: 100%;
+  justify-content: center;
+  color: var(--text);
 }
 .admin-main { padding: 28px 32px 60px; }
 .admin-top {

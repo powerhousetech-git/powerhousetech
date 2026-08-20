@@ -253,6 +253,11 @@
     shellEl.classList.remove('hidden');
     document.getElementById('admin-email').textContent = me.email;
 
+    const outreach = document.getElementById('outreach-link');
+    if (outreach && window.PH_SITE?.outreachPortalUrl) {
+      outreach.href = window.PH_SITE.outreachPortalUrl;
+    }
+
     const [users, events] = await Promise.all([loadUsers(), loadEvents()]);
     await loadOverview(users, events);
     await loadEntitlements();

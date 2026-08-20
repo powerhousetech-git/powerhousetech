@@ -81,3 +81,10 @@ firebase-debug.log
 __pycache__/
 *.pyc
 nce_converter/
+
+# Outreach portal local DB + env
+portal/node_modules/
+portal/prisma/*.db
+portal/prisma/*.db-journal
+portal/.env
+
