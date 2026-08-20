@@ -1,127 +1,81 @@
 # Cowork ↔ Cursor handoff — Outreach portal + n8n
 
-> For Claude Cowork / the n8n workspace. The portal already exists in the **powerhousetech** GitHub repo (built by Cursor). Do not rebuild it.
+> For Claude Cowork / the n8n workspace. Do not rebuild the portal.
 
-## Permanent production URL (use this for n8n)
+## Paste this into n8n workflows (find-replace + re-import)
 
 ```
 PORTAL_BASE_URL=https://msratyvmnuvozuthgkmi.supabase.co/functions/v1/outreach-api
-PORTAL_API_KEY=<same Bearer secret Cowork already has>
+PORTAL_API_KEY=2e5559ab3d6c6c520534ad11841227924392e7a6d97f9bfb
 ```
 
-Admin dashboard: https://powerhousetech.in/outreach/ (Google admin login).
+1. Find-replace any `trycloudflare.com` or `localhost:3000` base → `PORTAL_BASE_URL` above.
+2. Ensure every portal HTTP node has:
 
-See `n8n/PRODUCTION.md`. Local Express in `/portal` remains for offline/dev.
+```
+Authorization: Bearer 2e5559ab3d6c6c520534ad11841227924392e7a6d97f9bfb
+```
 
-## Where things live
+3. Re-import the four workflow JSONs.
 
-| Thing | Location |
-|---|---|
-| Portal (API + admin dashboard) | GitHub `powerhousetech-git/powerhousetech` → `/portal` |
-| This handoff + n8n setup | `/n8n/` in that same repo |
-| n8n workflow JSONs (01–04) | Cowork workspace (not yet committed to GitHub) |
+Admin dashboard (Google as `shreyas@powerhousetech.in`): https://powerhousetech.in/outreach/
+
+Full endpoint list: `n8n/PRODUCTION.md`.
+
+## You still do in n8n (manual)
+
+1. **Gmail OAuth2** → Settings → Credentials → assign to workflows **03 & 04**
+2. **Anthropic key** → HTTP Header Auth, header `x-api-key` → assign to workflow **03**
 
 ## Two different “logins” — do not confuse them
 
 | Who | How they auth | Used for |
 |---|---|---|
-| **Shreyas (human)** | Google sign-in as `shreyas@powerhousetech.in` (admin) | Dashboard UI at the portal URL (contacts / stats) |
-| **n8n (machine)** | `Authorization: Bearer <PORTAL_API_KEY>` | Every HTTP Request node that calls `/api/contacts` or `/api/stats` |
+| **Shreyas (human)** | Google sign-in as `shreyas@powerhousetech.in` | Dashboard at `/outreach/` |
+| **n8n (machine)** | `Authorization: Bearer <PORTAL_API_KEY>` | Every HTTP Request node to `/api/contacts` or `/api/stats` |
 
 n8n **cannot** use Google admin login. If portal HTTP nodes return `401 Sign in required`, the Bearer API key header is missing.
 
-## Portal URL
+## Endpoints n8n should call
 
-Local (Cursor already has it running):
-
-```
-http://localhost:3000
-```
-
-- Health (no auth): `GET http://localhost:3000/api/health` → `{"ok":true,"service":"outreach-portal"}`
-- Dashboard: open that origin in a browser → Sign in with Google as `shreyas@powerhousetech.in`
-- Main site Admin also links via `PH_SITE.outreachPortalUrl` (`js/site-config.js`)
-
-When deploying the Node app, replace the base URL everywhere and update `outreachPortalUrl`.
-
-**Permanent hosting:** deploy `/portal` to Railway — see `portal/RAILWAY.md`. Quick tunnels (`*.trycloudflare.com`) are temporary.
-
-**Note:** `powerhousetech.in` is static Netlify. The outreach API is this separate Express app — not the marketing site HTML.
-
-## Placeholders to replace in the 4 workflow JSONs
-
-| Placeholder | Replace with |
-|---|---|
-| `REPLACE_PORTAL_BASE_URL` | `http://localhost:3000` (or deployed HTTPS origin) |
-| `REPLACE_PORTAL_API_KEY` | Same value as `portal/.env` → `PORTAL_API_KEY` |
-| `REPLACE_APOLLO_KEY_1` … `4` | Apollo keys (workflow 01) |
-| `REPLACE_ANTHROPIC_API_KEY` | Anthropic key (workflow 03) |
-
-## Required header on every portal HTTP node
-
-```
-Authorization: Bearer REPLACE_PORTAL_API_KEY
-```
-
-After substitution:
-
-```
-Authorization: Bearer <actual-secret>
-```
-
-Endpoints n8n should call:
-
-- `GET {BASE}/api/contacts?...`
+- `GET  {BASE}/api/health` (no auth)
+- `GET  {BASE}/api/contacts?...`
 - `POST {BASE}/api/contacts`
 - `PATCH {BASE}/api/contacts/:id`
+- `GET  {BASE}/api/stats`
 
-## Patch script (in this repo)
-
-If you copy the four JSON files into `/n8n/`:
-
-```bash
-# From repo root
-node n8n/patch-portal-auth.js
-```
-
-That script:
-
-1. Ensures every portal HTTP node has the Authorization header (adds if missing).
-2. Leaves `REPLACE_*` placeholders intact unless you pass `--apply` with env vars.
+## Smoke test
 
 ```bash
-PORTAL_BASE_URL=http://localhost:3000 \
-PORTAL_API_KEY=your-secret \
-node n8n/patch-portal-auth.js --apply
-```
-
-Then re-import the patched JSONs into n8n (or paste header manually once).
-
-## Smoke test before activating schedules
-
-```bash
-export KEY='your-PORTAL_API_KEY'
-export BASE='http://localhost:3000'
+export KEY='2e5559ab3d6c6c520534ad11841227924392e7a6d97f9bfb'
+export BASE='https://msratyvmnuvozuthgkmi.supabase.co/functions/v1/outreach-api'
 
 curl -sS "$BASE/api/health"
 curl -sS "$BASE/api/contacts?limit=1" -H "Authorization: Bearer $KEY"
+curl -sS "$BASE/api/stats" -H "Authorization: Bearer $KEY"
 ```
 
-Expect JSON contacts payload, not `{"error":"Sign in required"}`.
+Expect JSON, not `{"error":"Sign in required"}`.
 
-## Workflow schedule reminder (already in n8n)
+## Workflow schedule reminder
 
 1. **01 Lead Discovery** — every 3h — Apollo → create contacts  
 2. **02 Email Resolver** — hourly — Queue → Email Found  
 3. **03 Sequence Engine** — daily 08:00 IST — Day1/4/9 via Claude + Gmail  
 4. **04 Reply Monitor** — every 2h — Gmail → Replied  
 
-Also configure **Gmail OAuth2** in n8n for workflows 03 and 04 before activating.
+## Optional: patch script
 
-## If Cowork cannot see `/portal`
-
-Pull / open the GitHub repo `powerhousetech-git/powerhousetech` (branch `main`). The portal is committed there. Start with:
+If workflow JSONs are copied into `/n8n/`:
 
 ```bash
-cd portal && cp .env.example .env && npm install && npx prisma migrate dev && npm start
+PORTAL_BASE_URL=https://msratyvmnuvozuthgkmi.supabase.co/functions/v1/outreach-api \
+PORTAL_API_KEY=2e5559ab3d6c6c520534ad11841227924392e7a6d97f9bfb \
+node n8n/patch-portal-auth.js --apply
 ```
+
+Then re-import.
+
+## Local Express (dev only)
+
+`/portal` remains for offline/dev. Production for n8n is the Supabase URL above — not Railway, not Cloudflare tunnels.
