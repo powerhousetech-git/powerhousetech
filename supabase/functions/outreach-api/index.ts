@@ -11,10 +11,12 @@ import {
   isValidEmail,
   newId,
   normalizeCadence,
+  normalizeStatus,
   parseCadenceDays,
   parseCsv,
   renderTemplate,
   slugify,
+  statusesCompletedFollowUp,
   trackForIndustrySlug,
   type Status,
 } from '../_shared/outreach-helpers.ts';
@@ -1287,10 +1289,10 @@ Deno.serve(async (req) => {
           if (error) throw error;
           rows = data || [];
         } else {
-          const prevStatus = `Follow${i} Sent`;
+          const prevStatuses = statusesCompletedFollowUp(i);
           const gapDays = activeDays[i] - activeDays[i - 1];
           const cutoffDate = new Date(now.getTime() - gapDays * 24 * 60 * 60 * 1000);
-          let q = db.from('outreach_contacts').select('*').eq('status', prevStatus).limit(60);
+          let q = db.from('outreach_contacts').select('*').in('status', prevStatuses).limit(60);
           if (track) q = q.eq('track', track);
           if (resolvedIndustryId) q = q.eq('industry_id', resolvedIndustryId);
           const { data, error } = await q;
@@ -1466,7 +1468,7 @@ Deno.serve(async (req) => {
         if (followUpNum === 2) data.day4_sent_at = sentAt;
         if (followUpNum === 3) data.day9_sent_at = sentAt;
         if (body.status != null) {
-          const st = String(body.status);
+          const st = normalizeStatus(body.status);
           if (!STATUSES.includes(st as Status)) {
             return jsonResponse(400, { error: 'Invalid status. Use: ' + STATUSES.join(', ') });
           }
@@ -1528,10 +1530,11 @@ Deno.serve(async (req) => {
           continue;
         }
         if (k === 'status') {
-          if (!STATUSES.includes(String(body[k]) as Status)) {
+          const st = normalizeStatus(body[k]);
+          if (!STATUSES.includes(st as Status)) {
             return jsonResponse(400, { error: 'Invalid status. Use: ' + STATUSES.join(', ') });
           }
-          data[col] = String(body[k]);
+          data[col] = st;
           continue;
         }
         if (k === 'email') {

@@ -6,6 +6,8 @@ const {
   FOLLOW_STATUSES,
   DEFAULT_CADENCE,
   normalizeCadence,
+  normalizeStatus,
+  statusesCompletedFollowUp,
 } = require('../lib/outreach');
 
 const router = express.Router();
@@ -190,11 +192,12 @@ router.get(
           take: 60,
         });
       } else {
-        const prevStatus = `Follow${i} Sent`;
+        // Completed previous step: Follow{i} Sent (+ legacy Day1/Day4/Day9)
+        const prevStatuses = statusesCompletedFollowUp(i);
         const gapDays = activeDays[i] - activeDays[i - 1];
         const cutoffDate = new Date(now.getTime() - gapDays * 24 * 60 * 60 * 1000);
         const candidates = await prisma.contact.findMany({
-          where: { status: prevStatus, ...baseWhere },
+          where: { status: { in: prevStatuses }, ...baseWhere },
           take: 60,
         });
         contacts = candidates.filter((c) => {
@@ -369,7 +372,7 @@ router.patch(
       if (followUpNum === 3) data.day9SentAt = sentAt;
 
       if (body.status != null) {
-        const st = String(body.status);
+        const st = normalizeStatus(body.status);
         if (!STATUSES.includes(st)) {
           return jsonError(res, 400, 'Invalid status. Use: ' + STATUSES.join(', '));
         }
@@ -413,10 +416,11 @@ router.patch(
         continue;
       }
       if (key === 'status') {
-        if (!STATUSES.includes(String(value))) {
+        const st = normalizeStatus(value);
+        if (!STATUSES.includes(st)) {
           return jsonError(res, 400, 'Invalid status. Use: ' + STATUSES.join(', '));
         }
-        data.status = String(value);
+        data.status = st;
         continue;
       }
       if (key === 'email') {

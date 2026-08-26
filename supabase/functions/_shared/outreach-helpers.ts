@@ -5,6 +5,12 @@
 
 export const FOLLOW_STATUSES = Array.from({ length: 10 }, (_, i) => `Follow${i + 1} Sent`);
 
+export const LEGACY_STATUS_MAP: Record<string, string> = {
+  'Day1 Sent': 'Follow1 Sent',
+  'Day4 Sent': 'Follow2 Sent',
+  'Day9 Sent': 'Follow3 Sent',
+};
+
 export const STATUSES = [
   'Queue',
   'Email Found',
@@ -17,6 +23,20 @@ export const STATUSES = [
 export type Status = (typeof STATUSES)[number];
 
 export const ACTIVE_PIPELINE: string[] = ['Email Found', ...FOLLOW_STATUSES];
+
+/** Statuses meaning "completed follow-up N" (1-indexed), including legacy Day labels. */
+export function statusesCompletedFollowUp(n: number): string[] {
+  const modern = `Follow${n} Sent`;
+  if (n === 1) return [modern, 'Day1 Sent'];
+  if (n === 2) return [modern, 'Day4 Sent'];
+  if (n === 3) return [modern, 'Day9 Sent'];
+  return [modern];
+}
+
+export function normalizeStatus(status: unknown): string {
+  const s = String(status || '');
+  return LEGACY_STATUS_MAP[s] || s;
+}
 
 export const DEFAULT_CADENCE: (number | null)[] = [
   1,
