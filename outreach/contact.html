@@ -21,17 +21,7 @@
   </div>
 
   <div id="admin-shell" class="shell hidden">
-    <aside class="side">
-      <div class="brand">Outreach</div>
-      <a data-nav="contacts" href="/outreach/">Contacts</a>
-      <a data-nav="controls" href="/outreach/controls">Controls</a>
-      <a data-nav="stats" href="/outreach/stats">Stats</a>
-      <div style="margin-top:auto;padding:12px 10px;font-size:.78rem;color:#777">
-        <div id="admin-email" class="muted"></div>
-        <button type="button" id="admin-signout" style="margin-top:8px;width:100%">Sign out</button>
-        <a class="btn" href="https://powerhousetech.in/admin" style="margin-top:8px;width:100%;justify-content:center">← Admin</a>
-      </div>
-    </aside>
+    <aside class="side nav-side" id="side-nav"></aside>
 
     <main class="main">
       <div class="top">
@@ -88,13 +78,13 @@
     };
     window.dispatchEvent(new CustomEvent('ph-firebase-ready'));
   </script>
-  <script src="/outreach/app.js?v=2"></script>
+  <script src="/outreach/app.js?v=5"></script>
   <script>
     (async function () {
       const ui = window.OutreachUI;
       const me = await ui.requireAdminShell();
       if (!me) return;
-      ui.navActive('contacts');
+      await ui.renderIndustrySidebar('dashboard', me.email);
 
       const id = new URLSearchParams(location.search).get('id');
       if (!id) {

@@ -168,6 +168,14 @@
   to = "/outreach/controls.html"
   status = 200
 
+# Per-industry admin page (clean URL) — proxy rewrite (200) keeps the browser
+# URL as /outreach/industry/:slug so industry.html can read the slug from
+# location.pathname (and ?tab=... from location.search is preserved as-is).
+[[redirects]]
+  from = "/outreach/industry/*"
+  to = "/outreach/industry.html"
+  status = 200
+
 # Invoice Radar sample dashboard (interactive demo data)
 [[redirects]]
   from = "/invoice-dashboard"

@@ -76,8 +76,8 @@ function serialize(contact) {
   };
 }
 
-function serializeSeqContact(contact) {
-  return {
+function serializeSeqContact(contact, template = null) {
+  const base = {
     id: contact.id,
     name: contact.name,
     firstName: contact.firstName,
@@ -89,7 +89,18 @@ function serializeSeqContact(contact) {
     country: contact.country,
     track: contact.track,
     status: contact.status,
+    industryId: contact.industryId || null,
+    templateSubject: null,
+    templateBody: null,
+    templateType: null,
   };
+  if (template) {
+    const { renderTemplate } = require('../lib/outreach');
+    base.templateSubject = renderTemplate(template.subject, contact);
+    base.templateBody = renderTemplate(template.body, contact);
+    base.templateType = template.templateType || 'ai';
+  }
+  return base;
 }
 
 function prevSentAt(contact, prevFollowUpNum) {
@@ -105,16 +116,68 @@ function prevSentAt(contact, prevFollowUpNum) {
   return null;
 }
 
+async function resolveCadence(industryId) {
+  if (industryId) {
+    const ic = await prisma.industryConfig.findUnique({
+      where: { industryId },
+    });
+    if (ic) {
+      return {
+        source: 'industry',
+        cadenceDays: normalizeCadence(ic.cadenceDays),
+      };
+    }
+  }
+  const config = await prisma.outreachConfig.findUnique({ where: { id: 1 } });
+  return {
+    source: 'global',
+    cadenceDays: normalizeCadence(config?.cadenceDays ?? DEFAULT_CADENCE),
+  };
+}
+
 /** GET /api/contacts/sequence-ready — n8n batching for workflow 03 */
 router.get(
   '/sequence-ready',
   asyncHandler(async (req, res) => {
     const track = req.query.track ? String(req.query.track) : null;
-    const config = await prisma.outreachConfig.findUnique({ where: { id: 1 } });
-    const cadenceDays = normalizeCadence(config?.cadenceDays ?? DEFAULT_CADENCE);
+    const industryId = req.query.industryId
+      ? String(req.query.industryId)
+      : req.query.industry
+        ? String(req.query.industry)
+        : null;
+
+    let resolvedIndustryId = industryId;
+    if (industryId && !industryId.startsWith('c') && industryId.length < 30) {
+      // allow slug
+      const ind = await prisma.industry.findFirst({
+        where: { OR: [{ id: industryId }, { slug: industryId }] },
+      });
+      resolvedIndustryId = ind?.id || industryId;
+    }
+
+    const { cadenceDays, source } = await resolveCadence(resolvedIndustryId);
     const activeDays = cadenceDays.filter((d) => d !== null);
     const now = new Date();
     const groups = [];
+    const templateCache = new Map();
+
+    async function templateFor(indId, followUpNum) {
+      if (!indId) return null;
+      const key = `${indId}:${followUpNum}`;
+      if (templateCache.has(key)) return templateCache.get(key);
+      const t = await prisma.emailTemplate.findUnique({
+        where: {
+          industryId_followUpNum: { industryId: indId, followUpNum },
+        },
+      });
+      templateCache.set(key, t && t.isActive ? t : null);
+      return templateCache.get(key);
+    }
+
+    const baseWhere = {
+      ...(track ? { track: { contains: track } } : {}),
+      ...(resolvedIndustryId ? { industryId: resolvedIndustryId } : {}),
+    };
 
     for (let i = 0; i < activeDays.length; i++) {
       const followUpNum = i + 1;
@@ -123,10 +186,7 @@ router.get(
 
       if (i === 0) {
         contacts = await prisma.contact.findMany({
-          where: {
-            status: 'Email Found',
-            ...(track ? { track } : {}),
-          },
+          where: { status: 'Email Found', ...baseWhere },
           take: 60,
         });
       } else {
@@ -134,10 +194,7 @@ router.get(
         const gapDays = activeDays[i] - activeDays[i - 1];
         const cutoffDate = new Date(now.getTime() - gapDays * 24 * 60 * 60 * 1000);
         const candidates = await prisma.contact.findMany({
-          where: {
-            status: prevStatus,
-            ...(track ? { track } : {}),
-          },
+          where: { status: prevStatus, ...baseWhere },
           take: 60,
         });
         contacts = candidates.filter((c) => {
@@ -148,10 +205,15 @@ router.get(
       }
 
       if (contacts.length > 0) {
+        const enriched = [];
+        for (const c of contacts) {
+          const tmpl = await templateFor(c.industryId, followUpNum);
+          enriched.push(serializeSeqContact(c, tmpl));
+        }
         groups.push({
           followUpNum,
           dayInSequence,
-          contacts: contacts.map(serializeSeqContact),
+          contacts: enriched,
         });
       }
     }
@@ -159,6 +221,7 @@ router.get(
     res.json({
       groups,
       activeDays,
+      cadenceSource: source,
       totalContacts: groups.reduce((sum, g) => sum + g.contacts.length, 0),
     });
   }),
@@ -175,6 +238,7 @@ router.get(
       domain,
       name,
       track,
+      industryId: industryQ,
       limit,
       sort,
     } = req.query;
@@ -197,6 +261,7 @@ router.get(
     if (domain) where.domain = String(domain).trim().toLowerCase();
     if (name) where.name = String(name).trim();
     if (track) where.track = { contains: String(track) };
+    if (industryQ) where.industryId = String(industryQ);
 
     const take = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 1000);
     const orderBy = parseSort(sort);
@@ -323,6 +388,7 @@ router.patch(
           contactId: contact.id,
           followUpNum,
           track: contact.track,
+          industryId: body.industryId || contact.industryId || null,
           sentAt,
         },
       });

@@ -12,6 +12,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
+    "seed:industries": "node scripts/seed-industries.js",
     "postinstall": "prisma generate"
   },
   "engines": {
@@ -19,8 +20,10 @@
   },
   "license": "UNLICENSED",
   "dependencies": {
+    "@paralleldrive/cuid2": "^3.3.0",
     "@prisma/client": "6.16.2",
     "cors": "^2.8.5",
+    "cuid": "^3.0.0",
     "dotenv": "^17.2.2",
     "express": "^5.1.0"
   },

@@ -30,8 +30,21 @@ Endpoints (same contract as local Express portal):
 - `POST {BASE}/api/triggers/discover` (admin) — fire n8n workflow 01
 - `POST {BASE}/api/triggers/mail` body `{ "track": "A"|"B" }` (admin) — fire workflow 03
 
-Statuses: `Follow1 Sent` … `Follow10 Sent` (replaces Day1/Day4/Day9 Sent).
-Default cadence: `[1,4,9,null×7]`.
+## Multi-industry (V3)
+
+- `GET/POST /api/industries`
+- `GET/PUT/DELETE /api/industries/:idOrSlug` (DELETE soft-archives)
+- `GET/PUT/DELETE /api/industries/:id/config` — per-industry cadence
+- `GET/POST /api/industries/:id/templates` + `PUT/DELETE .../templates/:templateId`
+- `GET /api/industries/:id/stats`
+- `POST /api/industries/:id/contacts/import-csv`
+- `POST /api/industries/:id/contacts/apollo-search`
+- `POST /api/industries/:id/historical-import`
+- `GET /api/contacts/sequence-ready` now returns `templateSubject` / `templateBody` / `templateType`
+
+UI: `/outreach/` (global) · `/outreach/industry/{slug}` (tabs) · `/outreach/controls`
+
+See `n8n/V3_N8N_NOTES.md` for workflow 03 template routing updates.
 
 n8n webhook URLs are stored in `outreach_portal_config` (`n8n_webhook_base_url`, `n8n_discover_path`, `n8n_mail_path`).
 

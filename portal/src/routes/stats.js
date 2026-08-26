@@ -57,6 +57,28 @@ router.get(
       _count: { id: true },
     });
 
+    const industries = await prisma.industry.findMany({
+      where: { isArchived: false },
+    });
+    const byIndustry = {};
+    for (const ind of industries) {
+      const [allTime, today] = await Promise.all([
+        prisma.emailLog.count({ where: { industryId: ind.id } }),
+        prisma.emailLog.count({
+          where: { industryId: ind.id, sentAt: { gte: startOfToday } },
+        }),
+      ]);
+      const hist = await prisma.historicalSend.aggregate({
+        where: { industryId: ind.id },
+        _sum: { count: true },
+      });
+      byIndustry[ind.slug] = {
+        name: ind.name,
+        total: allTime + (hist._sum.count || 0),
+        today,
+      };
+    }
+
     res.json({
       total,
       pipeline,
@@ -68,6 +90,7 @@ router.get(
         track: r.track || 'Unspecified',
         count: r._count.id,
       })),
+      byIndustry,
       replyRate,
       emailVolume: {
         today: {
@@ -93,7 +116,6 @@ router.get(
         followUpNum: l.followUpNum,
         sentAt: l.sentAt.toISOString(),
       })),
-      // Back-compat for older stats page snippets
       emailsSentToday: {
         total: todayLogs.length,
         day1: todayLogs.filter((l) => l.followUpNum === 1).length,

@@ -377,3 +377,365 @@ tr.clickable:hover { background: rgba(66, 79, 209, 0.08); }
   .kpis, .detail-grid, .cadence-grid { grid-template-columns: 1fr; }
   .field { grid-template-columns: 1fr; }
 }
+
+/* ---- Shared industry sidebar (.nav-side, 220px via .shell grid) ------- */
+.nav-side {
+  width: 100%;
+  min-width: 0;
+}
+.side .nav-label {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 14px 12px 4px;
+}
+.side .nav-industries {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.side .nav-loading,
+.side .nav-empty {
+  padding: 8px 12px;
+  font-size: 0.82rem;
+}
+.side a.nav-industry-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.side a.nav-industry-link.archived {
+  opacity: 0.5;
+}
+.nav-dot {
+  width: 9px;
+  height: 9px;
+  min-width: 9px;
+  border-radius: 50%;
+}
+.nav-industry-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nav-archived-tag {
+  display: inline-flex;
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(107, 114, 128, 0.25);
+  color: var(--muted);
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.side .nav-add-btn {
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  margin: 6px 4px 0;
+  text-align: center;
+  font-size: 0.85rem;
+}
+.side .nav-add-btn:hover {
+  color: #fff;
+  border-color: var(--primary);
+}
+.side .nav-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 10px 4px;
+}
+.side .nav-bottom {
+  margin-top: auto;
+  padding: 12px 10px;
+  font-size: 0.78rem;
+  color: #777;
+}
+.nav-settings-note {
+  font-size: 0.74rem;
+  line-height: 1.4;
+  margin: 0 0 10px;
+}
+
+/* ---- By-industry dashboard cards --------------------------------------- */
+.industry-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.industry-card {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  transition: border-color 0.15s ease;
+}
+.industry-card:hover {
+  border-color: var(--primary);
+}
+.industry-card.archived {
+  opacity: 0.55;
+}
+.industry-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+}
+.industry-dot-lg {
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  border-radius: 50%;
+}
+.industry-card-desc {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.industry-card-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 14px 0 10px;
+}
+.industry-card-stats > div {
+  display: flex;
+  flex-direction: column;
+}
+.industry-card-stats .v {
+  font-size: 1.1rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.industry-card-stats .k {
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.industry-card-view {
+  color: var(--primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+/* ---- Industry detail page header + tabs -------------------------------- */
+.industry-header .industry-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.industry-header h1 { margin: 0; }
+.tabs-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+.tab-btn {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 10px 16px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab-btn:hover { color: #fff; }
+.tab-btn.active {
+  color: #fff;
+  border-bottom-color: var(--primary);
+}
+.tab-panel.hidden { display: none; }
+
+/* ---- Templates tab ------------------------------------------------------ */
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+.template-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+}
+.template-card-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+  border-style: dashed;
+}
+.template-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.template-subject {
+  font-size: 0.82rem;
+  margin-bottom: 8px;
+}
+.template-preview {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--muted);
+  margin: 0;
+  font-family: inherit;
+}
+
+/* ---- Import tab --------------------------------------------------------- */
+.import-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 18px;
+}
+.csv-textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 0.82rem;
+  resize: vertical;
+}
+.hist-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 0.82rem;
+}
+@media (max-width: 900px) {
+  .import-grid { grid-template-columns: 1fr; }
+}
+
+/* ---- Modal --------------------------------------------------------------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 50;
+}
+.modal-card {
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.modal-header h2 { margin: 0; font-size: 1.1rem; }
+.modal-x {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.modal-x:hover { color: #fff; }
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.modal-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin: 10px 0 2px;
+}
+.modal-body input[type="text"],
+.modal-body input[type="number"],
+.modal-body input[type="date"],
+.modal-body select,
+.modal-body textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font: inherit;
+}
+.modal-body textarea { resize: vertical; }
+.modal-preview {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 0.82rem;
+  margin-top: 4px;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+.color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.color-swatch.active {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px var(--primary);
+}
+
+@media (max-width: 900px) {
+  .industry-cards-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 560px) {
+  .industry-cards-grid { grid-template-columns: 1fr; }
+  .industry-card-stats { grid-template-columns: repeat(2, 1fr); }
+}

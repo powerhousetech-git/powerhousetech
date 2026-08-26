@@ -7,6 +7,68 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Industry {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  color       String   @default("#6366f1")
+  isArchived  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  contacts        Contact[]
+  templates       EmailTemplate[]
+  config          IndustryConfig?
+  emailLogs       EmailLog[]
+  historicalSends HistoricalSend[]
+}
+
+model EmailTemplate {
+  id           String   @id @default(cuid())
+  industryId   String
+  followUpNum  Int
+  name         String
+  subject      String
+  body         String
+  templateType String   @default("ai") // "static" | "ai"
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  industry Industry @relation(fields: [industryId], references: [id], onDelete: Cascade)
+
+  // TODO: relax for A/B testing — one template per step per industry for now
+  @@unique([industryId, followUpNum])
+}
+
+model IndustryConfig {
+  id          String   @id @default(cuid())
+  industryId  String   @unique
+  cadenceDays Json     @default("[1,4,9,null,null,null,null,null,null,null]")
+  updatedAt   DateTime @updatedAt
+
+  industry Industry @relation(fields: [industryId], references: [id], onDelete: Cascade)
+}
+
+model HistoricalSend {
+  id          String   @id @default(cuid())
+  industryId  String
+  followUpNum Int
+  count       Int
+  trackA      Int      @default(0)
+  trackB      Int      @default(0)
+  periodStart DateTime
+  periodEnd   DateTime
+  note        String?
+  createdAt   DateTime @default(now())
+
+  industry Industry @relation(fields: [industryId], references: [id], onDelete: Cascade)
+
+  @@index([industryId])
+  @@index([followUpNum])
+}
+
 model Contact {
   id              String     @id @default(uuid())
   name            String
@@ -17,27 +79,27 @@ model Contact {
   domain          String
   title           String?
   country         String?
-  track           String? // "Track A - Startups" | "Track B - EMS"
+  track           String?
+  industryId      String?
   status          String     @default("Queue")
   source          String?    @default("Apollo")
   allPermutations String?
-  // Legacy timestamps kept for backwards compatibility
   day1SentAt      DateTime?
   day4SentAt      DateTime?
   day9SentAt      DateTime?
-  /// Map of follow-up number → ISO timestamp, e.g. {"1":"...","2":"..."}
   followUpDates   Json?
   repliedAt       DateTime?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   emailLogs       EmailLog[]
+  industry        Industry?  @relation(fields: [industryId], references: [id])
 
   @@unique([domain, name])
   @@index([status])
   @@index([email])
+  @@index([industryId])
 }
 
-/// Single-row cadence config (id = 1). Exactly 10 slots; null = inactive.
 model OutreachConfig {
   id          Int      @id @default(1)
   cadenceDays Json     @default("[1,4,9,null,null,null,null,null,null,null]")
@@ -45,14 +107,17 @@ model OutreachConfig {
 }
 
 model EmailLog {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   contactId   String
-  followUpNum Int // 1 = initial, 2 = first follow-up, …
+  followUpNum Int
   track       String?
-  sentAt      DateTime @default(now())
-  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  industryId  String?
+  sentAt      DateTime  @default(now())
+  contact     Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  industry    Industry? @relation(fields: [industryId], references: [id])
 
   @@index([sentAt])
   @@index([followUpNum])
   @@index([track])
+  @@index([industryId])
 }

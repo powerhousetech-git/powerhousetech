@@ -1,0 +1,2 @@
+-- Multi-industry V3 (reference; applied via Supabase MCP)
+-- See apply_migration outreach_multi_industry_v3

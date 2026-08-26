@@ -1,21 +1,37 @@
-/** Shared outreach helpers (Express portal). */
+/**
+ * Shared outreach helpers for the outreach-api edge function.
+ * Mirrors /workspace/portal/src/lib/outreach.js (kept in sync intentionally).
+ */
 
-const FOLLOW_STATUSES = Array.from({ length: 10 }, (_, i) => `Follow${i + 1} Sent`);
+export const FOLLOW_STATUSES = Array.from({ length: 10 }, (_, i) => `Follow${i + 1} Sent`);
 
-const STATUSES = [
+export const STATUSES = [
   'Queue',
   'Email Found',
   ...FOLLOW_STATUSES,
   'Replied',
   'Bounced',
   'Unsubscribed',
+] as const;
+
+export type Status = (typeof STATUSES)[number];
+
+export const ACTIVE_PIPELINE: string[] = ['Email Found', ...FOLLOW_STATUSES];
+
+export const DEFAULT_CADENCE: (number | null)[] = [
+  1,
+  4,
+  9,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
 ];
 
-const ACTIVE_PIPELINE = ['Email Found', ...FOLLOW_STATUSES];
-
-const DEFAULT_CADENCE = [1, 4, 9, null, null, null, null, null, null, null];
-
-function slugify(name) {
+export function slugify(name: unknown): string {
   return String(name || '')
     .toLowerCase()
     .trim()
@@ -24,70 +40,80 @@ function slugify(name) {
     .slice(0, 64);
 }
 
-function trackForIndustrySlug(slug, name) {
+export function trackForIndustrySlug(slug: unknown, name?: unknown): string {
   if (slug === 'ems') return 'Track B - EMS';
   if (slug === 'saas-startups') return 'Track A - Startups';
-  return name || slug;
+  return (name as string) || (slug as string) || '';
 }
 
-function parseCadenceDays(raw) {
+export type CadenceParseResult =
+  | { ok: false; error: string }
+  | { ok: true; error?: undefined; days: (number | null)[] };
+
+export function parseCadenceDays(raw: unknown): CadenceParseResult {
   if (!Array.isArray(raw) || raw.length !== 10) {
-    return { error: 'cadenceDays must be an array of exactly 10 elements.' };
+    return { ok: false, error: 'cadenceDays must be an array of exactly 10 elements.' };
   }
 
-  const days = raw.map((v) => {
-    if (v === null || v === undefined || v === '') return null;
-    const n = Number.parseInt(v, 10);
-    if (!Number.isInteger(n) || n < 1) return { bad: true };
-    return n;
-  });
-
-  if (days.some((d) => d && typeof d === 'object' && d.bad)) {
-    return { error: 'Each element must be null or a positive integer > 0.' };
+  const days: (number | null)[] = [];
+  for (const v of raw) {
+    if (v === null || v === undefined || v === '') {
+      days.push(null);
+      continue;
+    }
+    const n = Number.parseInt(String(v), 10);
+    if (!Number.isInteger(n) || n < 1) {
+      return { ok: false, error: 'Each element must be null or a positive integer > 0.' };
+    }
+    days.push(n);
   }
 
   let seenNull = false;
   for (const d of days) {
     if (d === null) seenNull = true;
     else if (seenNull) {
-      return { error: 'Non-null values must all come before null values (no gaps).' };
+      return { ok: false, error: 'Non-null values must all come before null values (no gaps).' };
     }
   }
 
-  const active = days.filter((d) => d !== null);
+  const active = days.filter((d): d is number => d !== null);
   for (let i = 1; i < active.length; i++) {
     if (!(active[i - 1] < active[i])) {
-      return { error: 'Days must be strictly ascending.' };
+      return { ok: false, error: 'Days must be strictly ascending.' };
     }
   }
-  if (active.length && active[0] < 1) {
-    return { error: 'First non-null value must be >= 1.' };
-  }
 
-  return { days };
+  return { ok: true, days };
 }
 
-function normalizeCadence(value) {
-  if (Array.isArray(value) && value.length === 10) return value;
+export function normalizeCadence(value: unknown): (number | null)[] {
+  if (Array.isArray(value) && value.length === 10) {
+    return value.map((v) => (v === null || v === undefined ? null : Number(v)));
+  }
   if (value && typeof value === 'object' && !Array.isArray(value)) {
-    const d1 = value.sequenceDay1 ?? 1;
-    const d2 = value.sequenceDay2 ?? 4;
-    const d3 = value.sequenceDay3 ?? 9;
-    return [d1, d2, d3, null, null, null, null, null, null, null];
+    const v = value as Record<string, unknown>;
+    const d1 = v.sequenceDay1 ?? 1;
+    const d2 = v.sequenceDay2 ?? 4;
+    const d3 = v.sequenceDay3 ?? 9;
+    return [Number(d1), Number(d2), Number(d3), null, null, null, null, null, null, null];
   }
   return DEFAULT_CADENCE.slice();
 }
 
-function renderTemplate(str, contact) {
+export type RenderContact = {
+  name?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  company?: string | null;
+  title?: string | null;
+  country?: string | null;
+};
+
+export function renderTemplate(str: unknown, contact: RenderContact): string {
   const full = contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
-  const first =
-    contact.firstName ||
-    (full ? String(full).split(/\s+/)[0] : '') ||
-    '';
+  const first = contact.firstName || (full ? String(full).split(/\s+/)[0] : '') || '';
   const last =
-    contact.lastName ||
-    (full ? String(full).split(/\s+/).slice(1).join(' ') : '') ||
-    '';
+    contact.lastName || (full ? String(full).split(/\s+/).slice(1).join(' ') : '') || '';
   return String(str || '')
     .replace(/\{\{firstName\}\}/g, first)
     .replace(/\{\{lastName\}\}/g, last)
@@ -97,18 +123,21 @@ function renderTemplate(str, contact) {
     .replace(/\{\{country\}\}/g, contact.country || '');
 }
 
-function isValidEmail(email) {
+export function isValidEmail(email: unknown): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
 }
 
-function parseCsv(text) {
+export type CsvRow = Record<string, string> & { __row: number };
+
+export function parseCsv(text: unknown): { headers: string[]; rows: CsvRow[] } {
   const lines = String(text || '')
     .replace(/^\uFEFF/, '')
     .split(/\r?\n/)
     .filter((l) => l.trim());
   if (!lines.length) return { headers: [], rows: [] };
-  const split = (line) => {
-    const out = [];
+
+  const split = (line: string) => {
+    const out: string[] = [];
     let cur = '';
     let inQ = false;
     for (let i = 0; i < line.length; i++) {
@@ -126,19 +155,28 @@ function parseCsv(text) {
     out.push(cur.trim());
     return out;
   };
+
   const headers = split(lines[0]).map((h) => h.toLowerCase());
-  const rows = lines.slice(1).map((line, idx) => {
+  const rows: CsvRow[] = lines.slice(1).map((line, idx) => {
     const cols = split(line);
-    const obj = { __row: idx + 2 };
+    const obj: Record<string, string> = {};
     headers.forEach((h, i) => {
       obj[h] = cols[i] ?? '';
     });
-    return obj;
+    return { ...obj, __row: idx + 2 } as CsvRow;
   });
   return { headers, rows };
 }
 
-const DEFAULT_TEMPLATES = {
+export type DefaultTemplate = {
+  followUpNum: number;
+  name: string;
+  subject: string;
+  templateType: 'ai' | 'static';
+  body: string;
+};
+
+export const DEFAULT_TEMPLATES: Record<string, DefaultTemplate[]> = {
   ems: [
     {
       followUpNum: 1,
@@ -193,17 +231,10 @@ const DEFAULT_TEMPLATES = {
   ],
 };
 
-module.exports = {
-  STATUSES,
-  FOLLOW_STATUSES,
-  ACTIVE_PIPELINE,
-  DEFAULT_CADENCE,
-  DEFAULT_TEMPLATES,
-  slugify,
-  trackForIndustrySlug,
-  parseCadenceDays,
-  normalizeCadence,
-  renderTemplate,
-  isValidEmail,
-  parseCsv,
-};
+/** Simple id generator for created rows (text primary keys). */
+export function newId(prefix = 'id'): string {
+  const uuid = typeof crypto?.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2) + Date.now().toString(36);
+  return `${prefix}_${uuid}`;
+}

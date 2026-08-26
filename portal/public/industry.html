@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Industry — Outreach Admin</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/png" href="https://powerhousetech.in/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div id="admin-gate" class="gate">
+    <div class="gate-card">
+      <h1>Admin access</h1>
+      <p class="muted" id="gate-msg">Checking your Google session…</p>
+      <p style="margin-top:16px"><button type="button" class="btn btn-primary" id="google-signin-btn">Sign in with Google</button></p>
+      <p class="muted" style="margin-top:12px;font-size:.8rem">Outreach portal is admin-only (same Google admins as /admin).</p>
+    </div>
+  </div>
+
+  <div id="admin-shell" class="shell hidden">
+    <aside class="side nav-side" id="side-nav"></aside>
+
+    <main class="main">
+      <div class="top" id="industry-not-found" style="display:none">
+        <div>
+          <h1>Industry not found</h1>
+          <p class="sub">Check the URL, or pick an industry from the sidebar.</p>
+        </div>
+        <a class="btn" href="/">← Dashboard</a>
+      </div>
+
+      <div id="industry-shell" style="display:none">
+        <div class="top industry-header">
+          <div>
+            <div class="industry-title-row">
+              <span class="industry-dot-lg" id="ind-dot"></span>
+              <h1 id="ind-name">Industry</h1>
+              <span class="nav-archived-tag hidden" id="ind-archived-tag">Archived</span>
+            </div>
+            <p class="sub" id="ind-desc"></p>
+          </div>
+          <a class="btn" href="/">← Dashboard</a>
+        </div>
+
+        <div class="tabs-nav" id="tabs-nav">
+          <button type="button" class="tab-btn" data-tab="overview">Overview</button>
+          <button type="button" class="tab-btn" data-tab="contacts">Contacts</button>
+          <button type="button" class="tab-btn" data-tab="templates">Templates</button>
+          <button type="button" class="tab-btn" data-tab="cadence">Cadence</button>
+          <button type="button" class="tab-btn" data-tab="import">Import</button>
+        </div>
+
+        <!-- Overview -->
+        <section class="tab-panel hidden" id="tab-overview">
+          <div class="dash-kpis">
+            <div class="dash-kpi">
+              <div class="lbl">Sent today</div>
+              <div class="val" id="ov-kpi-today">—</div>
+            </div>
+            <div class="dash-kpi">
+              <div class="lbl">Sent this week</div>
+              <div class="val" id="ov-kpi-week">—</div>
+            </div>
+            <div class="dash-kpi">
+              <div class="lbl">Sent all-time (live + historical)</div>
+              <div class="val" id="ov-kpi-total">—</div>
+              <div class="meta" id="ov-kpi-total-meta"></div>
+            </div>
+            <div class="dash-kpi">
+              <div class="lbl">Replied</div>
+              <div class="val" id="ov-kpi-replied">—</div>
+            </div>
+          </div>
+
+          <div class="funnel" id="ov-funnel"></div>
+
+          <div class="dash-card">
+            <div class="section-head"><h2>Sends by step (all-time, combined)</h2></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Step</th><th>Live</th><th>Historical</th><th>Combined</th></tr></thead>
+                <tbody id="ov-vol-rows"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="dash-card">
+            <div class="section-head"><h2>Recent sends</h2></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Contact</th><th>Step</th><th>When</th></tr></thead>
+                <tbody id="ov-recent-rows"><tr><td colspan="3" class="empty">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Contacts -->
+        <section class="tab-panel hidden" id="tab-contacts">
+          <div class="filters">
+            <select id="c-filter-status">
+              <option value="">All statuses</option>
+              <option value="all_followups">All Follow-ups</option>
+            </select>
+            <input id="c-filter-domain" type="search" placeholder="Domain…" style="min-width:160px">
+            <button type="button" class="btn" id="c-refresh">Refresh</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Name</th><th>Company</th><th>Status</th><th>Email</th><th>Updated</th></tr>
+              </thead>
+              <tbody id="c-rows"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Templates -->
+        <section class="tab-panel hidden" id="tab-templates">
+          <div class="section-head">
+            <h2>Email templates <span class="muted" style="font-weight:400">— one per sequence step</span></h2>
+          </div>
+          <div class="template-grid" id="tpl-grid">
+            <div class="muted">Loading…</div>
+          </div>
+        </section>
+
+        <!-- Cadence -->
+        <section class="tab-panel hidden" id="tab-cadence">
+          <div class="card control-card" style="max-width:720px">
+            <h2>
+              Cadence source
+              <span class="steps-badge" id="cad-source-badge">—</span>
+            </h2>
+            <p class="muted">Use the global cadence (set in Controls) or a custom schedule just for this industry.</p>
+            <div class="toggle" role="group" aria-label="Cadence mode" style="margin-bottom:16px">
+              <button type="button" id="cad-mode-global">Use global cadence</button>
+              <button type="button" id="cad-mode-custom">Custom cadence</button>
+            </div>
+
+            <div class="cadence-grid" id="cad-grid">
+              <div class="cadence-field">
+                <label for="cad-day-0">Step 1 — Initial</label>
+                <input id="cad-day-0" type="number" min="1" value="1" disabled readonly>
+              </div>
+              <div class="cadence-field"><label for="cad-day-1">Step 2</label><input id="cad-day-1" type="number" min="1" step="1"></div>
+              <div class="cadence-field"><label for="cad-day-2">Step 3</label><input id="cad-day-2" type="number" min="1" step="1"></div>
+              <div class="cadence-field"><label for="cad-day-3">Step 4</label><input id="cad-day-3" type="number" min="1" step="1"></div>
+              <div class="cadence-field"><label for="cad-day-4">Step 5</label><input id="cad-day-4" type="number" min="1" step="1"></div>
+              <div class="cadence-field"><label for="cad-day-5">Step 6</label><input id="cad-day-5" type="number" min="1" step="1"></div>
+              <div class="cadence-field"><label for="cad-day-6">Step 7</label><input id="cad-day-6" type="number" min="1" step="1"></div>
+              <div class="cadence-field"><label for="cad-day-7">Step 8</label><input id="cad-day-7" type="number" min="1" step="1"></div>
+              <div class="cadence-field"><label for="cad-day-8">Step 9</label><input id="cad-day-8" type="number" min="1" step="1"></div>
+              <div class="cadence-field"><label for="cad-day-9">Step 10</label><input id="cad-day-9" type="number" min="1" step="1"></div>
+            </div>
+
+            <div class="control-row">
+              <button type="button" class="btn btn-primary" id="cad-save" data-label="Save Custom Cadence">Save Custom Cadence</button>
+              <span class="control-status" id="cad-status"></span>
+              <span class="muted" id="cad-updated">Last saved: —</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Import -->
+        <section class="tab-panel hidden" id="tab-import">
+          <div class="import-grid">
+            <div class="card">
+              <h2>Import contacts (CSV)</h2>
+              <p class="muted">Paste CSV below or choose a file. Columns: name, email, company, domain, title, country, status.</p>
+              <textarea id="imp-csv" class="csv-textarea" rows="8" placeholder="name,email,company,title,country&#10;Jane Doe,jane@acme.com,Acme Inc,VP Sales,US"></textarea>
+              <div class="control-row" style="margin-top:10px">
+                <label class="btn" for="imp-file">Choose file…</label>
+                <input id="imp-file" type="file" accept=".csv,text/csv" class="hidden">
+                <button type="button" class="btn btn-primary" id="imp-submit" data-label="Import CSV">Import CSV</button>
+                <span class="control-status" id="imp-status"></span>
+              </div>
+              <div id="imp-result"></div>
+            </div>
+
+            <div class="card">
+              <h2>Historical send data</h2>
+              <p class="muted">Backfill aggregate send counts from before this system existed (per step, per period).</p>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Step #</th><th>Count</th><th>Track A</th><th>Track B</th>
+                      <th>Period start</th><th>Period end</th><th>Note</th><th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="hist-rows"></tbody>
+                </table>
+              </div>
+              <div class="control-row" style="margin-top:10px">
+                <button type="button" class="btn" id="hist-add-row">+ Add row</button>
+                <button type="button" class="btn btn-primary" id="hist-submit" data-label="Import Historical Data">Import Historical Data</button>
+                <span class="control-status" id="hist-status"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="https://powerhousetech.in/js/firebase-boot.js"></script>
+  <script src="/app.js"></script>
+  <script>
+    (async function () {
+      const ui = window.OutreachUI;
+      const me = await ui.requireAdminShell();
+      if (!me) return;
+
+      const params = new URLSearchParams(location.search);
+      let slug = params.get('slug');
+      if (!slug) {
+        // Express route /industry/:slug serves this file with the slug in the path.
+        const parts = location.pathname.split('/').filter(Boolean);
+        const idx = parts.indexOf('industry');
+        if (idx !== -1 && parts[idx + 1]) slug = decodeURIComponent(parts[idx + 1]);
+      }
+
+      const VALID_TABS = ['overview', 'contacts', 'templates', 'cadence', 'import'];
+      let tab = params.get('tab');
+      if (!VALID_TABS.includes(tab)) tab = 'overview';
+
+      if (!slug) {
+        document.getElementById('industry-not-found').style.display = '';
+        await ui.renderIndustrySidebar('dashboard', me.email);
+        return;
+      }
+
+      let industry = null;
+      let templatesCache = [];
+      let histRowCount = 0;
+
+      async function resolveIndustry() {
+        const list = await ui.loadIndustries({ includeArchived: true });
+        industry = list.find((i) => i.slug === slug || i.id === slug) || null;
+      }
+
+      await resolveIndustry();
+      if (!industry) {
+        document.getElementById('industry-not-found').style.display = '';
+        await ui.renderIndustrySidebar('dashboard', me.email);
+        return;
+      }
+
+      await ui.renderIndustrySidebar('industry:' + industry.slug, me.email);
+
+      document.getElementById('industry-shell').style.display = '';
+      document.getElementById('ind-dot').style.background = ui.industryColor(industry);
+      document.getElementById('ind-name').textContent = industry.name;
+      document.getElementById('ind-desc').textContent =
+        industry.description || `${industry.contactCount ?? 0} contacts · ${industry.totalSent ?? 0} sent all-time`;
+      document.getElementById('ind-archived-tag').classList.toggle('hidden', !industry.isArchived);
+      document.title = industry.name + ' — Outreach Admin';
+
+      const statusSel = document.getElementById('c-filter-status');
+      ui.STATUSES.forEach((s) => {
+        const o = document.createElement('option');
+        o.value = s;
+        o.textContent = s;
+        statusSel.appendChild(o);
+      });
+
+      function setUrlTab(t) {
+        const url = new URL(location.href);
+        url.search = '';
+        url.searchParams.set('tab', t);
+        if (params.get('slug')) url.searchParams.set('slug', slug);
+        history.replaceState(null, '', url.pathname + '?' + url.searchParams.toString());
+      }
+
+      function activateTab(t) {
+        tab = t;
+        document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === t));
+        document.querySelectorAll('.tab-panel').forEach((p) => p.classList.toggle('hidden', p.id !== 'tab-' + t));
+        setUrlTab(t);
+        loadTab(t);
+      }
+
+      document.querySelectorAll('.tab-btn').forEach((b) => {
+        b.addEventListener('click', () => activateTab(b.dataset.tab));
+      });
+
+      // ---- Overview ---------------------------------------------------
+
+      async function loadOverview() {
+        const funnelEl = document.getElementById('ov-funnel');
+        try {
+          const data = await ui.api(
+            '/api/industries/' + encodeURIComponent(industry.id) + '/stats',
+          );
+          const pipeline = data.pipeline || {};
+          document.getElementById('ov-kpi-today').textContent = String(data.emailVolume?.today?.total ?? 0);
+          document.getElementById('ov-kpi-week').textContent = String(data.emailVolume?.thisWeek?.total ?? 0);
+          const allTime = data.emailVolume?.allTime || {};
+          document.getElementById('ov-kpi-total').textContent = String(allTime.combined?.total ?? 0);
+          document.getElementById('ov-kpi-total-meta').textContent =
+            `Live: ${allTime.live?.total ?? 0} · Historical: ${allTime.historical?.total ?? 0}`;
+          document.getElementById('ov-kpi-replied').textContent = String(pipeline.Replied || 0);
+
+          const FUNNEL_ORDER = ['Queue', 'Email Found', ...ui.FOLLOW_STATUSES, 'Replied'];
+          const parts = [];
+          FUNNEL_ORDER.forEach((status) => {
+            const count = pipeline[status] || 0;
+            if (!count) return;
+            if (parts.length) parts.push('<span class="funnel-arrow">→</span>');
+            parts.push(
+              '<span class="funnel-chip">' + ui.badge(status) + ' <strong>' + count + '</strong></span>',
+            );
+          });
+          funnelEl.innerHTML = parts.join('') || '<span class="muted">No pipeline data yet.</span>';
+
+          const combined = allTime.combined?.byFollowUp || {};
+          const live = allTime.live?.byFollowUp || {};
+          const hist = allTime.historical?.byFollowUp || {};
+          const steps = new Set([
+            ...Object.keys(combined),
+            ...Object.keys(live),
+            ...Object.keys(hist),
+          ].map(Number).filter((n) => n > 0));
+          const volRows = [...steps]
+            .sort((a, b) => a - b)
+            .map(
+              (n) =>
+                `<tr><td>Step ${n}</td><td>${live[n] || 0}</td><td>${hist[n] || 0}</td><td><strong>${combined[n] || 0}</strong></td></tr>`,
+            );
+          document.getElementById('ov-vol-rows').innerHTML =
+            volRows.join('') || '<tr><td colspan="4" class="empty">No sends yet.</td></tr>';
+
+          const recent = data.recentSends || [];
+          document.getElementById('ov-recent-rows').innerHTML =
+            recent
+              .map(
+                (r) =>
+                  `<tr><td><strong>${ui.esc(r.contactName || '—')}</strong>${r.company ? `<div class="muted">${ui.esc(r.company)}</div>` : ''}</td><td>Step ${r.followUpNum}</td><td>${ui.esc(ui.relativeTime(r.sentAt))}</td></tr>`,
+              )
+              .join('') || '<tr><td colspan="3" class="empty">No recent sends.</td></tr>';
+        } catch (err) {
+          funnelEl.innerHTML = '<span class="muted">' + ui.esc(err.message) + '</span>';
+        }
+      }
+
+      // ---- Contacts -----------------------------------------------------
+
+      async function loadContacts() {
+        const body = document.getElementById('c-rows');
+        body.innerHTML = '<tr><td colspan="5" class="empty">Loading…</td></tr>';
+        const qs = new URLSearchParams();
+        qs.set('industryId', industry.id);
+        if (statusSel.value) qs.set('status', statusSel.value);
+        const domain = document.getElementById('c-filter-domain').value.trim();
+        if (domain) qs.set('domain', domain);
+        qs.set('limit', '200');
+        qs.set('sort', 'updatedAt:desc');
+        try {
+          const data = await ui.api('/api/contacts?' + qs.toString());
+          const rows = data.contacts || [];
+          if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="5" class="empty">No contacts for this industry yet.</td></tr>';
+            return;
+          }
+          body.innerHTML = rows
+            .map(
+              (c) => `<tr class="clickable" data-id="${ui.esc(c.id)}">
+                <td><strong>${ui.esc(c.name)}</strong><div class="muted">${ui.esc(c.title || '')}</div></td>
+                <td>${ui.esc(c.company || '—')}<div class="muted">${ui.esc(c.domain)}</div></td>
+                <td>${ui.badge(c.status)}</td>
+                <td>${ui.esc(c.email || '—')}</td>
+                <td>${ui.fmt(c.updatedAt)}</td>
+              </tr>`,
+            )
+            .join('');
+          body.querySelectorAll('tr.clickable').forEach((tr) => {
+            tr.addEventListener('click', () => {
+              location.href = '/contacts/' + tr.getAttribute('data-id');
+            });
+          });
+        } catch (err) {
+          body.innerHTML = '<tr><td colspan="5" class="empty">' + ui.esc(err.message) + '</td></tr>';
+        }
+      }
+
+      document.getElementById('c-refresh').addEventListener('click', loadContacts);
+      statusSel.addEventListener('change', loadContacts);
+      document.getElementById('c-filter-domain').addEventListener('change', loadContacts);
+
+      // ---- Templates ------------------------------------------------------
+
+      function extractPlaceholders(str) {
+        const out = new Set();
+        String(str || '').replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, k) => {
+          out.add(k);
+          return '';
+        });
+        return [...out];
+      }
+
+      const SAMPLE_CONTACT = {
+        firstName: 'Alex',
+        lastName: 'Rivera',
+        fullName: 'Alex Rivera',
+        company: 'Acme Manufacturing',
+        title: 'VP Operations',
+        country: 'United States',
+      };
+
+      function renderPlaceholderPreview(str) {
+        return String(str || '').replace(/\{\{\s*([\w.]+)\s*\}\}/g, (m, k) =>
+          SAMPLE_CONTACT[k] !== undefined ? ui.esc(SAMPLE_CONTACT[k]) : m,
+        );
+      }
+
+      async function loadTemplates() {
+        const grid = document.getElementById('tpl-grid');
+        grid.innerHTML = '<div class="muted">Loading…</div>';
+        try {
+          const data = await ui.api('/api/industries/' + encodeURIComponent(industry.id) + '/templates');
+          templatesCache = Array.isArray(data) ? data : data.templates || [];
+          renderTemplateGrid();
+        } catch (err) {
+          grid.innerHTML = '<p class="muted">' + ui.esc(err.message) + '</p>';
+        }
+      }
+
+      function renderTemplateGrid() {
+        const grid = document.getElementById('tpl-grid');
+        const bySlot = new Map();
+        templatesCache.forEach((t) => bySlot.set(Number(t.followUpNum), t));
+        const cards = [];
+        for (let step = 1; step <= 10; step++) {
+          const t = bySlot.get(step);
+          if (t) {
+            const placeholders = extractPlaceholders(t.subject + ' ' + t.body);
+            cards.push(`<div class="template-card">
+              <div class="template-card-head">
+                <strong>Step ${step} — ${ui.esc(t.name || 'Untitled')}</strong>
+                <span class="badge ${t.templateType === 'static' ? 's-Bounced' : 's-Email-Found'}">${ui.esc(t.templateType || 'ai')}</span>
+              </div>
+              <div class="template-subject muted">Subject: ${ui.esc(t.subject || '—')}</div>
+              <pre class="template-preview">${ui.esc((t.body || '').slice(0, 220))}${(t.body || '').length > 220 ? '…' : ''}</pre>
+              ${placeholders.length ? `<div class="muted" style="font-size:.76rem">Placeholders: ${placeholders.map((p) => '{{' + ui.esc(p) + '}}').join(', ')}</div>` : ''}
+              <div class="control-row" style="margin-top:10px">
+                <button type="button" class="btn btn-primary" data-edit-tpl="${ui.esc(t.id)}">Edit</button>
+              </div>
+            </div>`);
+          } else {
+            cards.push(`<div class="template-card template-card-empty">
+              <strong>Step ${step}</strong>
+              <p class="muted">No template configured — n8n will skip contacts at this step.</p>
+              <button type="button" class="btn" data-add-tpl="${step}">+ Add template</button>
+            </div>`);
+          }
+        }
+        grid.innerHTML = cards.join('');
+
+        grid.querySelectorAll('[data-edit-tpl]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const t = templatesCache.find((x) => String(x.id) === btn.getAttribute('data-edit-tpl'));
+            if (t) openTemplateModal(t, t.followUpNum);
+          });
+        });
+        grid.querySelectorAll('[data-add-tpl]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            openTemplateModal(null, Number(btn.getAttribute('data-add-tpl')));
+          });
+        });
+      }
+
+      function openTemplateModal(existing, followUpNum) {
+        const card = ui.openModal(`
+          <div class="modal-header">
+            <h2>${existing ? 'Edit' : 'Add'} template — Step ${followUpNum}</h2>
+            <button type="button" class="modal-x" data-modal-close aria-label="Close">×</button>
+          </div>
+          <div class="modal-body">
+            <label class="modal-label" for="tm-name">Name</label>
+            <input id="tm-name" type="text" value="${ui.esc(existing?.name || '')}" placeholder="e.g. Initial — Hook">
+
+            <label class="modal-label" for="tm-type">Type</label>
+            <select id="tm-type">
+              <option value="ai" ${(!existing || existing.templateType !== 'static') ? 'selected' : ''}>AI-generated (prompt)</option>
+              <option value="static" ${existing?.templateType === 'static' ? 'selected' : ''}>Static (sent as-is)</option>
+            </select>
+
+            <label class="modal-label" for="tm-subject">Subject</label>
+            <input id="tm-subject" type="text" value="${ui.esc(existing?.subject || '')}" placeholder="Subject line — supports {{firstName}}, {{company}}…">
+
+            <label class="modal-label" for="tm-body">Body${existing?.templateType === 'static' ? '' : ' (AI prompt)'}</label>
+            <textarea id="tm-body" rows="8" placeholder="Use {{firstName}}, {{lastName}}, {{fullName}}, {{company}}, {{title}}, {{country}}">${ui.esc(existing?.body || '')}</textarea>
+
+            <div class="muted" style="font-size:.78rem;margin-top:6px">Placeholder preview (sample contact):</div>
+            <div class="modal-preview" id="tm-preview"></div>
+            <p class="muted" id="tm-error" style="display:none;color:#f87171"></p>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn" data-modal-close>Cancel</button>
+            <button type="button" class="btn btn-primary" id="tm-save">Save template</button>
+          </div>
+        `);
+
+        function updatePreview() {
+          const subj = card.querySelector('#tm-subject').value;
+          const body = card.querySelector('#tm-body').value;
+          card.querySelector('#tm-preview').innerHTML =
+            `<div><strong>Subject:</strong> ${renderPlaceholderPreview(subj) || '<span class="muted">—</span>'}</div>` +
+            `<pre class="template-preview">${renderPlaceholderPreview(body) || ''}</pre>`;
+        }
+        card.querySelector('#tm-subject').addEventListener('input', updatePreview);
+        card.querySelector('#tm-body').addEventListener('input', updatePreview);
+        updatePreview();
+
+        const errEl = card.querySelector('#tm-error');
+        card.querySelector('#tm-save').addEventListener('click', async () => {
+          const name = card.querySelector('#tm-name').value.trim();
+          const subject = card.querySelector('#tm-subject').value.trim();
+          const body = card.querySelector('#tm-body').value.trim();
+          const templateType = card.querySelector('#tm-type').value;
+          errEl.style.display = 'none';
+          if (!name || !subject || !body) {
+            errEl.textContent = 'Name, subject, and body are required.';
+            errEl.style.display = '';
+            return;
+          }
+          const saveBtn = card.querySelector('#tm-save');
+          saveBtn.disabled = true;
+          saveBtn.textContent = 'Saving…';
+          try {
+            if (existing) {
+              await ui.api(
+                '/api/industries/' + encodeURIComponent(industry.id) + '/templates/' + encodeURIComponent(existing.id),
+                { method: 'PUT', body: { name, subject, body, templateType } },
+              );
+            } else {
+              await ui.api('/api/industries/' + encodeURIComponent(industry.id) + '/templates', {
+                method: 'POST',
+                body: { followUpNum, name, subject, body, templateType },
+              });
+            }
+            ui.closeModal();
+            await loadTemplates();
+          } catch (err) {
+            errEl.textContent = err.message || 'Failed to save template';
+            errEl.style.display = '';
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save template';
+          }
+        });
+      }
+
+      // ---- Cadence --------------------------------------------------------
+
+      const cadInputs = Array.from({ length: 10 }, (_, i) => document.getElementById('cad-day-' + i));
+      let cadenceSource = 'global';
+
+      function populateCadenceInputs(days) {
+        const arr = Array.isArray(days) ? days : [];
+        for (let i = 0; i < 10; i++) {
+          if (i === 0) {
+            cadInputs[0].value = 1;
+            continue;
+          }
+          const v = arr[i];
+          cadInputs[i].value = v === null || v === undefined || v === '' ? '' : String(v);
+        }
+      }
+
+      function setCadenceMode(mode) {
+        cadenceSource = mode;
+        document.getElementById('cad-mode-global').classList.toggle('active', mode === 'global');
+        document.getElementById('cad-mode-custom').classList.toggle('active', mode === 'custom');
+        document.getElementById('cad-source-badge').textContent = mode === 'global' ? 'Using global' : 'Custom';
+        cadInputs.forEach((el, i) => {
+          if (i === 0) return;
+          el.disabled = mode === 'global';
+        });
+        document.getElementById('cad-save').classList.toggle('hidden', mode === 'global');
+      }
+
+      function validateCadenceDays(days) {
+        for (const v of days) {
+          if (v === null) continue;
+          if (!Number.isInteger(v) || v < 1) return 'Each element must be null or a positive integer > 0.';
+        }
+        let seenNull = false;
+        for (const d of days) {
+          if (d === null) seenNull = true;
+          else if (seenNull) return 'Non-null values must all come before null values (no gaps).';
+        }
+        const active = days.filter((d) => d !== null);
+        for (let i = 1; i < active.length; i++) {
+          if (!(active[i - 1] < active[i])) return 'Days must be strictly ascending.';
+        }
+        return null;
+      }
+
+      async function loadCadence() {
+        try {
+          const cfg = await ui.api('/api/industries/' + encodeURIComponent(industry.id) + '/config');
+          populateCadenceInputs(cfg.cadenceDays);
+          setCadenceMode(cfg.source === 'industry' ? 'custom' : 'global');
+          const updated = document.getElementById('cad-updated');
+          updated.textContent = cfg.updatedAt ? 'Last saved: ' + ui.fmt(cfg.updatedAt) : 'Last saved: —';
+        } catch (err) {
+          document.getElementById('cad-status').textContent = err.message;
+          document.getElementById('cad-status').style.color = '#f87171';
+        }
+      }
+
+      document.getElementById('cad-mode-global').addEventListener('click', async () => {
+        if (cadenceSource === 'global') return;
+        const statusEl = document.getElementById('cad-status');
+        statusEl.textContent = 'Reverting…';
+        statusEl.style.color = '';
+        try {
+          await ui.api('/api/industries/' + encodeURIComponent(industry.id) + '/config', { method: 'DELETE' });
+          statusEl.textContent = 'Reverted to global';
+          statusEl.style.color = '#4ade80';
+          await loadCadence();
+        } catch (err) {
+          statusEl.textContent = err.message;
+          statusEl.style.color = '#f87171';
+        }
+      });
+
+      document.getElementById('cad-mode-custom').addEventListener('click', () => {
+        setCadenceMode('custom');
+      });
+
+      document.getElementById('cad-save').addEventListener('click', async () => {
+        const days = [];
+        for (let i = 0; i < 10; i++) {
+          if (i === 0) {
+            days.push(1);
+            continue;
+          }
+          const raw = String(cadInputs[i].value || '').trim();
+          if (!raw) {
+            days.push(null);
+            continue;
+          }
+          const n = Number.parseInt(raw, 10);
+          days.push(Number.isInteger(n) ? n : { bad: true });
+        }
+        const statusEl = document.getElementById('cad-status');
+        if (days.some((d) => d && typeof d === 'object' && d.bad)) {
+          statusEl.textContent = 'Each element must be null or a positive integer > 0.';
+          statusEl.style.color = '#f87171';
+          return;
+        }
+        const errMsg = validateCadenceDays(days);
+        if (errMsg) {
+          statusEl.textContent = errMsg;
+          statusEl.style.color = '#f87171';
+          return;
+        }
+        const saveBtn = document.getElementById('cad-save');
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+        try {
+          const cfg = await ui.api('/api/industries/' + encodeURIComponent(industry.id) + '/config', {
+            method: 'PUT',
+            body: { cadenceDays: days },
+          });
+          populateCadenceInputs(cfg.cadenceDays);
+          setCadenceMode('custom');
+          statusEl.textContent = 'Saved';
+          statusEl.style.color = '#4ade80';
+          document.getElementById('cad-updated').textContent = 'Last saved: ' + ui.fmt(cfg.updatedAt);
+        } catch (err) {
+          statusEl.textContent = err.message || 'Save failed';
+          statusEl.style.color = '#f87171';
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = saveBtn.dataset.label;
+        }
+      });
+
+      // ---- Import ---------------------------------------------------------
+
+      document.getElementById('imp-file').addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const text = await file.text();
+        document.getElementById('imp-csv').value = text;
+      });
+
+      document.getElementById('imp-submit').addEventListener('click', async () => {
+        const csv = document.getElementById('imp-csv').value.trim();
+        const statusEl = document.getElementById('imp-status');
+        const resultEl = document.getElementById('imp-result');
+        if (!csv) {
+          statusEl.textContent = 'Paste or upload a CSV first';
+          statusEl.style.color = '#f87171';
+          return;
+        }
+        const btn = document.getElementById('imp-submit');
+        btn.disabled = true;
+        btn.textContent = 'Importing…';
+        statusEl.textContent = '';
+        try {
+          const res = await ui.api(
+            '/api/industries/' + encodeURIComponent(industry.id) + '/contacts/import-csv',
+            { method: 'POST', body: { csv } },
+          );
+          statusEl.textContent = 'Done';
+          statusEl.style.color = '#4ade80';
+          const reasons = (res.skippedReasons || [])
+            .slice(0, 20)
+            .map((r) => `<tr><td>${r.row ?? '—'}</td><td>${ui.esc(r.email || '')}</td><td>${ui.esc(r.reason || '')}</td></tr>`)
+            .join('');
+          resultEl.innerHTML = `
+            <p class="muted" style="margin-top:10px">Imported <strong>${res.imported ?? 0}</strong> · Skipped <strong>${res.skipped ?? 0}</strong> · Errors <strong>${res.errors ?? 0}</strong></p>
+            ${reasons ? `<div class="table-wrap"><table><thead><tr><th>Row</th><th>Email</th><th>Reason</th></tr></thead><tbody>${reasons}</tbody></table></div>` : ''}
+          `;
+        } catch (err) {
+          statusEl.textContent = err.message || 'Import failed';
+          statusEl.style.color = '#f87171';
+        } finally {
+          btn.disabled = false;
+          btn.textContent = btn.dataset.label;
+        }
+      });
+
+      function histRowHtml(idx) {
+        return `<tr data-hist-row="${idx}">
+          <td><input type="number" min="1" max="10" class="hist-input" data-f="followUpNum" style="width:60px"></td>
+          <td><input type="number" min="0" class="hist-input" data-f="count" style="width:70px"></td>
+          <td><input type="number" min="0" class="hist-input" data-f="trackA" style="width:70px" value="0"></td>
+          <td><input type="number" min="0" class="hist-input" data-f="trackB" style="width:70px" value="0"></td>
+          <td><input type="date" class="hist-input" data-f="periodStart"></td>
+          <td><input type="date" class="hist-input" data-f="periodEnd"></td>
+          <td><input type="text" class="hist-input" data-f="note" placeholder="optional" style="width:120px"></td>
+          <td><button type="button" class="btn" data-remove-hist="${idx}">×</button></td>
+        </tr>`;
+      }
+
+      function addHistRow() {
+        const tbody = document.getElementById('hist-rows');
+        const idx = histRowCount++;
+        tbody.insertAdjacentHTML('beforeend', histRowHtml(idx));
+        tbody.querySelector(`[data-remove-hist="${idx}"]`).addEventListener('click', (e) => {
+          e.target.closest('tr')?.remove();
+        });
+      }
+
+      document.getElementById('hist-add-row').addEventListener('click', addHistRow);
+
+      document.getElementById('hist-submit').addEventListener('click', async () => {
+        const statusEl = document.getElementById('hist-status');
+        const rows = Array.from(document.querySelectorAll('#hist-rows tr'));
+        const entries = rows.map((tr) => {
+          const get = (f) => tr.querySelector(`[data-f="${f}"]`)?.value || '';
+          return {
+            followUpNum: Number.parseInt(get('followUpNum'), 10),
+            count: Number.parseInt(get('count'), 10),
+            trackA: Number.parseInt(get('trackA'), 10) || 0,
+            trackB: Number.parseInt(get('trackB'), 10) || 0,
+            periodStart: get('periodStart'),
+            periodEnd: get('periodEnd'),
+            note: get('note') || undefined,
+          };
+        }).filter((e) => Number.isInteger(e.followUpNum) && Number.isInteger(e.count) && e.periodStart && e.periodEnd);
+
+        if (!entries.length) {
+          statusEl.textContent = 'Add at least one complete row (step #, count, period start/end).';
+          statusEl.style.color = '#f87171';
+          return;
+        }
+
+        const btn = document.getElementById('hist-submit');
+        btn.disabled = true;
+        btn.textContent = 'Importing…';
+        try {
+          const res = await ui.api(
+            '/api/industries/' + encodeURIComponent(industry.id) + '/historical-import',
+            { method: 'POST', body: { mode: 'aggregate', entries } },
+          );
+          statusEl.textContent = `Imported ${res.created ?? entries.length} historical entries`;
+          statusEl.style.color = '#4ade80';
+          document.getElementById('hist-rows').innerHTML = '';
+          histRowCount = 0;
+          addHistRow();
+        } catch (err) {
+          statusEl.textContent = err.message || 'Import failed';
+          statusEl.style.color = '#f87171';
+        } finally {
+          btn.disabled = false;
+          btn.textContent = btn.dataset.label;
+        }
+      });
+
+      addHistRow();
+
+      // ---- Tab loader / boot ------------------------------------------------
+
+      function loadTab(t) {
+        if (t === 'overview') return loadOverview();
+        if (t === 'contacts') return loadContacts();
+        if (t === 'templates') return loadTemplates();
+        if (t === 'cadence') return loadCadence();
+      }
+
+      activateTab(tab);
+    })();
+  </script>
+</body>
+</html>
