@@ -137,10 +137,31 @@ async function resolveCadence(industryId) {
   };
 }
 
+/** POST /api/contacts/apollo-search — gated by global kill switch */
+router.post(
+  '/apollo-search',
+  asyncHandler(async (_req, res) => {
+    const config = await prisma.outreachConfig.findFirst();
+    if (!config?.systemEnabled) {
+      return res.status(503).json({ error: 'System paused' });
+    }
+    return jsonError(
+      res,
+      400,
+      'Apollo search requires an industry. Use POST /api/industries/:id/contacts/apollo-search',
+    );
+  }),
+);
+
 /** GET /api/contacts/sequence-ready — n8n batching for workflow 03 */
 router.get(
   '/sequence-ready',
   asyncHandler(async (req, res) => {
+    const config = await prisma.outreachConfig.findFirst();
+    if (!config?.systemEnabled) {
+      return res.json({ groups: [], totalContacts: 0, paused: true });
+    }
+
     const track = req.query.track ? String(req.query.track) : null;
     const industryId = req.query.industryId
       ? String(req.query.industryId)
