@@ -165,7 +165,8 @@ Deno.serve(async (req) => {
         .order('updated_at', { ascending: false })
         .limit(200);
       if (status) q = q.eq('status', status);
-      if (member.role === 'costing_engineer') {
+      // Non-admins only see their own costings.
+      if (member.role !== 'admin') {
         q = q.eq('created_by', actor);
       }
       const { data, error } = await q;
@@ -182,7 +183,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (error) throw error;
       if (!data) return jsonResponse(404, { error: 'Costing not found' });
-      if (member.role === 'costing_engineer' && data.created_by !== actor) {
+      if (member.role !== 'admin' && data.created_by !== actor) {
         return jsonResponse(403, { error: 'Access denied' });
       }
       const { data: audit } = await db
@@ -232,7 +233,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (fetchErr) throw fetchErr;
       if (!existing) return jsonResponse(404, { error: 'Costing not found' });
-      if (member.role === 'costing_engineer' && existing.created_by !== actor) {
+      if (member.role !== 'admin' && existing.created_by !== actor) {
         return jsonResponse(403, { error: 'Access denied' });
       }
       if (['sent', 'approved'].includes(existing.status) && member.role !== 'admin') {
@@ -266,10 +267,10 @@ Deno.serve(async (req) => {
     }
 
     if (req.method === 'GET' && op === 'dashboard') {
-      assertRole(member, ['admin', 'reviewer']);
+      assertRole(member, ['admin']);
       const { data, error } = await db
         .from('sahasra_costings')
-        .select('id, status, client_name, assembly_name, quantity, created_by, updated_at')
+        .select('id, status, client_name, assembly_name, quantity, created_by, updated_by, updated_at')
         .eq('org_id', member.org_id)
         .order('updated_at', { ascending: false })
         .limit(500);

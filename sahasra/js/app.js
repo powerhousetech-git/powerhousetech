@@ -399,7 +399,10 @@
   async function loadDashboard() {
     setActiveNav('dashboard');
     $('main-title').textContent = 'Dashboard';
-    $('main-sub').textContent = 'Track pending drafts and completed costings.';
+    $('main-sub').textContent =
+      state.profile && state.profile.role === 'admin'
+        ? 'All team costings — who created each entry is shown.'
+        : 'Your costings only — other users’ work is private.';
     var res = await SahasraApi.listCostings();
     var rows = res.ok ? res.data.costings || [] : [];
     var counts = countByProgress(rows);
@@ -432,8 +435,13 @@
 
   function renderCostingsTable(rows) {
     if (!rows.length) return '<p class="muted">No costings yet. Create your first one.</p>';
+    var isAdmin = state.profile && state.profile.role === 'admin';
+    var head =
+      '<table class="data-table"><thead><tr><th>Client</th><th>Assembly</th>' +
+      (isAdmin ? '<th>Created by</th>' : '') +
+      '<th>Progress</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody>';
     return (
-      '<table class="data-table"><thead><tr><th>Client</th><th>Assembly</th><th>Progress</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody>' +
+      head +
       rows
         .map(function (r) {
           return (
@@ -441,7 +449,9 @@
             esc(r.client_name) +
             '</td><td>' +
             esc(r.assembly_name) +
-            '</td><td>' +
+            '</td>' +
+            (isAdmin ? '<td>' + esc(r.created_by || '—') + '</td>' : '') +
+            '<td>' +
             progressBadge(r) +
             '</td><td>' +
             statusBadge(r) +
@@ -511,13 +521,24 @@
     });
   }
 
+  function costingSubtitle(c, suffix) {
+    var parts = [c.client_name];
+    if (state.profile && state.profile.role === 'admin' && c.created_by) {
+      parts.push('Created by ' + c.created_by);
+    }
+    if (suffix) parts.push(suffix);
+    return parts.join(' · ');
+  }
+
   function renderCostingWizard() {
     var c = state.costing;
     recompute();
     var comp = state.computed;
     $('main-title').textContent = c.assembly_name;
-    $('main-sub').textContent =
-      c.client_name + ' · ' + c.currency + ' · ' + SahasraFormat.progressLabel(c).label;
+    $('main-sub').textContent = costingSubtitle(
+      c,
+      c.currency + ' · ' + SahasraFormat.progressLabel(c).label,
+    );
 
     var step = STEPS[state.wizardStep - 1];
     var fieldsHtml = step.fields.map(function (f) {
@@ -614,7 +635,7 @@
     recompute();
     var c = state.costing;
     var comp = state.computed;
-    $('main-sub').textContent = c.client_name + ' · Ready for review';
+    $('main-sub').textContent = costingSubtitle(c, 'Ready for review');
 
     var rows = [
       ['Material Cost', fmtMoney(comp.material_cost, c.currency)],
@@ -721,7 +742,31 @@
       s.total +
       '</div></div></div><p>' +
       statusHtml +
-      '</p><h3>Recent activity</h3><ul class="activity-list">' +
+      '</p>' +
+      '<div class="panel-head"><h2>Recent costings</h2></div>' +
+      '<table class="data-table"><thead><tr><th>Client</th><th>Assembly</th><th>Created by</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody>' +
+      (res.data.recent_costings || [])
+        .slice(0, 20)
+        .map(function (r) {
+          return (
+            '<tr><td>' +
+            esc(r.client_name) +
+            '</td><td>' +
+            esc(r.assembly_name) +
+            '</td><td>' +
+            esc(r.created_by || '—') +
+            '</td><td>' +
+            esc(r.status) +
+            '</td><td>' +
+            new Date(r.updated_at).toLocaleString() +
+            '</td><td><a href="#/costing/' +
+            r.id +
+            '">Open</a></td></tr>'
+          );
+        })
+        .join('') +
+      '</tbody></table>' +
+      '<h3>Recent activity</h3><ul class="activity-list">' +
       (res.data.recent_activity || [])
         .slice(0, 15)
         .map(function (a) {
