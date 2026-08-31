@@ -125,29 +125,29 @@
   async function initFirebase() {
     var fb = window.sahasraFirebase;
     if (fb) return fb;
-    var cfg = window.SAHASRA.firebaseConfig;
-    var appMod = await import('https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js');
-    var authMod = await import('https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js');
-    var app = appMod.getApps().length ? appMod.getApps()[0] : appMod.initializeApp(cfg);
-    var auth = authMod.getAuth(app);
-    await authMod.setPersistence(auth, authMod.browserLocalPersistence).catch(function () {});
-    var googleProvider = new authMod.GoogleAuthProvider();
-    window.sahasraFirebase = {
-      auth: auth,
-      googleProvider: googleProvider,
-      signInWithPopup: authMod.signInWithPopup,
-      signOut: authMod.signOut,
-    };
-    return window.sahasraFirebase;
+    await new Promise(function (resolve) {
+      if (window.sahasraFirebase) return resolve();
+      window.addEventListener('sahasra-firebase-ready', resolve, { once: true });
+      setTimeout(resolve, 8000);
+    });
+    fb = window.sahasraFirebase;
+    if (!fb) throw new Error('Authentication failed to load. Refresh and try again.');
+    return fb;
   }
 
   async function signIn() {
-    var fb = await initFirebase();
+    var btn = $('btn-signin');
+    if (btn) btn.disabled = true;
     try {
+      var fb = await initFirebase();
       await fb.signInWithPopup(fb.auth, fb.googleProvider);
       await bootSession();
     } catch (err) {
-      if (err && err.code !== 'auth/popup-closed-by-user') toast(err.message || 'Sign-in failed', true);
+      if (err && err.code !== 'auth/popup-closed-by-user') {
+        toast(err.message || 'Sign-in failed', true);
+      }
+    } finally {
+      if (btn) btn.disabled = false;
     }
   }
 
@@ -172,22 +172,15 @@
     if (res.status === 403) {
       show('denied-view');
       $('denied-email').textContent = user.email;
-<<<<<<< HEAD
-=======
       $('denied-view').querySelector('#denied-hint').innerHTML =
         'Only Sahasra-authorized Google accounts can access this portal.<br>Try <strong>shreyassinha.work@gmail.com</strong> or ask your admin to add <strong>' +
         esc(user.email) +
         '</strong>.';
->>>>>>> cursor/sahasra-portal-c344
       return;
     }
     if (!res.ok) {
       show('gate-view');
-<<<<<<< HEAD
-      toast(res.data.error || 'Could not verify access', true);
-=======
       toast((res.data && res.data.error) || 'Could not verify access (HTTP ' + res.status + ')', true);
->>>>>>> cursor/sahasra-portal-c344
       return;
     }
     state.profile = res.data;
@@ -608,12 +601,14 @@
   }
 
   function renderGate() {
-    $('gate-email-hint').textContent = 'Use your Sahasra-authorized Google account.';
+    // Keep HTML hint from index.html; only ensure gate is visible.
   }
 
   function bindEvents() {
-    $('btn-signin').addEventListener('click', signIn);
-    $('btn-signout').addEventListener('click', signOut);
+    var signInBtn = $('btn-signin');
+    var signOutBtn = $('btn-signout');
+    if (signInBtn) signInBtn.addEventListener('click', signIn);
+    if (signOutBtn) signOutBtn.addEventListener('click', signOut);
     window.addEventListener('hashchange', function () {
       if (state.profile) routeFromHash();
     });
@@ -622,16 +617,18 @@
   async function boot() {
     bindEvents();
     renderGate();
-    var fb = await initFirebase();
-    return new Promise(function (resolve) {
-      import('https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js').then(function (authMod) {
-        authMod.onAuthStateChanged(fb.auth, function (user) {
+    try {
+      var fb = await initFirebase();
+      return new Promise(function (resolve) {
+        fb.onAuthStateChanged(fb.auth, function (user) {
           if (user && user.email) bootSession();
           else show('gate-view');
           resolve();
         });
       });
-    });
+    } catch (err) {
+      toast(err.message || 'Could not start sign-in', true);
+    }
   }
 
   boot();

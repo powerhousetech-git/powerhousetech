@@ -66,12 +66,27 @@
 
   <div id="toast" class="toast" role="status"></div>
 
-  <script src="/sahasra/js/config.js"></script>
-  <script src="/sahasra/js/compute-costing.js"></script>
-  <script src="/sahasra/js/validation.js"></script>
-  <script src="/sahasra/js/export-excel.js"></script>
-  <script src="/sahasra/js/api.js"></script>
-  <script src="/sahasra/js/app.js"></script>
+  <script src="/sahasra/js/config.js?v=2"></script>
+  <script src="/sahasra/js/compute-costing.js?v=2"></script>
+  <script src="/sahasra/js/validation.js?v=2"></script>
+  <script src="/sahasra/js/export-excel.js?v=2"></script>
+  <script src="/sahasra/js/api.js?v=2"></script>
+  <script type="module">
+    import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
+    import {
+      getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
+      setPersistence, browserLocalPersistence,
+    } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
+
+    const cfg = window.SAHASRA.firebaseConfig;
+    const app = getApps().length ? getApps()[0] : initializeApp(cfg);
+    const auth = getAuth(app);
+    await setPersistence(auth, browserLocalPersistence).catch(() => {});
+    const googleProvider = new GoogleAuthProvider();
+    window.sahasraFirebase = { auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged };
+    window.dispatchEvent(new CustomEvent('sahasra-firebase-ready'));
+  </script>
+  <script src="/sahasra/js/app.js?v=2"></script>
   <script>
     document.getElementById('btn-signout-denied')?.addEventListener('click', function () {
       document.getElementById('btn-signout')?.click();
