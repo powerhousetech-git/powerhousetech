@@ -5,20 +5,61 @@ import { adminClient } from '../_shared/portal-users.ts';
 import {
   COSTING_FIELDS,
   loadOrgDefaults,
+  memberFromPortalUser,
   requireSahasraMember,
-  requireSahasraRole,
+  type SahasraMember,
+  type SahasraRole,
 } from '../_shared/sahasra-auth.ts';
+import { signPortalToken, verifyPortalToken } from '../_shared/sahasra-portal-session.ts';
 
-async function authedUser(req: Request) {
+function unauthorized(msg = 'Sign in required') {
+  const err = new Error(msg);
+  (err as Error & { status: number }).status = 401;
+  return err;
+}
+
+function forbidden(msg = 'Access denied') {
+  const err = new Error(msg);
+  (err as Error & { status: number }).status = 403;
+  return err;
+}
+
+function actorId(member: SahasraMember): string {
+  return member.username || member.email;
+}
+
+async function resolveMember(req: Request): Promise<SahasraMember> {
   const token = bearerToken(req);
-  if (!token) {
-    const err = new Error('Sign in required');
-    (err as Error & { status: number }).status = 401;
-    throw err;
+  if (!token) throw unauthorized();
+
+  const portal = await verifyPortalToken(token);
+  if (portal) {
+    const db = adminClient();
+    const { data } = await db
+      .from('sahasra_portal_users')
+      .select('username, org_id, full_name, role')
+      .eq('username', portal.u)
+      .maybeSingle();
+    if (data) return memberFromPortalUser(data);
+    return memberFromPortalUser({
+      username: portal.u,
+      org_id: portal.o,
+      full_name: null,
+      role: portal.r,
+    });
   }
-  const user = await verifyFirebaseIdToken(token);
-  const member = await requireSahasraMember(user.email);
-  return { user, member };
+
+  try {
+    const user = await verifyFirebaseIdToken(token);
+    const member = await requireSahasraMember(user.email);
+    return { ...member, username: member.email.split('@')[0] };
+  } catch {
+    throw unauthorized('Invalid or expired session');
+  }
+}
+
+function assertRole(member: SahasraMember, allowed: SahasraRole[]) {
+  if (!allowed.includes(member.role)) throw forbidden('You do not have permission for this action.');
 }
 
 function pickCostingPatch(body: Record<string, unknown>) {
@@ -33,7 +74,7 @@ function pickCostingPatch(body: Record<string, unknown>) {
 
 async function writeAudit(
   costingId: string,
-  userEmail: string,
+  actor: string,
   fieldName: string,
   oldValue: unknown,
   newValue: unknown,
@@ -42,11 +83,29 @@ async function writeAudit(
   const db = adminClient();
   await db.from('sahasra_audit_log').insert({
     costing_id: costingId,
-    user_email: userEmail,
+    user_email: actor,
     field_name: fieldName,
     old_value: oldValue == null ? null : String(oldValue),
     new_value: newValue == null ? '' : String(newValue),
   });
+}
+
+async function profilePayload(member: SahasraMember) {
+  const defaults = await loadOrgDefaults(member.org_id);
+  const db = adminClient();
+  const { data: org } = await db
+    .from('sahasra_organizations')
+    .select('id, name, default_currency')
+    .eq('id', member.org_id)
+    .maybeSingle();
+  return {
+    username: member.username,
+    email: member.email,
+    full_name: member.full_name,
+    role: member.role,
+    org,
+    defaults,
+  };
 }
 
 Deno.serve(async (req) => {
@@ -55,38 +114,47 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const op = url.searchParams.get('op') || 'me';
   const id = url.searchParams.get('id');
+  const db = adminClient();
 
   try {
-    if (op === 'me') {
-      const token = bearerToken(req);
-      if (!token) return jsonResponse(401, { error: 'Sign in required' });
-      const user = await verifyFirebaseIdToken(token);
+    if (req.method === 'POST' && op === 'login') {
+      let body: Record<string, unknown> = {};
       try {
-        const member = await requireSahasraMember(user.email);
-        const defaults = await loadOrgDefaults(member.org_id);
-        const db = adminClient();
-        const { data: org } = await db
-          .from('sahasra_organizations')
-          .select('id, name, default_currency')
-          .eq('id', member.org_id)
-          .maybeSingle();
-        return jsonResponse(200, {
-          email: member.email,
-          full_name: member.full_name,
-          role: member.role,
-          org,
-          defaults,
-        });
-      } catch (err) {
-        const status = (err as Error & { status?: number }).status ?? 403;
-        return jsonResponse(status, {
-          error: err instanceof Error ? err.message : 'Access denied',
-        });
+        body = await req.json();
+      } catch {
+        body = {};
       }
+      const username = String(body.username || '').trim();
+      const password = String(body.password || '');
+      if (!username || !password) {
+        return jsonResponse(400, { error: 'Username and password are required' });
+      }
+      const { data, error } = await db.rpc('sahasra_verify_login', {
+        p_username: username,
+        p_password: password,
+      });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) return jsonResponse(401, { error: 'Invalid username or password' });
+      const member = memberFromPortalUser(row);
+      const token = await signPortalToken({
+        username: member.username,
+        role: member.role,
+        org_id: member.org_id,
+      });
+      return jsonResponse(200, {
+        token,
+        ...(await profilePayload(member)),
+      });
     }
 
-    const { user, member } = await authedUser(req);
-    const db = adminClient();
+    if (op === 'me') {
+      const member = await resolveMember(req);
+      return jsonResponse(200, await profilePayload(member));
+    }
+
+    const member = await resolveMember(req);
+    const actor = actorId(member);
 
     if (req.method === 'GET' && op === 'costings') {
       const status = url.searchParams.get('status');
@@ -98,7 +166,7 @@ Deno.serve(async (req) => {
         .limit(200);
       if (status) q = q.eq('status', status);
       if (member.role === 'costing_engineer') {
-        q = q.eq('created_by', member.email);
+        q = q.eq('created_by', actor);
       }
       const { data, error } = await q;
       if (error) throw error;
@@ -114,7 +182,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (error) throw error;
       if (!data) return jsonResponse(404, { error: 'Costing not found' });
-      if (member.role === 'costing_engineer' && data.created_by !== member.email) {
+      if (member.role === 'costing_engineer' && data.created_by !== actor) {
         return jsonResponse(403, { error: 'Access denied' });
       }
       const { data: audit } = await db
@@ -144,14 +212,14 @@ Deno.serve(async (req) => {
         assembly_name: assemblyName,
         currency: body.currency === 'INR' ? 'INR' : 'USD',
         exchange_rate: body.exchange_rate ?? null,
-        created_by: member.email,
-        updated_by: member.email,
+        created_by: actor,
+        updated_by: actor,
         status: 'draft',
         current_step: 1,
       };
       const { data, error } = await db.from('sahasra_costings').insert(row).select('*').single();
       if (error) throw error;
-      await writeAudit(data.id, member.email, 'created', null, assemblyName);
+      await writeAudit(data.id, actor, 'created', null, assemblyName);
       return jsonResponse(201, { costing: data });
     }
 
@@ -164,7 +232,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (fetchErr) throw fetchErr;
       if (!existing) return jsonResponse(404, { error: 'Costing not found' });
-      if (member.role === 'costing_engineer' && existing.created_by !== member.email) {
+      if (member.role === 'costing_engineer' && existing.created_by !== actor) {
         return jsonResponse(403, { error: 'Access denied' });
       }
       if (['sent', 'approved'].includes(existing.status) && member.role !== 'admin') {
@@ -178,7 +246,7 @@ Deno.serve(async (req) => {
         body = {};
       }
       const patch = pickCostingPatch(body);
-      patch.updated_by = member.email;
+      patch.updated_by = actor;
       patch.updated_at = new Date().toISOString();
 
       const { data, error } = await db
@@ -191,14 +259,14 @@ Deno.serve(async (req) => {
 
       for (const key of Object.keys(patch)) {
         if (key === 'updated_by' || key === 'updated_at') continue;
-        await writeAudit(id, member.email, key, (existing as Record<string, unknown>)[key], patch[key]);
+        await writeAudit(id, actor, key, (existing as Record<string, unknown>)[key], patch[key]);
       }
 
       return jsonResponse(200, { costing: data });
     }
 
     if (req.method === 'GET' && op === 'dashboard') {
-      await requireSahasraRole(user.email, ['admin', 'reviewer']);
+      assertRole(member, ['admin', 'reviewer']);
       const { data, error } = await db
         .from('sahasra_costings')
         .select('id, status, client_name, assembly_name, quantity, created_by, updated_at')
@@ -217,10 +285,7 @@ Deno.serve(async (req) => {
         .order('changed_at', { ascending: false })
         .limit(30);
       return jsonResponse(200, {
-        summary: {
-          total: rows.length,
-          by_status: byStatus,
-        },
+        summary: { total: rows.length, by_status: byStatus },
         recent_costings: rows.slice(0, 20),
         recent_activity: recentAudit || [],
       });

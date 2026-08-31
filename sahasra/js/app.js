@@ -127,7 +127,7 @@
   }
 
   function show(id) {
-    ['gate-view', 'denied-view', 'app-shell'].forEach(function (v) {
+    ['gate-view', 'app-shell'].forEach(function (v) {
       var el = $(v);
       if (el) el.classList.toggle('hidden', v !== id);
     });
@@ -308,73 +308,52 @@
     );
   }
 
-  async function initFirebase() {
-    var fb = window.sahasraFirebase;
-    if (fb) return fb;
-    await new Promise(function (resolve) {
-      if (window.sahasraFirebase) return resolve();
-      window.addEventListener('sahasra-firebase-ready', resolve, { once: true });
-      setTimeout(resolve, 8000);
-    });
-    fb = window.sahasraFirebase;
-    if (!fb) throw new Error('Authentication failed to load. Refresh and try again.');
-    return fb;
-  }
-
-  async function signIn() {
-    var btn = $('btn-signin');
+  async function loginWithPassword(username, password) {
+    var btn = $('btn-login');
     if (btn) btn.disabled = true;
     try {
-      var fb = await initFirebase();
-      await fb.signInWithPopup(fb.auth, fb.googleProvider);
-      await bootSession();
-    } catch (err) {
-      if (err && err.code !== 'auth/popup-closed-by-user') {
-        toast(err.message || 'Sign-in failed', true);
+      var res = await SahasraApi.login(username, password);
+      if (!res.ok) {
+        toast(res.data.error || 'Login failed', true);
+        return;
       }
+      SahasraApi.setToken(res.data.token);
+      await enterApp(res.data);
     } finally {
       if (btn) btn.disabled = false;
     }
   }
 
-  async function signOut() {
-    var fb = await initFirebase();
-    if (fb.auth.currentUser) await fb.signOut(fb.auth);
+  function signOut() {
+    SahasraApi.clearToken();
     state.profile = null;
     state.user = null;
     show('gate-view');
   }
 
-  async function bootSession() {
-    var fb = await initFirebase();
-    var user = fb.auth.currentUser;
-    if (!user || !user.email) {
-      show('gate-view');
-      return;
-    }
-    state.user = user;
-    var res = await SahasraApi.me();
-    if (res.status === 403) {
-      show('denied-view');
-      $('denied-email').textContent = user.email;
-      $('denied-view').querySelector('#denied-hint').innerHTML =
-        'Only Sahasra-authorized Google accounts can access this portal.<br>Try <strong>shreyassinha.work@gmail.com</strong> or ask your admin to add <strong>' +
-        esc(user.email) +
-        '</strong>.';
-      return;
-    }
-    if (!res.ok) {
-      show('gate-view');
-      toast((res.data && res.data.error) || 'Could not verify access (HTTP ' + res.status + ')', true);
-      return;
-    }
-    state.profile = res.data;
+  async function enterApp(profile) {
+    state.profile = profile;
     show('app-shell');
-    $('nav-user-email').textContent = user.email;
-    $('nav-user-name').textContent = state.profile.full_name || user.displayName || user.email.split('@')[0];
-    $('nav-org').textContent = (state.profile.org && state.profile.org.name) || 'Sahasra Group';
-    $('nav-admin-link').classList.toggle('hidden', state.profile.role !== 'admin');
+    $('nav-user-email').textContent = profile.username || profile.email || '';
+    $('nav-user-name').textContent = profile.full_name || profile.username || 'User';
+    $('nav-org').textContent = (profile.org && profile.org.name) || 'Sahasra Group';
+    $('nav-admin-link').classList.toggle('hidden', profile.role !== 'admin');
     routeFromHash();
+  }
+
+  async function bootSession() {
+    if (!SahasraApi.getToken()) {
+      show('gate-view');
+      return;
+    }
+    var res = await SahasraApi.me();
+    if (!res.ok) {
+      SahasraApi.clearToken();
+      show('gate-view');
+      if (res.status !== 401) toast(res.data.error || 'Session expired', true);
+      return;
+    }
+    await enterApp(res.data);
   }
 
   function routeFromHash() {
@@ -761,29 +740,24 @@
   }
 
   function bindEvents() {
-    var signInBtn = $('btn-signin');
+    var form = $('login-form');
+    if (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var fd = new FormData(form);
+        loginWithPassword(String(fd.get('username') || '').trim(), String(fd.get('password') || ''));
+      });
+    }
     var signOutBtn = $('btn-signout');
-    if (signInBtn) signInBtn.addEventListener('click', signIn);
     if (signOutBtn) signOutBtn.addEventListener('click', signOut);
     window.addEventListener('hashchange', function () {
       if (state.profile) routeFromHash();
     });
   }
 
-  async function boot() {
+  function boot() {
     bindEvents();
-    try {
-      var fb = await initFirebase();
-      return new Promise(function (resolve) {
-        fb.onAuthStateChanged(fb.auth, function (user) {
-          if (user && user.email) bootSession();
-          else show('gate-view');
-          resolve();
-        });
-      });
-    } catch (err) {
-      toast(err.message || 'Could not start sign-in', true);
-    }
+    bootSession();
   }
 
   boot();

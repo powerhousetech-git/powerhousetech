@@ -58,10 +58,57 @@ body {
   margin: 0;
 }
 
-.gate-foot {
-  margin-top: 24px;
+.gate-lead {
+  color: var(--muted);
+  margin: 0 0 20px;
+  font-size: 15px;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+  margin-bottom: 12px;
+}
+
+.login-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.login-form input {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  font: inherit;
+}
+
+.btn-block {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.demo-creds {
+  margin-top: 16px;
+  text-align: left;
   font-size: 12px;
   color: var(--muted);
+}
+
+.demo-creds summary {
+  cursor: pointer;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.demo-creds p {
+  margin: 4px 0;
 }
 
 .app-shell {
@@ -140,6 +187,15 @@ body {
   padding: 10px 16px;
   font: inherit;
   cursor: pointer;
+}
+
+.btn-google {
+  width: 100%;
+  margin-top: 16px;
+  background: #fff;
+  color: #222;
+  border: none;
+  font-weight: 600;
 }
 
 .btn-primary {

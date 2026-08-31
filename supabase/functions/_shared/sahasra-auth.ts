@@ -4,10 +4,26 @@ export type SahasraRole = 'costing_engineer' | 'reviewer' | 'admin';
 
 export type SahasraMember = {
   email: string;
+  username: string;
   org_id: string;
   full_name: string | null;
   role: SahasraRole;
 };
+
+export function memberFromPortalUser(row: {
+  username: string;
+  org_id: string;
+  full_name: string | null;
+  role: string;
+}): SahasraMember {
+  return {
+    username: row.username,
+    email: row.username + '@portal.sahasra',
+    org_id: row.org_id,
+    full_name: row.full_name,
+    role: row.role as SahasraRole,
+  };
+}
 
 export type OrgDefaults = {
   freight_in_pct: number;

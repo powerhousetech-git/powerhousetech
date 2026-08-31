@@ -2,24 +2,39 @@
   'use strict';
 
   var API = global.SAHASRA.API;
+  var TOKEN_KEY = 'sahasra_portal_token';
 
-  async function token() {
-    var fb = global.sahasraFirebase;
-    if (!fb || !fb.auth || !fb.auth.currentUser) return null;
-    return fb.auth.currentUser.getIdToken();
+  function getToken() {
+    try {
+      return sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
+    } catch (_) {
+      return null;
+    }
   }
 
-  async function request(method, query, body) {
-    var t = await token();
-    if (!t) return { ok: false, status: 401, data: { error: 'Sign in required' } };
+  function setToken(token) {
+    try {
+      sessionStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(TOKEN_KEY, token);
+    } catch (_) {}
+  }
+
+  function clearToken() {
+    try {
+      sessionStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(TOKEN_KEY);
+    } catch (_) {}
+  }
+
+  async function request(method, query, body, auth) {
     var url = API + (query ? '?' + query : '');
-    var opts = {
-      method: method,
-      headers: {
-        Authorization: 'Bearer ' + t,
-        'Content-Type': 'application/json',
-      },
-    };
+    var headers = { 'Content-Type': 'application/json' };
+    if (auth !== false) {
+      var t = getToken();
+      if (!t) return { ok: false, status: 401, data: { error: 'Sign in required' } };
+      headers.Authorization = 'Bearer ' + t;
+    }
+    var opts = { method: method, headers: headers };
     if (body != null) opts.body = JSON.stringify(body);
     var res = await fetch(url, opts);
     var data = {};
@@ -30,6 +45,12 @@
   }
 
   global.SahasraApi = {
+    getToken: getToken,
+    setToken: setToken,
+    clearToken: clearToken,
+    login: function (username, password) {
+      return request('POST', 'op=login', { username: username, password: password }, false);
+    },
     me: function () {
       return request('GET', 'op=me');
     },

@@ -18,20 +18,21 @@
     <div class="gate-card">
       <p class="eyebrow">Sahasra Group</p>
       <h1>Quotation Costing</h1>
-      <p id="gate-email-hint">Sign in at <strong>/sahasra/</strong> with your authorized Google account.<br>This is separate from the PowerhouseTech portal at /portal.</p>
-      <button type="button" class="btn btn-google" id="btn-signin">
-        Continue with Google
-      </button>
-      <p class="gate-foot">Powered by PowerhouseTech · Separate client portal</p>
-    </div>
-  </div>
-
-  <div id="denied-view" class="gate-shell hidden">
-    <div class="gate-card">
-      <h1>Access not enabled</h1>
-      <p>Account <strong id="denied-email"></strong> is not on the Sahasra portal yet.</p>
-      <p class="muted" id="denied-hint">Contact your Sahasra admin or PowerhouseTech to get access.</p>
-      <button type="button" class="btn btn-ghost" id="btn-signout-denied">Sign out</button>
+      <p class="gate-lead">Login to access the quotation costing portal.</p>
+      <form id="login-form" class="login-form">
+        <label>Username
+          <input name="username" id="login-username" autocomplete="username" required />
+        </label>
+        <label>Password
+          <input name="password" id="login-password" type="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit" class="btn btn-primary btn-block" id="btn-login">Login</button>
+      </form>
+      <details class="demo-creds">
+        <summary>Sample credentials</summary>
+        <p><strong>Admin:</strong> SahasraAdmin / SahasraAdmin</p>
+        <p><strong>Users:</strong> Sahasra_1 … Sahasra_5 (password = username)</p>
+      </details>
     </div>
   </div>
 
@@ -66,32 +67,12 @@
 
   <div id="toast" class="toast" role="status"></div>
 
-  <script src="/sahasra/js/config.js?v=3"></script>
-  <script src="/sahasra/js/format.js?v=3"></script>
-  <script src="/sahasra/js/compute-costing.js?v=3"></script>
-  <script src="/sahasra/js/validation.js?v=3"></script>
-  <script src="/sahasra/js/export-excel.js?v=3"></script>
-  <script src="/sahasra/js/api.js?v=3"></script>
-  <script type="module">
-    import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
-    import {
-      getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
-      setPersistence, browserLocalPersistence,
-    } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
-
-    const cfg = window.SAHASRA.firebaseConfig;
-    const app = getApps().length ? getApps()[0] : initializeApp(cfg);
-    const auth = getAuth(app);
-    await setPersistence(auth, browserLocalPersistence).catch(() => {});
-    const googleProvider = new GoogleAuthProvider();
-    window.sahasraFirebase = { auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged };
-    window.dispatchEvent(new CustomEvent('sahasra-firebase-ready'));
-  </script>
-  <script src="/sahasra/js/app.js?v=3"></script>
-  <script>
-    document.getElementById('btn-signout-denied')?.addEventListener('click', function () {
-      document.getElementById('btn-signout')?.click();
-    });
-  </script>
+  <script src="/sahasra/js/config.js?v=4"></script>
+  <script src="/sahasra/js/format.js?v=4"></script>
+  <script src="/sahasra/js/compute-costing.js?v=4"></script>
+  <script src="/sahasra/js/validation.js?v=4"></script>
+  <script src="/sahasra/js/export-excel.js?v=4"></script>
+  <script src="/sahasra/js/api.js?v=4"></script>
+  <script src="/sahasra/js/app.js?v=4"></script>
 </body>
 </html>
