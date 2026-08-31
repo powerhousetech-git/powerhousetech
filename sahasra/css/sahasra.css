@@ -210,6 +210,49 @@ body {
   color: var(--accent);
 }
 
+.badge-pending {
+  background: rgba(212, 160, 23, 0.15);
+  color: #e8c060;
+}
+
+.badge-review {
+  background: rgba(66, 79, 209, 0.18);
+  color: #9aa8ff;
+}
+
+.badge-done {
+  background: rgba(46, 168, 106, 0.15);
+  color: var(--green);
+}
+
+.field-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.computed-field {
+  background: var(--surface2);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.computed-label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.computed-value {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
 .form-panel {
   display: flex;
   flex-direction: column;

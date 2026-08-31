@@ -1,17 +1,12 @@
 (function (global) {
   'use strict';
 
-  function money(n, currency) {
-    var sym = currency === 'INR' ? '₹' : '$';
-    return sym + (Number(n) || 0).toFixed(2);
-  }
-
   function exportCostingExcel(costing, computed) {
     if (typeof XLSX === 'undefined') {
       alert('Excel library still loading. Try again in a moment.');
       return;
     }
-    var c = currencySymbol(costing.currency);
+
     var rows = [
       ['Assembly Name', costing.assembly_name || ''],
       ['', ''],
@@ -59,6 +54,9 @@
 
     var ws = XLSX.utils.aoa_to_sheet(rows);
     ws['!cols'] = [{ wch: 38 }, { wch: 18 }];
+    // Match sample: Value Addition shows as 18.3% not 0.183
+    if (ws.B43) ws.B43.z = '0.0%';
+
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Costing');
     var fname =
@@ -69,12 +67,10 @@
     XLSX.writeFile(wb, fname);
   }
 
-  function currencySymbol(currency) {
-    return currency === 'INR' ? 'INR' : 'USD';
-  }
-
   global.SahasraExport = {
     exportCostingExcel: exportCostingExcel,
-    money: money,
+    money: global.SahasraFormat ? global.SahasraFormat.money : function (n) {
+      return '$' + (Number(n) || 0).toFixed(2);
+    },
   };
 })(window);
