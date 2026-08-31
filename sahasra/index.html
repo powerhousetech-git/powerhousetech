@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sahasra Quotation Costing</title>
+  <meta name="description" content="Guided quotation costing for Sahasra Group EMS.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/sahasra/css/sahasra.css">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div id="gate-view" class="gate-shell">
+    <div class="gate-card">
+      <p class="eyebrow">Sahasra Group</p>
+      <h1>Quotation Costing</h1>
+      <p id="gate-email-hint">Sign in with your authorized Google account.</p>
+      <button type="button" class="btn btn-google" id="btn-signin">
+        Continue with Google
+      </button>
+      <p class="gate-foot">Powered by PowerhouseTech · Separate client portal</p>
+    </div>
+  </div>
+
+  <div id="denied-view" class="gate-shell hidden">
+    <div class="gate-card">
+      <h1>Access not enabled</h1>
+      <p>Account <strong id="denied-email"></strong> is not on the Sahasra portal yet.</p>
+      <p class="muted">Contact your Sahasra admin or PowerhouseTech to get access.</p>
+      <button type="button" class="btn btn-ghost" id="btn-signout-denied">Sign out</button>
+    </div>
+  </div>
+
+  <div id="app-shell" class="app-shell hidden">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <div class="brand-title">Sahasra</div>
+        <div class="brand-sub" id="nav-org">Sahasra Group</div>
+      </div>
+      <nav class="side-nav">
+        <a href="#/dashboard" data-nav="dashboard">Dashboard</a>
+        <a href="#/costings" data-nav="costings">Costings</a>
+        <a href="#/costing/new" data-nav="costings" class="nav-cta">+ New costing</a>
+        <a href="#/admin" data-nav="admin" id="nav-admin-link" class="hidden">Leadership</a>
+      </nav>
+      <div class="side-user">
+        <div class="user-name" id="nav-user-name">User</div>
+        <div class="user-email" id="nav-user-email"></div>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-signout">Sign out</button>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="main-head">
+        <div>
+          <h1 id="main-title">Dashboard</h1>
+          <p id="main-sub" class="muted"></p>
+        </div>
+      </header>
+      <div id="main-content" class="main-content"></div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="/sahasra/js/config.js"></script>
+  <script src="/sahasra/js/compute-costing.js"></script>
+  <script src="/sahasra/js/validation.js"></script>
+  <script src="/sahasra/js/export-excel.js"></script>
+  <script src="/sahasra/js/api.js"></script>
+  <script src="/sahasra/js/app.js"></script>
+  <script>
+    document.getElementById('btn-signout-denied')?.addEventListener('click', function () {
+      document.getElementById('btn-signout')?.click();
+    });
+  </script>
+</body>
+</html>

@@ -9,6 +9,17 @@
   publish = "."
   port = 8742
 
+# Sahasra client portal (separate from PowerhouseTech /portal)
+[[redirects]]
+  from = "/sahasra"
+  to = "/sahasra/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/sahasra/"
+  to = "/sahasra/index.html"
+  status = 200
+
 # Live Invoice Radar app (must stay above the /app → portal redirect)
 [[redirects]]
   from = "/app/invoice-radar"
