@@ -425,7 +425,10 @@
   async function loadCostingsList() {
     setActiveNav('costings');
     $('main-title').textContent = 'All costings';
-    $('main-sub').textContent = 'Pending drafts and finished quotations.';
+    $('main-sub').textContent =
+      state.profile && state.profile.role === 'admin'
+        ? 'Org-wide list with creator.'
+        : 'Only costings you created.';
     var res = await SahasraApi.listCostings();
     state.costings = res.ok ? res.data.costings || [] : [];
     $('main-content').innerHTML =
