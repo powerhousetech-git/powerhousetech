@@ -172,7 +172,7 @@
     if (res.status === 403) {
       show('denied-view');
       $('denied-email').textContent = user.email;
-      $('denied-view').querySelector('p.muted').innerHTML =
+      $('denied-view').querySelector('#denied-hint').innerHTML =
         'Only Sahasra-authorized Google accounts can access this portal.<br>Try <strong>shreyassinha.work@gmail.com</strong> or ask your admin to add <strong>' +
         esc(user.email) +
         '</strong>.';
