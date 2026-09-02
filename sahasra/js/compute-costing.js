@@ -6,7 +6,24 @@
     return Number.isFinite(n) ? n : fallback || 0;
   }
 
+  function naList(costing) {
+    var list = costing && costing.na_fields;
+    return Array.isArray(list) ? list : [];
+  }
+
+  function isNaField(costing, field) {
+    return naList(costing).indexOf(field) >= 0;
+  }
+
+  function fieldNum(costing, field, fallback) {
+    if (isNaField(costing, field)) return fallback || 0;
+    return num(costing[field], fallback || 0);
+  }
+
   function pct(costing, key, defaults) {
+    if (isNaField(costing, key) || isNaField(costing, key + '_override')) {
+      return num(defaults[key], 0);
+    }
     var override = costing[key + '_override'] ?? costing[key];
     if (override != null && override !== '') return num(override, defaults[key] ?? 0);
     return num(defaults[key], 0);
@@ -14,11 +31,11 @@
 
   function computeCosting(costing, defaults) {
     defaults = defaults || {};
-    var quantity = num(costing.quantity, 0);
-    var bomElec = num(costing.bom_cost_elec, 0);
-    var bomMech = num(costing.bom_cost_mech, 0);
-    var pcbCost = num(costing.pcb_cost, 0);
-    var smtPth = num(costing.smt_pth, 0);
+    var quantity = fieldNum(costing, 'quantity', 0);
+    var bomElec = fieldNum(costing, 'bom_cost_elec', 0);
+    var bomMech = fieldNum(costing, 'bom_cost_mech', 0);
+    var pcbCost = fieldNum(costing, 'pcb_cost', 0);
+    var smtPth = fieldNum(costing, 'smt_pth', 0);
 
     var freightInPct = pct(costing, 'freight_in_pct', defaults);
     var inventoryPct = pct(costing, 'inventory_carrying_pct', defaults);
@@ -34,17 +51,19 @@
     var inventoryCarrying = materialCost * (inventoryPct / 100);
 
     var labourElec =
-      costing.labour_elec_override != null && costing.labour_elec_override !== ''
+      !isNaField(costing, 'labour_elec_override') &&
+      costing.labour_elec_override != null &&
+      costing.labour_elec_override !== ''
         ? num(costing.labour_elec_override, 0)
         : smtPth * labourMult;
 
-    var labourMech = num(costing.labour_mech, 0);
-    var testing = num(costing.functional_ict_testing, 0);
-    var programming = num(costing.programming, 0);
-    var grease = num(costing.lubrication_grease, 0);
-    var aoi = num(costing.aoi, 0);
-    var labeling = num(costing.pca_labeling, 0);
-    var packaging = num(costing.packaging_forwarding, 0);
+    var labourMech = fieldNum(costing, 'labour_mech', 0);
+    var testing = fieldNum(costing, 'functional_ict_testing', 0);
+    var programming = fieldNum(costing, 'programming', 0);
+    var grease = fieldNum(costing, 'lubrication_grease', 0);
+    var aoi = fieldNum(costing, 'aoi', 0);
+    var labeling = fieldNum(costing, 'pca_labeling', 0);
+    var packaging = fieldNum(costing, 'packaging_forwarding', 0);
 
     var mfgCost =
       inventoryCarrying +
@@ -68,12 +87,14 @@
     var orderValue = quantity * quotePrice;
 
     var pcbTooling =
-      costing.pcb_tooling_override != null && costing.pcb_tooling_override !== ''
+      !isNaField(costing, 'pcb_tooling_override') &&
+      costing.pcb_tooling_override != null &&
+      costing.pcb_tooling_override !== ''
         ? num(costing.pcb_tooling_override, 0)
         : pcbToolingDefault;
-    var smtStencil = num(costing.smt_stencil, 0);
-    var mechTooling = num(costing.mech_pkg_dev_tooling, 0);
-    var miscTooling = num(costing.misc_tooling, 0);
+    var smtStencil = fieldNum(costing, 'smt_stencil', 0);
+    var mechTooling = fieldNum(costing, 'mech_pkg_dev_tooling', 0);
+    var miscTooling = fieldNum(costing, 'misc_tooling', 0);
     var toolingCost = pcbTooling + smtStencil + mechTooling + miscTooling;
 
     var valueAdditionPct =
@@ -110,5 +131,11 @@
     };
   }
 
-  global.SahasraCompute = { computeCosting: computeCosting, num: num };
+  global.SahasraCompute = {
+    computeCosting: computeCosting,
+    num: num,
+    isNaField: isNaField,
+    naList: naList,
+    fieldNum: fieldNum,
+  };
 })(window);

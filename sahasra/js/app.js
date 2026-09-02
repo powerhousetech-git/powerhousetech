@@ -59,9 +59,9 @@
     bom_cost_elec: 'BOM Cost (Amt.) - Elec.',
     bom_cost_mech: 'BOM Cost (Amt.) - Mech.',
     pcb_cost: 'PCB Cost (Amt.)',
-    freight_in_pct_override: 'Freight In & CC (%) override',
-    inventory_carrying_pct_override: 'Inventory carrying (%) override',
-    inventory_carrying_cost: 'Inventory Carrying Cost @ 1%',
+    freight_in_pct_override: 'Freight In & CC (%)',
+    inventory_carrying_pct_override: 'Inventory carrying (%)',
+    inventory_carrying_cost: 'Inventory Carrying Cost',
     labour_elec: 'Labour Elec.',
     labour_mech: 'Labour Mech.',
     functional_ict_testing: 'Functional & ICT Testing',
@@ -75,17 +75,18 @@
     pcb_price: 'PCB Price',
     pcb_size: 'PCB Size (LxW mm)',
     pcb_layer: 'PCB layer',
-    pcb_tooling_override: 'PCB Tooling override',
+    pcb_tooling_override: 'PCB Tooling',
     smt_stencil: 'SMT Stencil',
     mech_pkg_dev_tooling: 'Mech. & Pkg. Dev. Tooling',
     misc_tooling: 'Mic. Tooling',
     parts_lead_time: 'Parts LT',
     production_lead_time: 'Production Lead-Time',
     engineering_lead_time: 'Engineering LT',
-    rejection_pct_override: 'Rejection (%) override',
-    overhead_pct_override: 'Overhead (%) override',
-    freight_out_pct_override: 'Freight Out (%) override',
-    margin_pct_override: 'Margin (%) override',
+    labour_elec_override: 'Labour Elec. (manual)',
+    rejection_pct_override: 'Rejection (%)',
+    overhead_pct_override: 'Overhead (%)',
+    freight_out_pct_override: 'Freight Out (%)',
+    margin_pct_override: 'Margin (%)',
   };
 
   var PLACEHOLDERS = {
@@ -95,6 +96,81 @@
     pcb_size: '200x169.4',
     pcb_vendor: 'SCS',
   };
+
+  var OVERRIDE_FIELDS = {
+    freight_in_pct_override: true,
+    inventory_carrying_pct_override: true,
+    labour_elec_override: true,
+    pcb_tooling_override: true,
+    rejection_pct_override: true,
+    overhead_pct_override: true,
+    freight_out_pct_override: true,
+    margin_pct_override: true,
+  };
+
+  function defaultPct(key) {
+    var d = (state.profile && state.profile.defaults) || {};
+    if (key === 'freight_in_pct_override') return d.freight_in_pct != null ? d.freight_in_pct : 5;
+    if (key === 'inventory_carrying_pct_override') {
+      return d.inventory_carrying_pct != null ? d.inventory_carrying_pct : 1;
+    }
+    if (key === 'rejection_pct_override') return d.rejection_pct != null ? d.rejection_pct : 1;
+    if (key === 'overhead_pct_override') return d.overhead_pct != null ? d.overhead_pct : 3;
+    if (key === 'freight_out_pct_override') return d.freight_out_pct != null ? d.freight_out_pct : 5;
+    if (key === 'margin_pct_override') return d.margin_pct != null ? d.margin_pct : 10;
+    if (key === 'pcb_tooling_override') return d.pcb_tooling_default != null ? d.pcb_tooling_default : 600;
+    if (key === 'labour_elec_override') {
+      return d.labour_elec_multiplier != null ? d.labour_elec_multiplier : 0.005;
+    }
+    return '';
+  }
+
+  function overrideFormula(key) {
+    var d = defaultPct(key);
+    if (key === 'freight_in_pct_override') {
+      return 'Formula: (BOM Elec + BOM Mech + PCB Cost) × ' + d + '%. Change % if needed.';
+    }
+    if (key === 'inventory_carrying_pct_override') {
+      return 'Formula: Material Cost × ' + d + '%. Change % if needed.';
+    }
+    if (key === 'labour_elec_override') {
+      return 'Formula: SMT+PTH × ' + d + '. Leave blank to auto-calc, or enter a fixed amount.';
+    }
+    if (key === 'pcb_tooling_override') {
+      return 'Default tooling amount: ' + d + '. Leave blank to use default, or enter a new amount.';
+    }
+    if (key === 'rejection_pct_override') return 'Formula: Sub Total 1 × ' + d + '%.';
+    if (key === 'overhead_pct_override') return 'Formula: Sub Total 2 × ' + d + '%.';
+    if (key === 'freight_out_pct_override') return 'Formula: Product Cost × ' + d + '%.';
+    if (key === 'margin_pct_override') return 'Formula: Product Cost × ' + d + '%.';
+    return 'Optional — leave blank to use org default.';
+  }
+
+  function getNaFields(costing) {
+    return SahasraCompute.naList(costing || state.costing || {});
+  }
+
+  function isNaMarked(field, costing) {
+    return SahasraCompute.isNaField(costing || state.costing || {}, field);
+  }
+
+  function isOverrideField(f) {
+    return !!OVERRIDE_FIELDS[f];
+  }
+
+  function isFieldSatisfied(field, costing) {
+    if (isOverrideField(field)) return true;
+    if (isNaMarked(field, costing)) return true;
+    var v = costing[field];
+    return v != null && String(v).trim() !== '';
+  }
+
+  function stepRequiredComplete(step, costing) {
+    if (!step || !step.fields) return true;
+    return step.fields.every(function (f) {
+      return isFieldSatisfied(f, costing);
+    });
+  }
 
   var COMPUTED_LABELS = {
     inventory_carrying_cost: 'inventory_carrying_cost',
@@ -223,12 +299,25 @@
 
   function collectFormFields(form) {
     var patch = {};
+    var naFields = getNaFields(state.costing).slice();
     form.querySelectorAll('[data-field]').forEach(function (inp) {
       var key = inp.getAttribute('data-field');
+      var naBox = form.querySelector('[data-na="' + key + '"]');
+      var markedNa = naBox ? naBox.checked : isNaMarked(key);
+      if (markedNa) {
+        if (naFields.indexOf(key) < 0) naFields.push(key);
+        patch[key] = null;
+        return;
+      }
+      naFields = naFields.filter(function (f) {
+        return f !== key;
+      });
       var v = inp.value.trim();
       if (v === '') patch[key] = null;
       else patch[key] = inp.type === 'number' ? Number(v) : v;
     });
+    // Keep NA marks for fields not on this step.
+    patch.na_fields = naFields;
     return patch;
   }
 
@@ -237,6 +326,16 @@
     Object.keys(patch).forEach(function (k) {
       state.costing[k] = patch[k];
     });
+  }
+
+  function updateContinueGate(form) {
+    var btn = form && form.querySelector('#btn-continue');
+    if (!btn) return;
+    var step = STEPS[state.wizardStep - 1];
+    applyFormFieldsToState(form);
+    var ok = stepRequiredComplete(step, state.costing);
+    btn.disabled = !ok;
+    btn.title = ok ? '' : 'Fill all required fields or mark NA to continue';
   }
 
   async function persistCosting(patch, msg) {
@@ -251,6 +350,7 @@
       return false;
     }
     state.costing = res.data.costing;
+    if (!Array.isArray(state.costing.na_fields)) state.costing.na_fields = [];
     recompute();
     if (msg) toast(msg);
     return true;
@@ -261,14 +361,48 @@
     var isLead = f.indexOf('lead_time') >= 0 || f.indexOf('_lt') >= 0;
     var isText = isLead || f === 'pcb_vendor' || f === 'pcb_size';
     var type = isText ? 'text' : 'number';
-    var ph = PLACEHOLDERS[f] ? ' placeholder="' + esc(PLACEHOLDERS[f]) + '"' : '';
+    var optional = isOverrideField(f);
+    var markedNa = !optional && isNaMarked(f, c);
+    var ph = '';
+    if (optional) {
+      ph = ' placeholder="' + esc(String(defaultPct(f))) + '"';
+    } else if (PLACEHOLDERS[f]) {
+      ph = ' placeholder="' + esc(PLACEHOLDERS[f]) + '"';
+    }
     var hint = '';
-    if (isLead) {
+    if (optional) {
+      hint = '<span class="field-hint">' + esc(overrideFormula(f)) + '</span>';
+    } else if (isLead) {
       hint = '<span class="field-hint">Include units, e.g. weeks or week / Batch</span>';
     }
-    return (
-      '<label class="field-label">' +
+    var labelText =
       esc(LABELS[f] || f) +
+      (optional
+        ? ' <span class="opt-tag">optional</span>'
+        : ' <span class="req-star" title="Required">*</span>');
+    var naToggle = optional
+      ? ''
+      : '<label class="na-toggle' +
+        (markedNa ? ' is-on' : '') +
+        '"><input type="checkbox" data-na="' +
+        f +
+        '"' +
+        (markedNa ? ' checked' : '') +
+        ' /><span>NA</span></label>';
+    return (
+      '<div class="field-row' +
+      (markedNa ? ' is-na' : '') +
+      (optional ? ' is-optional' : '') +
+      '" data-field-row="' +
+      f +
+      '">' +
+      '<div class="field-main">' +
+      '<div class="field-top">' +
+      '<span class="field-name">' +
+      labelText +
+      '</span>' +
+      naToggle +
+      '</div>' +
       '<input data-field="' +
       f +
       '" type="' +
@@ -276,22 +410,34 @@
       '"' +
       (type === 'number' ? ' step="any"' : '') +
       ph +
+      (markedNa ? ' disabled' : '') +
       ' value="' +
-      esc(val != null ? val : '') +
+      esc(markedNa ? '' : val != null ? val : '') +
       '" />' +
       hint +
-      '</label>'
+      '</div></div>'
     );
   }
 
   function computedFieldHtml(key, c, comp) {
     var text = '';
+    var formula = 'Auto-calculated · matches Excel formula row';
     if (key === 'labour_elec') {
       text = comp.labour_elec_pending
         ? 'Pending — fill SMT+PTH in Step 4'
         : fmtMoney(comp.labour_elec, c.currency);
+      formula =
+        'Formula: SMT+PTH × ' +
+        ((state.profile && state.profile.defaults && state.profile.defaults.labour_elec_multiplier) ||
+          0.005);
     } else if (key === 'inventory_carrying_cost') {
       text = fmtMoney(comp.inventory_carrying_cost, c.currency);
+      formula =
+        'Formula: Material Cost × ' +
+        (comp.percentages.inventory_carrying_pct != null
+          ? comp.percentages.inventory_carrying_pct
+          : 1) +
+        '%';
     }
     return (
       '<div class="computed-field">' +
@@ -303,7 +449,9 @@
       '">' +
       esc(text) +
       '</span>' +
-      '<span class="field-hint">Auto-calculated · matches Excel formula row</span>' +
+      '<span class="field-hint">' +
+      esc(formula) +
+      '</span>' +
       '</div>'
     );
   }
@@ -609,6 +757,7 @@
       return;
     }
     state.costing = res.data.costing;
+    if (!Array.isArray(state.costing.na_fields)) state.costing.na_fields = [];
     state.wizardStep = state.costing.current_step || 1;
     if (state.wizardStep > 7) state.wizardStep = 7;
     recompute();
@@ -627,6 +776,29 @@
       inp.addEventListener('input', function () {
         applyFormFieldsToState(form);
         schedulePreviewUpdate();
+        updateContinueGate(form);
+      });
+    });
+    form.querySelectorAll('[data-na]').forEach(function (box) {
+      box.addEventListener('change', function () {
+        var key = box.getAttribute('data-na');
+        var row = form.querySelector('[data-field-row="' + key + '"]');
+        var inp = form.querySelector('[data-field="' + key + '"]');
+        if (box.checked) {
+          if (inp) {
+            inp.value = '';
+            inp.disabled = true;
+          }
+          if (row) row.classList.add('is-na');
+          box.closest('.na-toggle').classList.add('is-on');
+        } else {
+          if (inp) inp.disabled = false;
+          if (row) row.classList.remove('is-na');
+          box.closest('.na-toggle').classList.remove('is-on');
+        }
+        applyFormFieldsToState(form);
+        schedulePreviewUpdate();
+        updateContinueGate(form);
       });
     });
   }
@@ -664,13 +836,10 @@
     }
 
     if (state.wizardStep === 3) {
-      fieldsHtml +=
-        '<label class="field-label">Labour Elec. override (optional)' +
-        '<input data-field="labour_elec_override" type="number" step="any" value="' +
-        esc(c.labour_elec_override != null ? c.labour_elec_override : '') +
-        '" placeholder="Leave blank to auto-calc from SMT+PTH" /></label>';
+      fieldsHtml += fieldInputHtml('labour_elec_override', c);
     }
 
+    var stepOk = stepRequiredComplete(step, c);
     var stepper = STEPS.map(function (s) {
       var done = s.n < state.wizardStep;
       var cur = s.n === state.wizardStep;
@@ -696,14 +865,17 @@
       step.n +
       ': ' +
       esc(step.title) +
-      '</h2><form id="step-form" class="form-panel">' +
+      '</h2><p class="step-req-note">Required fields marked * — use NA if not applicable. Optional % fields show the formula and stay editable.</p><form id="step-form" class="form-panel">' +
       fieldsHtml +
       '<div class="form-actions">' +
       '<button type="button" class="btn btn-ghost" id="btn-back"' +
       (state.wizardStep <= 1 ? ' disabled' : '') +
       '>Back</button>' +
       '<button type="button" class="btn btn-ghost" id="btn-draft">Save draft</button>' +
-      '<button type="submit" class="btn btn-primary">' +
+      '<button type="submit" class="btn btn-primary" id="btn-continue"' +
+      (stepOk ? '' : ' disabled') +
+      (stepOk ? '' : ' title="Fill all required fields or mark NA to continue"') +
+      '>' +
       (state.wizardStep >= 6 ? 'Continue to review' : 'Save & continue') +
       '</button></div></form></div>' +
       '<div class="preview-panel">' +
@@ -712,9 +884,16 @@
 
     var form = $('step-form');
     bindStepInputs(form);
+    updateContinueGate(form);
 
     form.onsubmit = async function (e) {
       e.preventDefault();
+      applyFormFieldsToState(form);
+      if (!stepRequiredComplete(step, state.costing)) {
+        toast('Fill all required fields or mark them NA before continuing.', true);
+        updateContinueGate(form);
+        return;
+      }
       var patch = collectFormFields(form);
       var nextStep = state.wizardStep >= 6 ? 7 : state.wizardStep + 1;
       patch.current_step = nextStep;

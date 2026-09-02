@@ -334,6 +334,83 @@ body {
   margin-top: 2px;
 }
 
+.step-req-note {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 14px;
+}
+
+.field-row {
+  text-align: left;
+}
+
+.field-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.field-name {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.req-star {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.opt-tag {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  opacity: 0.85;
+}
+
+.na-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  flex-direction: row;
+  margin: 0;
+}
+
+.na-toggle input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.na-toggle.is-on {
+  color: var(--accent);
+}
+
+.field-row.is-na input[data-field] {
+  background: rgba(255, 255, 255, 0.03);
+  color: transparent;
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+.field-row.is-na::after {
+  content: 'NA — excluded from this quote';
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.field-row.is-optional .field-hint {
+  margin-top: 4px;
+}
+
 .computed-field {
   background: var(--surface2);
   border: 1px dashed var(--border);
@@ -373,13 +450,26 @@ body {
 }
 
 .form-panel input,
-.form-panel select {
+.form-panel select,
+.field-row input[data-field] {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 12px;
   color: var(--text);
   font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-panel input:disabled,
+.field-row input[data-field]:disabled {
+  opacity: 0.55;
+}
+
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .form-actions {

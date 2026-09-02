@@ -129,4 +129,5 @@ export const COSTING_FIELDS = [
   'overhead_pct_override',
   'freight_out_pct_override',
   'margin_pct_override',
+  'na_fields',
 ] as const;
