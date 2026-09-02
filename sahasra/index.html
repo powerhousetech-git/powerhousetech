@@ -28,11 +28,16 @@
         </label>
         <button type="submit" class="btn btn-primary btn-block" id="btn-login">Login</button>
       </form>
-      <details class="demo-creds">
-        <summary>Sample credentials</summary>
-        <p><strong>Admin:</strong> SahasraAdmin / SahasraAdmin</p>
-        <p><strong>Users:</strong> Sahasra_1 … Sahasra_5 (password = username)</p>
-      </details>
+      <div class="gate-footer">
+        <details class="demo-creds">
+          <summary>Sample credentials</summary>
+          <p><strong>Admin:</strong> SahasraAdmin / SahasraAdmin</p>
+          <p><strong>Users:</strong> Sahasra_1 … Sahasra_5 (password = username)</p>
+        </details>
+        <button type="button" class="btn-google-admin" id="btn-google-admin">
+          PowerhouseTech admin · Google
+        </button>
+      </div>
     </div>
   </div>
 
@@ -67,12 +72,13 @@
 
   <div id="toast" class="toast" role="status"></div>
 
-  <script src="/sahasra/js/config.js?v=5"></script>
-  <script src="/sahasra/js/format.js?v=5"></script>
-  <script src="/sahasra/js/compute-costing.js?v=5"></script>
-  <script src="/sahasra/js/validation.js?v=5"></script>
-  <script src="/sahasra/js/export-excel.js?v=5"></script>
-  <script src="/sahasra/js/api.js?v=5"></script>
-  <script src="/sahasra/js/app.js?v=5"></script>
+  <script type="module" src="/js/firebase-boot.js"></script>
+  <script src="/sahasra/js/config.js?v=6"></script>
+  <script src="/sahasra/js/format.js?v=6"></script>
+  <script src="/sahasra/js/compute-costing.js?v=6"></script>
+  <script src="/sahasra/js/validation.js?v=6"></script>
+  <script src="/sahasra/js/export-excel.js?v=6"></script>
+  <script src="/sahasra/js/api.js?v=6"></script>
+  <script src="/sahasra/js/app.js?v=6"></script>
 </body>
 </html>

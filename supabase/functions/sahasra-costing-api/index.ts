@@ -52,7 +52,8 @@ async function resolveMember(req: Request): Promise<SahasraMember> {
   try {
     const user = await verifyFirebaseIdToken(token);
     const member = await requireSahasraMember(user.email);
-    return { ...member, username: member.email.split('@')[0] };
+    // Use full email as actor id so admin "Created by" is unambiguous.
+    return { ...member, username: member.email, email: member.email };
   } catch {
     throw unauthorized('Invalid or expired session');
   }

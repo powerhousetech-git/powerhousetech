@@ -308,6 +308,31 @@
     );
   }
 
+  var PH_ADMIN_GOOGLE_EMAIL = 'shreyassinha.work@gmail.com';
+
+  function waitForFirebase(timeoutMs) {
+    return new Promise(function (resolve) {
+      if (window.phFirebaseAuth) {
+        resolve(window.phFirebaseAuth);
+        return;
+      }
+      var done = false;
+      function finish(val) {
+        if (done) return;
+        done = true;
+        window.removeEventListener('ph-firebase-ready', onReady);
+        resolve(val);
+      }
+      function onReady() {
+        finish(window.phFirebaseAuth || null);
+      }
+      window.addEventListener('ph-firebase-ready', onReady);
+      setTimeout(function () {
+        finish(window.phFirebaseAuth || null);
+      }, timeoutMs || 8000);
+    });
+  }
+
   async function loginWithPassword(username, password) {
     var btn = $('btn-login');
     if (btn) btn.disabled = true;
@@ -324,17 +349,60 @@
     }
   }
 
-  function signOut() {
+  async function loginWithGoogleAdmin() {
+    var btn = $('btn-google-admin');
+    if (btn) btn.disabled = true;
+    try {
+      var fb = await waitForFirebase();
+      if (!fb) {
+        toast('Google sign-in is unavailable. Try again.', true);
+        return;
+      }
+      var result = await fb.signInWithPopup(fb.auth, fb.googleProvider);
+      var email = (result.user && result.user.email ? result.user.email : '').trim().toLowerCase();
+      if (email !== PH_ADMIN_GOOGLE_EMAIL) {
+        await fb.signOut(fb.auth).catch(function () {});
+        SahasraApi.clearToken();
+        toast('Use ' + PH_ADMIN_GOOGLE_EMAIL + ' for PowerhouseTech admin access.', true);
+        return;
+      }
+      var idToken = await result.user.getIdToken();
+      SahasraApi.setToken(idToken);
+      var res = await SahasraApi.me();
+      if (!res.ok) {
+        await fb.signOut(fb.auth).catch(function () {});
+        SahasraApi.clearToken();
+        toast(res.data.error || 'Google admin access denied', true);
+        return;
+      }
+      await enterApp(res.data);
+    } catch (err) {
+      var code = err && err.code;
+      if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
+        toast((err && err.message) || 'Google sign-in failed', true);
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function signOut() {
     SahasraApi.clearToken();
     state.profile = null;
     state.user = null;
+    try {
+      var fb = window.phFirebaseAuth;
+      if (fb && fb.auth && fb.auth.currentUser) {
+        await fb.signOut(fb.auth);
+      }
+    } catch (_) {}
     show('gate-view');
   }
 
   async function enterApp(profile) {
     state.profile = profile;
     show('app-shell');
-    $('nav-user-email').textContent = profile.username || profile.email || '';
+    $('nav-user-email').textContent = profile.email || profile.username || '';
     $('nav-user-name').textContent = profile.full_name || profile.username || 'User';
     $('nav-org').textContent = (profile.org && profile.org.name) || 'Sahasra Group';
     $('nav-admin-link').classList.toggle('hidden', profile.role !== 'admin');
@@ -342,18 +410,57 @@
   }
 
   async function bootSession() {
-    if (!SahasraApi.getToken()) {
-      show('gate-view');
+    var token = SahasraApi.getToken();
+    if (token && token.indexOf('sp1.') === 0) {
+      var resPw = await SahasraApi.me();
+      if (!resPw.ok) {
+        SahasraApi.clearToken();
+        show('gate-view');
+        if (resPw.status !== 401) toast(resPw.data.error || 'Session expired', true);
+        return;
+      }
+      await enterApp(resPw.data);
       return;
     }
-    var res = await SahasraApi.me();
-    if (!res.ok) {
+
+    var fb = await waitForFirebase();
+    if (fb && fb.auth) {
+      var user = await new Promise(function (resolve) {
+        var unsub = fb.onAuthStateChanged(fb.auth, function (u) {
+          unsub();
+          resolve(u);
+        });
+      });
+      if (user) {
+        var email = (user.email || '').trim().toLowerCase();
+        if (email !== PH_ADMIN_GOOGLE_EMAIL) {
+          await fb.signOut(fb.auth).catch(function () {});
+          SahasraApi.clearToken();
+          show('gate-view');
+          return;
+        }
+        try {
+          SahasraApi.setToken(await user.getIdToken());
+          var resG = await SahasraApi.me();
+          if (resG.ok) {
+            await enterApp(resG.data);
+            return;
+          }
+        } catch (_) {}
+        await fb.signOut(fb.auth).catch(function () {});
+        SahasraApi.clearToken();
+      }
+    }
+
+    if (token) {
+      var res = await SahasraApi.me();
+      if (res.ok) {
+        await enterApp(res.data);
+        return;
+      }
       SahasraApi.clearToken();
-      show('gate-view');
-      if (res.status !== 401) toast(res.data.error || 'Session expired', true);
-      return;
     }
-    await enterApp(res.data);
+    show('gate-view');
   }
 
   function routeFromHash() {
@@ -796,6 +903,8 @@
         loginWithPassword(String(fd.get('username') || '').trim(), String(fd.get('password') || ''));
       });
     }
+    var googleBtn = $('btn-google-admin');
+    if (googleBtn) googleBtn.addEventListener('click', loginWithGoogleAdmin);
     var signOutBtn = $('btn-signout');
     if (signOutBtn) signOutBtn.addEventListener('click', signOut);
     window.addEventListener('hashchange', function () {
