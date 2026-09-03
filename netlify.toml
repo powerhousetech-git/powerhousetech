@@ -20,6 +20,17 @@
   to = "/sahasra/index.html"
   status = 200
 
+# PS2 Lead Management (website entry)
+[[redirects]]
+  from = "/sahasra/lead-management"
+  to = "/sahasra/lead-management/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/sahasra/lead-management/"
+  to = "/sahasra/lead-management/index.html"
+  status = 200
+
 # PS2 lead management entry page on the static website.
 # The interactive Next.js app itself should be deployed to a server host
 # (for example Railway) and then proxied here as /ps2/*.
