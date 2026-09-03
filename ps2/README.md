@@ -37,6 +37,12 @@ See `.env.example`. For production Supabase (schema in `supabase/migrations/2026
 
 n8n calls use header `x-api-key: $N8N_API_KEY`.
 
+## Production deployment
+
+`ps2/` is a dynamic Next.js app and should be deployed on a server host such as Railway, then proxied through the main Netlify domain as `/ps2/*`.
+
+See `ps2/DEPLOY.md`.
+
 ## PRD
 
 `products/ps2-lead-management-prd.md`

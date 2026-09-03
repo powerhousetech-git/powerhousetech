@@ -20,6 +20,10 @@
   to = "/sahasra/index.html"
   status = 200
 
+# PS2 lead management entry page on the static website.
+# The interactive Next.js app itself should be deployed to a server host
+# (for example Railway) and then proxied here as /ps2/*.
+
 # Live Invoice Radar app (must stay above the /app → portal redirect)
 [[redirects]]
   from = "/app/invoice-radar"
