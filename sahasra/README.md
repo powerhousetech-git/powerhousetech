@@ -6,6 +6,7 @@ Separate client portal for **Sahasra Group** — not linked from the PowerhouseT
 
 - Production: https://powerhousetech.in/sahasra/
 - Local: serve repo root and open `/sahasra/`
+- Lead Management entry: `https://powerhousetech.in/sahasra/lead-management/` (launches the PS2 portal at `/ps2/login`)
 
 ## Access
 
