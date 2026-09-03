@@ -33,6 +33,7 @@ body {
   display: grid;
   place-items: center;
   padding: 24px;
+  position: relative;
 }
 
 .gate-card {
@@ -95,12 +96,10 @@ body {
 }
 
 .demo-creds {
-  margin: 0;
+  margin-top: 16px;
   text-align: left;
   font-size: 12px;
   color: var(--muted);
-  flex: 1;
-  min-width: 0;
 }
 
 .demo-creds summary {
@@ -113,49 +112,32 @@ body {
   margin: 4px 0;
 }
 
-.gate-footer {
-  margin-top: 16px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.btn-google-admin {
-  flex-shrink: 0;
-  margin-top: 2px;
+.gate-ph-arrow {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   border: 1px solid var(--border);
-  background: transparent;
+  background: rgba(21, 25, 34, 0.85);
   color: var(--muted);
-  font: inherit;
-  font-size: 11px;
-  padding: 6px 10px;
-  border-radius: 8px;
+  font-size: 16px;
+  line-height: 1;
   cursor: pointer;
-  white-space: nowrap;
   transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
-.btn-google-admin:hover {
-  color: var(--text);
+.gate-ph-arrow:hover {
+  color: var(--accent);
   border-color: var(--accent);
-  background: rgba(232, 122, 46, 0.08);
+  background: rgba(232, 122, 46, 0.1);
 }
 
-.btn-google-admin:disabled {
+.gate-ph-arrow:disabled {
   opacity: 0.6;
   cursor: wait;
-}
-
-@media (max-width: 480px) {
-  .gate-footer {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .btn-google-admin {
-    align-self: flex-end;
-  }
 }
 
 .app-shell {
@@ -567,6 +549,181 @@ body {
 
 .toast.show { opacity: 1; }
 .toast.err { border-color: #c44; color: #faa; }
+
+.true-value-banner {
+  margin: 16px 20px 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(232, 122, 46, 0.45);
+  background: rgba(232, 122, 46, 0.12);
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.true-value-banner a {
+  color: var(--accent);
+}
+
+.costing-row {
+  cursor: pointer;
+}
+
+.costing-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.costing-row.is-expanded {
+  background: rgba(232, 122, 46, 0.08);
+}
+
+.row-actions {
+  width: 44px;
+  text-align: right;
+}
+
+.btn-icon {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.7;
+  padding: 4px 6px;
+}
+
+.btn-icon:hover {
+  opacity: 1;
+}
+
+.summary-row td {
+  background: var(--surface2);
+  padding: 0;
+}
+
+.summary-card {
+  padding: 14px 16px 18px;
+  border-top: 1px solid var(--border);
+}
+
+.summary-head {
+  margin-bottom: 10px;
+}
+
+.mini-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.mini-table th,
+.mini-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.true-value-form,
+.flag-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+  margin-top: 8px;
+}
+
+.true-value-form label,
+.flag-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.true-value-form input,
+.flag-form input[name='body'] {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text);
+  font: inherit;
+  min-width: 140px;
+}
+
+.flag-form input[name='body'] {
+  flex: 1;
+  min-width: 220px;
+}
+
+.comments-block {
+  margin-top: 12px;
+}
+
+.comments-block h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 16px 0 24px;
+}
+
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.chart-card h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.btn-danger {
+  background: #c44;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: grid;
+  place-items: center;
+  z-index: 200;
+  padding: 20px;
+}
+
+.modal-card {
+  width: min(420px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px;
+}
+
+.modal-card h3 {
+  margin: 0 0 8px;
+}
+
+.history-list li {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 1100px) {
+  .charts-grid { grid-template-columns: 1fr; }
+}
 
 @media (max-width: 900px) {
   .app-shell { grid-template-columns: 1fr; }

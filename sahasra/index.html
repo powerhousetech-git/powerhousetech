@@ -12,9 +12,11 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/sahasra/css/sahasra.css">
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <div id="gate-view" class="gate-shell">
+    <button type="button" class="gate-ph-arrow" id="btn-google-admin" title="PowerhouseTech admin · Google">↗</button>
     <div class="gate-card">
       <p class="eyebrow">Sahasra Group</p>
       <h1>Quotation Costing</h1>
@@ -28,16 +30,11 @@
         </label>
         <button type="submit" class="btn btn-primary btn-block" id="btn-login">Login</button>
       </form>
-      <div class="gate-footer">
-        <details class="demo-creds">
-          <summary>Sample credentials</summary>
-          <p><strong>Admin:</strong> SahasraAdmin / SahasraAdmin</p>
-          <p><strong>Users:</strong> Sahasra_1 … Sahasra_5 (password = username)</p>
-        </details>
-        <button type="button" class="btn-google-admin" id="btn-google-admin">
-          PowerhouseTech admin · Google
-        </button>
-      </div>
+      <details class="demo-creds">
+        <summary>Sample credentials</summary>
+        <p><strong>Admin:</strong> SahasraAdmin / SahasraAdmin</p>
+        <p><strong>Users:</strong> Sahasra_1 … Sahasra_5 (password = username)</p>
+      </details>
     </div>
   </div>
 
@@ -48,10 +45,10 @@
         <div class="brand-sub" id="nav-org">Sahasra Group</div>
       </div>
       <nav class="side-nav">
-        <a href="#/dashboard" data-nav="dashboard">Dashboard</a>
         <a href="#/costings" data-nav="costings">Costings</a>
-        <a href="#/costing/new" data-nav="costings" class="nav-cta">+ New costing</a>
+        <a href="#/costing/new" data-nav="new" class="nav-cta">+ New costing</a>
         <a href="#/admin" data-nav="admin" id="nav-admin-link" class="hidden">Leadership</a>
+        <a href="#/history" data-nav="history" id="nav-history-link" class="hidden">History</a>
       </nav>
       <div class="side-user">
         <div class="user-name" id="nav-user-name">User</div>
@@ -60,9 +57,10 @@
       </div>
     </aside>
     <main class="main">
+      <div id="true-value-banner" class="true-value-banner hidden" role="status"></div>
       <header class="main-head">
         <div>
-          <h1 id="main-title">Dashboard</h1>
+          <h1 id="main-title">Costings</h1>
           <p id="main-sub" class="muted"></p>
         </div>
       </header>
@@ -70,15 +68,26 @@
     </main>
   </div>
 
+  <div id="confirm-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <h3 id="confirm-title">Delete costing?</h3>
+      <p id="confirm-body" class="muted">This cannot be undone from the list.</p>
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost" id="confirm-cancel">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirm-ok">Delete</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast" role="status"></div>
 
   <script type="module" src="/js/firebase-boot.js"></script>
-  <script src="/sahasra/js/config.js?v=7"></script>
-  <script src="/sahasra/js/format.js?v=7"></script>
-  <script src="/sahasra/js/compute-costing.js?v=7"></script>
-  <script src="/sahasra/js/validation.js?v=7"></script>
-  <script src="/sahasra/js/export-excel.js?v=7"></script>
-  <script src="/sahasra/js/api.js?v=7"></script>
-  <script src="/sahasra/js/app.js?v=7"></script>
+  <script src="/sahasra/js/config.js?v=8"></script>
+  <script src="/sahasra/js/format.js?v=8"></script>
+  <script src="/sahasra/js/compute-costing.js?v=8"></script>
+  <script src="/sahasra/js/validation.js?v=8"></script>
+  <script src="/sahasra/js/export-excel.js?v=8"></script>
+  <script src="/sahasra/js/api.js?v=8"></script>
+  <script src="/sahasra/js/app.js?v=8"></script>
 </body>
 </html>

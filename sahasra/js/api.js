@@ -68,8 +68,20 @@
     patchCosting: function (id, payload) {
       return request('PATCH', 'op=costing&id=' + encodeURIComponent(id), payload);
     },
+    deleteCosting: function (id) {
+      return request('DELETE', 'op=costing&id=' + encodeURIComponent(id));
+    },
     dashboard: function () {
       return request('GET', 'op=dashboard');
+    },
+    history: function () {
+      return request('GET', 'op=history');
+    },
+    addComment: function (id, body, isFlag) {
+      return request('POST', 'op=comment&id=' + encodeURIComponent(id), {
+        body: body,
+        is_flag: !!isFlag,
+      });
     },
   };
 })(window);

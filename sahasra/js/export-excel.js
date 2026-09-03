@@ -87,12 +87,16 @@
       ['Production Lead-Time', cell(costing, 'production_lead_time')],
       ['Engineering LT', cell(costing, 'engineering_lead_time')],
       ['Value Addition', computed.value_addition_pct / 100],
+      ['True Margin', costing.true_margin ?? ''],
+      ['True Quote Price', costing.true_quote_price ?? ''],
+      ['True Value Addition', costing.true_value_addition != null ? costing.true_value_addition / 100 : ''],
     ];
 
     var ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 38 }, { wch: 18 }];
+    ws['!cols'] = [{ wch: 42 }, { wch: 18 }];
     // Match sample: Value Addition shows as 18.3% not 0.183
     if (ws.B43) ws.B43.z = '0.0%';
+    if (ws.B46) ws.B46.z = '0.0%';
 
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Costing');

@@ -12,6 +12,23 @@ import {
 } from '../_shared/sahasra-auth.ts';
 import { signPortalToken, verifyPortalToken } from '../_shared/sahasra-portal-session.ts';
 
+const TRUE_VALUE_FIELDS = new Set([
+  'true_margin',
+  'true_quote_price',
+  'true_value_addition',
+  'true_value_updated_at',
+  'true_value_updated_by',
+]);
+
+const FINAL_SNAPSHOT_FIELDS = new Set([
+  'status',
+  'exported_at',
+  'calc_margin',
+  'calc_quote_price',
+  'calc_value_addition',
+  'current_step',
+]);
+
 function unauthorized(msg = 'Sign in required') {
   const err = new Error(msg);
   (err as Error & { status: number }).status = 401;
@@ -52,7 +69,6 @@ async function resolveMember(req: Request): Promise<SahasraMember> {
   try {
     const user = await verifyFirebaseIdToken(token);
     const member = await requireSahasraMember(user.email);
-    // Use full email as actor id so admin "Created by" is unambiguous.
     return { ...member, username: member.email, email: member.email };
   } catch {
     throw unauthorized('Invalid or expired session');
@@ -71,6 +87,10 @@ function pickCostingPatch(body: Record<string, unknown>) {
     }
   }
   return patch;
+}
+
+function isFinalLockedStatus(status: string) {
+  return status === 'final' || status === 'sent' || status === 'approved';
 }
 
 async function writeAudit(
@@ -107,6 +127,22 @@ async function profilePayload(member: SahasraMember) {
     org,
     defaults,
   };
+}
+
+async function loadCommentsForCostings(costingIds: string[]) {
+  if (!costingIds.length) return {} as Record<string, unknown[]>;
+  const db = adminClient();
+  const { data } = await db
+    .from('sahasra_costing_comments')
+    .select('id, costing_id, author, body, is_flag, created_at')
+    .in('costing_id', costingIds)
+    .order('created_at', { ascending: false });
+  const map: Record<string, unknown[]> = {};
+  for (const row of data || []) {
+    if (!map[row.costing_id]) map[row.costing_id] = [];
+    map[row.costing_id].push(row);
+  }
+  return map;
 }
 
 Deno.serve(async (req) => {
@@ -163,16 +199,24 @@ Deno.serve(async (req) => {
         .from('sahasra_costings')
         .select('*')
         .eq('org_id', member.org_id)
+        .is('deleted_at', null)
         .order('updated_at', { ascending: false })
         .limit(200);
       if (status) q = q.eq('status', status);
-      // Non-admins only see their own costings.
       if (member.role !== 'admin') {
         q = q.eq('created_by', actor);
       }
       const { data, error } = await q;
       if (error) throw error;
-      return jsonResponse(200, { costings: data || [] });
+      const rows = data || [];
+      const commentsMap = await loadCommentsForCostings(rows.map((r) => r.id));
+      const costings = rows.map((r) => ({
+        ...r,
+        comments: commentsMap[r.id] || [],
+        flag_count: (commentsMap[r.id] || []).filter((c) => (c as { is_flag?: boolean }).is_flag)
+          .length,
+      }));
+      return jsonResponse(200, { costings });
     }
 
     if (req.method === 'GET' && op === 'costing' && id) {
@@ -181,6 +225,7 @@ Deno.serve(async (req) => {
         .select('*')
         .eq('id', id)
         .eq('org_id', member.org_id)
+        .is('deleted_at', null)
         .maybeSingle();
       if (error) throw error;
       if (!data) return jsonResponse(404, { error: 'Costing not found' });
@@ -193,7 +238,17 @@ Deno.serve(async (req) => {
         .eq('costing_id', id)
         .order('changed_at', { ascending: false })
         .limit(100);
-      return jsonResponse(200, { costing: data, audit: audit || [] });
+      const { data: comments } = await db
+        .from('sahasra_costing_comments')
+        .select('id, costing_id, author, body, is_flag, created_at')
+        .eq('costing_id', id)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      return jsonResponse(200, {
+        costing: data,
+        audit: audit || [],
+        comments: comments || [],
+      });
     }
 
     if (req.method === 'POST' && op === 'costing') {
@@ -231,14 +286,12 @@ Deno.serve(async (req) => {
         .select('*')
         .eq('id', id)
         .eq('org_id', member.org_id)
+        .is('deleted_at', null)
         .maybeSingle();
       if (fetchErr) throw fetchErr;
       if (!existing) return jsonResponse(404, { error: 'Costing not found' });
       if (member.role !== 'admin' && existing.created_by !== actor) {
         return jsonResponse(403, { error: 'Access denied' });
-      }
-      if (['sent', 'approved'].includes(existing.status) && member.role !== 'admin') {
-        return jsonResponse(403, { error: 'This costing is locked' });
       }
 
       let body: Record<string, unknown> = {};
@@ -248,6 +301,31 @@ Deno.serve(async (req) => {
         body = {};
       }
       const patch = pickCostingPatch(body);
+
+      // Non-admins: final costings only allow true-value fields (+ reopen blocked).
+      if (isFinalLockedStatus(existing.status) && member.role !== 'admin') {
+        const keys = Object.keys(patch);
+        const illegal = keys.filter(
+          (k) => !TRUE_VALUE_FIELDS.has(k) && !FINAL_SNAPSHOT_FIELDS.has(k),
+        );
+        // Allow status reopen only for admin; non-admin cannot change away from final except true values.
+        if (patch.status && patch.status !== existing.status && patch.status !== 'final') {
+          return jsonResponse(403, { error: 'This costing is locked. Only true values can be edited.' });
+        }
+        if (illegal.length) {
+          return jsonResponse(403, {
+            error: 'This costing is locked. Only true values can be edited.',
+          });
+        }
+      }
+
+      if (Object.prototype.hasOwnProperty.call(patch, 'true_margin') ||
+        Object.prototype.hasOwnProperty.call(patch, 'true_quote_price') ||
+        Object.prototype.hasOwnProperty.call(patch, 'true_value_addition')) {
+        patch.true_value_updated_at = new Date().toISOString();
+        patch.true_value_updated_by = actor;
+      }
+
       patch.updated_by = actor;
       patch.updated_at = new Date().toISOString();
 
@@ -267,30 +345,130 @@ Deno.serve(async (req) => {
       return jsonResponse(200, { costing: data });
     }
 
+    if (req.method === 'DELETE' && op === 'costing' && id) {
+      const { data: existing, error: fetchErr } = await db
+        .from('sahasra_costings')
+        .select('*')
+        .eq('id', id)
+        .eq('org_id', member.org_id)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (fetchErr) throw fetchErr;
+      if (!existing) return jsonResponse(404, { error: 'Costing not found' });
+      if (member.role !== 'admin' && existing.created_by !== actor) {
+        return jsonResponse(403, { error: 'Access denied' });
+      }
+      const now = new Date().toISOString();
+      const { error } = await db
+        .from('sahasra_costings')
+        .update({ deleted_at: now, updated_by: actor, updated_at: now })
+        .eq('id', id);
+      if (error) throw error;
+      await writeAudit(id, actor, 'deleted', existing.status, 'deleted');
+      return jsonResponse(200, { ok: true });
+    }
+
+    if (req.method === 'GET' && op === 'comments' && id) {
+      const { data: existing } = await db
+        .from('sahasra_costings')
+        .select('id, created_by, org_id')
+        .eq('id', id)
+        .eq('org_id', member.org_id)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (!existing) return jsonResponse(404, { error: 'Costing not found' });
+      if (member.role !== 'admin' && existing.created_by !== actor) {
+        return jsonResponse(403, { error: 'Access denied' });
+      }
+      const { data: comments } = await db
+        .from('sahasra_costing_comments')
+        .select('id, costing_id, author, body, is_flag, created_at')
+        .eq('costing_id', id)
+        .order('created_at', { ascending: false });
+      return jsonResponse(200, { comments: comments || [] });
+    }
+
+    if (req.method === 'POST' && op === 'comment' && id) {
+      assertRole(member, ['admin']);
+      const { data: existing } = await db
+        .from('sahasra_costings')
+        .select('id, org_id')
+        .eq('id', id)
+        .eq('org_id', member.org_id)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (!existing) return jsonResponse(404, { error: 'Costing not found' });
+      let body: Record<string, unknown> = {};
+      try {
+        body = await req.json();
+      } catch {
+        body = {};
+      }
+      const text = String(body.body || '').trim();
+      if (!text) return jsonResponse(400, { error: 'Comment body is required' });
+      const isFlag = Boolean(body.is_flag);
+      const { data, error } = await db
+        .from('sahasra_costing_comments')
+        .insert({
+          costing_id: id,
+          author: actor,
+          body: text,
+          is_flag: isFlag,
+        })
+        .select('*')
+        .single();
+      if (error) throw error;
+      await writeAudit(id, actor, isFlag ? 'flag' : 'comment', null, text);
+      return jsonResponse(201, { comment: data });
+    }
+
     if (req.method === 'GET' && op === 'dashboard') {
       assertRole(member, ['admin']);
       const { data, error } = await db
         .from('sahasra_costings')
-        .select('id, status, client_name, assembly_name, quantity, created_by, updated_by, updated_at')
+        .select(
+          'id, status, client_name, assembly_name, quantity, created_by, updated_by, updated_at, exported_at, calc_margin, calc_quote_price, calc_value_addition, true_margin, true_quote_price, true_value_addition, currency',
+        )
         .eq('org_id', member.org_id)
+        .is('deleted_at', null)
         .order('updated_at', { ascending: false })
         .limit(500);
       if (error) throw error;
       const rows = data || [];
       const byStatus: Record<string, number> = {};
+      const byCreator: Record<string, number> = {};
       for (const r of rows) {
         byStatus[r.status] = (byStatus[r.status] || 0) + 1;
+        byCreator[r.created_by] = (byCreator[r.created_by] || 0) + 1;
       }
       const { data: recentAudit } = await db
         .from('sahasra_audit_log')
-        .select('id, costing_id, user_email, field_name, new_value, changed_at')
+        .select('id, costing_id, user_email, field_name, old_value, new_value, changed_at')
         .order('changed_at', { ascending: false })
-        .limit(30);
+        .limit(100);
+      const commentsMap = await loadCommentsForCostings(rows.map((r) => r.id));
+      const recent_costings = rows.slice(0, 50).map((r) => ({
+        ...r,
+        comments: commentsMap[r.id] || [],
+        flag_count: (commentsMap[r.id] || []).filter((c) => (c as { is_flag?: boolean }).is_flag)
+          .length,
+      }));
       return jsonResponse(200, {
-        summary: { total: rows.length, by_status: byStatus },
-        recent_costings: rows.slice(0, 20),
+        summary: { total: rows.length, by_status: byStatus, by_creator: byCreator },
+        recent_costings,
+        chart_rows: rows.filter((r) => r.status === 'final' || r.calc_quote_price != null),
         recent_activity: recentAudit || [],
       });
+    }
+
+    if (req.method === 'GET' && op === 'history') {
+      assertRole(member, ['admin']);
+      const { data: recentAudit } = await db
+        .from('sahasra_audit_log')
+        .select('id, costing_id, user_email, field_name, old_value, new_value, changed_at')
+        .order('changed_at', { ascending: false })
+        .limit(200);
+      return jsonResponse(200, { activity: recentAudit || [] });
     }
 
     return jsonResponse(404, { error: 'Unknown operation' });
