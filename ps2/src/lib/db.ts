@@ -1,5 +1,6 @@
 import * as demo from "./demo-store";
 import { isDemoMode } from "./supabase";
+import { ADMIN_ID, ORG_ID } from "./constants";
 import type {
   ActivityLog,
   ClientProject,
@@ -16,6 +17,14 @@ import type {
   SystemSetting,
   User,
 } from "./types";
+
+export function getServiceContext() {
+  return {
+    organization_id: ORG_ID,
+    actor_id: ADMIN_ID,
+    actor_name: "n8n-service",
+  };
+}
 
 export async function getUserByUsername(username: string): Promise<User | null> {
   if (isDemoMode()) return demo.getUserByUsername(username);
