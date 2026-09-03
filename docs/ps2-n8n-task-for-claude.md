@@ -62,6 +62,8 @@ All responses: `{ ok: true, data: ... }` or `{ ok: false, error: "..." }`
 |---|---|---|---|---|
 | List leads ready to email | GET | `?op=leads-ready-to-send` | – | `{ leads: [...] }` |
 | Get lead | GET | `?op=lead&id=<uuid>` | – | `{ lead: {...} }` |
+| Get lead by email | GET | `?op=lead-by-email&email=` | – | `{ lead: {...} }` |
+| Bulk import / upsert | POST | `?op=leads-import` | `{ source, leads:[], upsert? }` | `{ imported, duplicates, failed }` |
 | Update lead | PATCH | `?op=lead&id=<uuid>` | `{ status, website_summary, meeting_scheduled_at, ... }` | `{ lead: {...} }` |
 | List all leads | GET | `?op=leads&status=&source=&assigned_to=&page=` | – | `{ leads: [...], total }` |
 
@@ -122,20 +124,24 @@ new → mail_1_sent → follow_up_1 → follow_up_2 → ... → follow_up_10 →
 
 ---
 
-## 3. What I need from you (n8n → portal handshake)
+## 3. Handshake — configured 2026-09-03
 
-Before your workflows run, the portal needs these things to be configured:
+n8n Cloud workflows are deployed. Portal settings store these URLs:
 
-1. **`N8N_API_KEY`** — generate a long random key (e.g. `openssl rand -hex 32`). Set it in:
-   - n8n: as a credential/env var
-   - Supabase Edge Function secret: `N8N_API_KEY=<value>`
+| Key | Webhook |
+|---|---|
+| `n8n_webhooks.send_email` | `https://shreyas-sinha.app.n8n.cloud/webhook/ps2-send-email` |
+| `n8n_webhooks.process_replies` | `https://shreyas-sinha.app.n8n.cloud/webhook/ps2-process-replies` |
+| `n8n_webhooks.sync_sheets` | `https://shreyas-sinha.app.n8n.cloud/webhook/ps2-sync-sheets` |
+| `n8n_webhooks.enrich_website` | `https://shreyas-sinha.app.n8n.cloud/webhook/ps2-website-enrichment` |
 
-2. **Webhook URLs** — set the following in the portal's System Settings page (`/sahasra/lead-management/` → Settings → pt_admin login):
-   - `n8n_webhooks.send_email` → your Workflow A webhook URL
-   - `n8n_webhooks.sync_sheets` → your Workflow C webhook URL
-   - `n8n_webhooks.process_replies` → your Workflow B webhook URL
+**Auth:** same `N8N_API_KEY` both directions (`x-api-key` header). Set as Edge Function secret and/or portal System Settings. Do not commit the key.
 
-3. **Outlook OAuth** — connect Outlook accounts in n8n credentials. The email address must match `assigned_outlook` on leads (set by sahasra_admin in the portal).
+**Q1–Q3 answers:** enrichment uses Workflow D URL with `{ event, lead_id, website }`; n8n re-fetches the lead by ID; replies are Gmail-polled (no portal webhook required).
+
+**Workflow C upsert:** `POST ?op=leads-import` `{ source:"google_sheet", leads:[...] }`.
+
+See `docs/ps2-n8n-handshake.md`.
 
 ---
 
@@ -177,11 +183,10 @@ Use them as the system prompt when calling the Anthropic API.
 
 ---
 
-## 7. How to trigger Workflow D from the portal
+## 7. How Workflow D is triggered
 
-When a new lead is saved with a `website` field, the portal will POST to `n8n_webhooks.send_email` (or a dedicated enrichment webhook — tell us which URL to use and we'll save it in portal settings).
+When a new lead is saved with a `website` field, the portal POSTs to `n8n_webhooks.enrich_website`:
 
-Request body:
 ```json
 {
   "event": "lead.created",
@@ -190,9 +195,17 @@ Request body:
 }
 ```
 
+Header: `x-api-key: <N8N_API_KEY>`. n8n then `GET ?op=lead&id=` for the full row.
+
 ---
 
-> **Questions for Claude:** 
-> 1. What webhook URL should the portal POST to when a new lead with a website is created?
-> 2. Do you want the portal to POST the full lead object or just the ID on webhook triggers?
-> 3. Will Outlook polling be via n8n's built-in Outlook trigger or a separate webhook?
+## 8. Extra ops added after handshake
+
+| Op | Method | Use |
+|---|---|---|
+| `leads-import` | POST | Bulk insert/upsert for Excel + Workflow C. Body `{ source, filename?, batch_id?, upsert?, leads:[] }` |
+| `ingest-file` | POST | PDF/image card upload. Forwards to `extract_pdf` if configured |
+| `upload-batches` | GET | Recent ingest batches |
+| `stats` | GET | Includes `mail_1_sent`, `follow_ups_sent`, `responses`, `conversion_rate` |
+
+> **Open for Claude:** Workflow C should call `POST ?op=leads-import`. Optional Workflow E for `extract_pdf` if exhibition card OCR should be automated.
