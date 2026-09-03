@@ -1,54 +1,131 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="PS2 Lead Management Portal for Sahasra Group — lead capture, outreach pipeline, and client tracker.">
-  <title>PS2 Lead Management Portal — Sahasra Group</title>
-  <script>(function(){try{var t=localStorage.getItem('ph_theme');if(t!=='light')document.documentElement.setAttribute('data-theme','dark');else document.documentElement.removeAttribute('data-theme');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+  <title>PS2 — Lead Management Portal · Sahasra Group</title>
+  <meta name="description" content="Lead capture, outreach pipeline, and client tracker for Sahasra Group.">
+  <meta name="robots" content="noindex">
   <link rel="icon" type="image/png" href="/favicon.png">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/marketing.css">
-  <link rel="stylesheet" href="/css/marketing-extras.css">
-  <link rel="stylesheet" href="/css/marketing-theme.css">
-  <style>
-    .ps2-wrap{padding:96px 0 72px;background:radial-gradient(1200px 600px at 85% -20%, rgba(66,79,209,.32), transparent 60%), var(--bg)}
-    .ps2-card{max-width:860px;margin:0 auto;background:#fff;color:#0f172a;border-radius:20px;padding:32px;box-shadow:0 24px 64px rgba(15,23,42,.12)}
-    .ps2-kicker{font-size:.82rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#1a237e}
-    .ps2-title{margin:.4rem 0 .8rem;font-size:2rem;line-height:1.15;color:#1a237e}
-    .ps2-sub{margin:0 0 1.2rem;color:#475569}
-    .ps2-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:18px 0 20px}
-    .ps2-pill{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px}
-    .ps2-pill strong{display:block;color:#0f172a}
-    .ps2-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:18px}
-    .ps2-note{margin-top:14px;padding:12px 14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;color:#78350f}
-  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/sahasra/lead-management/css/ps2.css">
 </head>
-<body class="marketing-site">
-<div id="ph-nav"></div>
-<main>
-  <section class="ps2-wrap">
-    <div class="container">
-      <article class="ps2-card">
-        <p class="ps2-kicker">Sahasra Group · PowerhouseTech</p>
-        <h1 class="ps2-title">PS2 — Lead Management Portal</h1>
-        <p class="ps2-sub">Capture leads from business cards, Excel, Google Sheets, and manual forms. Automate outreach with AI drafts and track converted clients through project stages.</p>
-        <div class="ps2-grid">
-          <div class="ps2-pill"><strong>Segment 1</strong>Lead database + mailing workflow</div>
-          <div class="ps2-pill"><strong>Segment 2</strong>Client project tracker (Kanban + table)</div>
-          <div class="ps2-pill"><strong>Roles</strong>sahasra_admin, sahasra_employee, pt_admin</div>
-        </div>
-        <div class="ps2-actions">
-          <a class="btn btn-primary" href="/ps2/login">Open PS2 Portal</a>
-          <a class="btn btn-ghost" href="/services.html">Back to Services</a>
-        </div>
-        <p class="ps2-note"><strong>Demo login:</strong> <code>sahasra_admin</code> / <code>sahasra_admin</code></p>
-      </article>
+<body>
+
+  <!-- ── Login Gate ──────────────────────────────────────────────── -->
+  <div id="gate-view" class="gate-shell">
+    <div class="gate-card">
+      <p class="gate-logo">Sahasra Group · PS2</p>
+      <h1>Lead Management Portal</h1>
+      <p class="gate-sub">Built by PowerhouseTech</p>
+      <form id="login-form" class="login-form">
+        <label>Username
+          <input name="username" id="login-username" autocomplete="username" required />
+        </label>
+        <label>Password
+          <input name="password" id="login-password" type="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit" class="btn btn-primary btn-block" id="btn-login">Sign In</button>
+      </form>
+      <details class="demo-creds">
+        <summary>Demo credentials</summary>
+        <p><strong>Admin:</strong> sahasra_admin / sahasra_admin</p>
+        <p><strong>Employee:</strong> sahasra_employee / sahasra_employee</p>
+        <p><strong>PT Admin:</strong> pt_admin / pt_admin</p>
+      </details>
     </div>
-  </section>
-</main>
-<div id="ph-footer"></div>
-<script src="/js/site-config.js?v=2"></script>
-<script src="/js/marketing.js?v=5"></script>
+  </div>
+
+  <!-- ── App Shell ───────────────────────────────────────────────── -->
+  <div id="app-shell" class="app-shell hidden">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand-mark">
+        <div class="brand-ps2">PS2</div>
+        <div class="brand-client">Sahasra Group</div>
+        <div class="brand-built">by PowerhouseTech</div>
+      </div>
+
+      <nav>
+        <div class="nav-section">
+          <div class="nav-label">Overview</div>
+          <a href="#dashboard" class="nav-link" data-view="dashboard"
+             data-role="sahasra_admin,sahasra_employee">
+            <span class="icon">📊</span> Dashboard
+          </a>
+        </div>
+
+        <div class="nav-section" data-role="sahasra_admin,sahasra_employee">
+          <div class="nav-label">Segment 1 — Leads</div>
+          <a href="#leads" class="nav-link" data-view="leads"
+             data-role="sahasra_admin,sahasra_employee">
+            <span class="icon">👥</span> Leads Database
+          </a>
+          <a href="#pipeline" class="nav-link" data-view="pipeline"
+             data-role="sahasra_admin,sahasra_employee">
+            <span class="icon">📬</span> Pipeline
+          </a>
+          <a href="#review-drafts" class="nav-link" data-view="review-drafts"
+             data-role="sahasra_admin,sahasra_employee">
+            <span class="icon">✉️</span> Review Drafts
+          </a>
+          <a href="#mail-config" class="nav-link" data-view="mail-config"
+             data-role="sahasra_admin">
+            <span class="icon">⚙️</span> Mail Config
+          </a>
+        </div>
+
+        <div class="nav-section" data-role="sahasra_admin,sahasra_employee">
+          <div class="nav-label">Segment 2 — Projects</div>
+          <a href="#tracker" class="nav-link" data-view="tracker"
+             data-role="sahasra_admin,sahasra_employee">
+            <span class="icon">📦</span> Client Tracker
+          </a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-label">Settings</div>
+          <a href="#users" class="nav-link" data-view="users"
+             data-role="sahasra_admin">
+            <span class="icon">👤</span> Users
+          </a>
+          <a href="#outlook" class="nav-link" data-view="outlook"
+             data-role="sahasra_admin">
+            <span class="icon">📧</span> Outlook
+          </a>
+          <a href="#sheets" class="nav-link" data-view="sheets"
+             data-role="sahasra_admin">
+            <span class="icon">📄</span> Google Sheets
+          </a>
+          <a href="#settings" class="nav-link" data-view="settings"
+             data-role="pt_admin">
+            <span class="icon">🔧</span> System Settings
+          </a>
+        </div>
+      </nav>
+
+      <div class="side-user">
+        <div class="user-name" id="nav-user-name">—</div>
+        <div class="user-role" id="nav-user-role"></div>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-signout">Sign out</button>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main">
+      <div id="main-content">
+        <p style="color:var(--muted);padding:40px;text-align:center">Loading…</p>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="/sahasra/lead-management/js/config.js?v=1"></script>
+  <script src="/sahasra/lead-management/js/api.js?v=1"></script>
+  <script src="/sahasra/lead-management/js/app.js?v=1"></script>
 </body>
 </html>

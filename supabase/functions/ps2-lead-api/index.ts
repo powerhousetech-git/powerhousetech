@@ -1,0 +1,843 @@
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
+
+// ── Inlined shared helpers ────────────────────────────────────────────────────
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+};
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+}
+function optionsResponse(): Response {
+  return new Response(null, { status: 204, headers: corsHeaders });
+}
+
+const TOKEN_PREFIX = 'sp1.';
+type PortalPayload = { u: string; r: string; o: string; e: number };
+function _secretKey(): string {
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!key) throw new Error('Service role key not configured');
+  return key;
+}
+async function _hmacSign(message: string): Promise<string> {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(_secretKey()), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message));
+  return btoa(String.fromCharCode(...new Uint8Array(sig)));
+}
+async function signPortalToken(input: { username: string; role: string; org_id: string }): Promise<string> {
+  const payload = btoa(JSON.stringify({ u: input.username, r: input.role, o: input.org_id, e: Date.now() + 7 * 24 * 60 * 60 * 1000 } satisfies PortalPayload));
+  const sig = await _hmacSign(payload);
+  return TOKEN_PREFIX + payload + '.' + sig;
+}
+async function verifyPortalToken(token: string): Promise<PortalPayload | null> {
+  if (!token.startsWith(TOKEN_PREFIX)) return null;
+  const rest = token.slice(TOKEN_PREFIX.length);
+  const dot = rest.lastIndexOf('.');
+  if (dot < 1) return null;
+  const payloadB64 = rest.slice(0, dot);
+  const sig = rest.slice(dot + 1);
+  if ((await _hmacSign(payloadB64)) !== sig) return null;
+  try {
+    const p = JSON.parse(atob(payloadB64)) as PortalPayload;
+    if (!p.u || !p.r || !p.o || !p.e) return null;
+    if (Date.now() > p.e) return null;
+    return p;
+  } catch { return null; }
+}
+
+// ─── DB client ────────────────────────────────────────────────────────────────
+function db() {
+  const url = Deno.env.get('SUPABASE_URL')!;
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+const ORG_ID = 'b1c2d3e4-f5a6-7890-abcd-ef1234567890';
+
+type SessionUser = {
+  id: string;
+  username: string;
+  full_name: string | null;
+  role: 'sahasra_admin' | 'sahasra_employee' | 'pt_admin';
+  organization_id: string;
+  outlook_account: string | null;
+};
+
+function bearerToken(req: Request): string | null {
+  const h = req.headers.get('authorization') || '';
+  return h.startsWith('Bearer ') ? h.slice(7).trim() : null;
+}
+
+function n8nApiKey(req: Request): string | null {
+  return req.headers.get('x-api-key');
+}
+
+// N8N service actor (used for n8n API-key auth)
+const N8N_ACTOR: SessionUser = {
+  id: 'c2d3e4f5-a6b7-8901-bcde-f12345678901',
+  username: 'n8n-service',
+  full_name: 'n8n automation',
+  role: 'sahasra_admin',
+  organization_id: ORG_ID,
+  outlook_account: null,
+};
+
+async function resolveUser(req: Request): Promise<SessionUser | null> {
+  // n8n API key
+  const apiKey = n8nApiKey(req);
+  if (apiKey) {
+    const expected = Deno.env.get('N8N_API_KEY');
+    if (expected && apiKey === expected) return N8N_ACTOR;
+  }
+
+  // Portal JWT token
+  const token = bearerToken(req);
+  if (!token) return null;
+  const payload = await verifyPortalToken(token);
+  if (!payload) return null;
+
+  const { data } = await db()
+    .from('ps2_users')
+    .select('id, username, full_name, role, organization_id, outlook_account')
+    .eq('username', payload.u)
+    .eq('organization_id', ORG_ID)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (!data) return null;
+  return data as SessionUser;
+}
+
+function unauthorized() { return jsonResponse(401, { ok: false, error: 'Sign in required' }); }
+function forbidden(msg = 'Access denied') { return jsonResponse(403, { ok: false, error: msg }); }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const SENT_STATUSES = [
+  'mail_1_sent','follow_up_1','follow_up_2','follow_up_3','follow_up_4','follow_up_5',
+  'follow_up_6','follow_up_7','follow_up_8','follow_up_9','follow_up_10',
+];
+
+async function logActivity(
+  actorId: string | null,
+  entityType: string,
+  entityId: string | null,
+  action: string,
+  summary: string,
+) {
+  await db().from('ps2_activity_log').insert({
+    organization_id: ORG_ID,
+    actor_id: actorId,
+    entity_type: entityType,
+    entity_id: entityId,
+    action,
+    summary,
+  });
+}
+
+// ─── Main handler ─────────────────────────────────────────────────────────────
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return optionsResponse();
+
+  const url = new URL(req.url);
+  const op = url.searchParams.get('op') || '';
+  const id = url.searchParams.get('id') || '';
+  const method = req.method;
+
+  // ── LOGIN (no auth required) ──────────────────────────────────────────────
+  if (method === 'POST' && op === 'login') {
+    let body: Record<string, unknown> = {};
+    try { body = await req.json(); } catch { /* */ }
+    const username = String(body.username || '').trim();
+    const password = String(body.password || '');
+    if (!username || !password) return jsonResponse(400, { ok: false, error: 'Username and password required' });
+
+    const { data, error } = await db().rpc('sahasra_verify_login', {
+      p_username: username,
+      p_password: password,
+    });
+    // Falls back to ps2_users pgcrypto verify
+    if (error || !data?.[0]) {
+      // Try ps2_users directly via bcrypt — delegate to a separate RPC or check manually
+      const { data: user } = await db()
+        .from('ps2_users')
+        .select('id, username, password_hash, full_name, role, organization_id, outlook_account')
+        .eq('username', username)
+        .eq('organization_id', ORG_ID)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (!user) return jsonResponse(401, { ok: false, error: 'Invalid credentials' });
+
+      // Verify via pgcrypto function for ps2 users
+      const { data: verified } = await db().rpc('ps2_verify_login', {
+        p_username: username,
+        p_password: password,
+        p_org_id: ORG_ID,
+      });
+      if (!verified) return jsonResponse(401, { ok: false, error: 'Invalid credentials' });
+
+      const token = await signPortalToken({
+        username: user.username,
+        role: user.role,
+        org_id: user.organization_id,
+      });
+      await logActivity(user.id, 'session', null, 'login', `${user.full_name || user.username} signed in`);
+      return jsonResponse(200, {
+        ok: true,
+        token,
+        user: { id: user.id, username: user.username, full_name: user.full_name, role: user.role, organization_id: user.organization_id, outlook_account: user.outlook_account },
+      });
+    }
+    return jsonResponse(401, { ok: false, error: 'Invalid credentials' });
+  }
+
+  // ── All other ops require auth ─────────────────────────────────────────────
+  const user = await resolveUser(req);
+  if (!user) return unauthorized();
+
+  // pt_admin can only access settings/system op
+  if (user.role === 'pt_admin' && !['settings', 'system-settings'].includes(op)) {
+    return forbidden('pt_admin can only access system settings');
+  }
+
+  try {
+
+    // ── ME ──────────────────────────────────────────────────────────────────
+    if (op === 'me' && method === 'GET') {
+      return jsonResponse(200, { ok: true, user });
+    }
+
+    // ── DASHBOARD STATS ─────────────────────────────────────────────────────
+    if (op === 'stats' && method === 'GET') {
+      const { data: leads } = await db()
+        .from('ps2_leads').select('status').eq('organization_id', ORG_ID);
+      const all = leads || [];
+      const total = all.length;
+      const byStatus = Object.fromEntries(
+        ['new','mail_1_sent','responded','meeting_scheduled','converted','discarded']
+          .map(s => [s, all.filter(l => l.status === s).length])
+      );
+      const sent = all.filter(l => SENT_STATUSES.includes(l.status)).length;
+      const { data: projects } = await db()
+        .from('ps2_client_projects').select('stage').eq('organization_id', ORG_ID);
+      return jsonResponse(200, {
+        ok: true,
+        data: {
+          total_leads: total,
+          new_leads: byStatus['new'] || 0,
+          sent_leads: sent,
+          responded_leads: byStatus['responded'] || 0,
+          meetings_scheduled: byStatus['meeting_scheduled'] || 0,
+          converted_leads: byStatus['converted'] || 0,
+          discarded_leads: byStatus['discarded'] || 0,
+          active_projects: (projects || []).filter(p => !['completed','on_hold'].includes(p.stage)).length,
+          funnel: [
+            { status: 'new', label: 'New', count: byStatus['new'] || 0 },
+            { status: 'sent', label: 'Sent', count: sent },
+            { status: 'responded', label: 'Responded', count: byStatus['responded'] || 0 },
+            { status: 'meeting', label: 'Meeting', count: byStatus['meeting_scheduled'] || 0 },
+            { status: 'converted', label: 'Converted', count: byStatus['converted'] || 0 },
+          ],
+        },
+      });
+    }
+
+    // ── ACTIVITY ─────────────────────────────────────────────────────────────
+    if (op === 'activity' && method === 'GET') {
+      const limit = parseInt(url.searchParams.get('limit') || '20');
+      const { data } = await db()
+        .from('ps2_activity_log')
+        .select('*')
+        .eq('organization_id', ORG_ID)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      return jsonResponse(200, { ok: true, data: data || [] });
+    }
+
+    // ── LEADS LIST ───────────────────────────────────────────────────────────
+    if (op === 'leads' && method === 'GET') {
+      const status = url.searchParams.get('status');
+      const source = url.searchParams.get('source');
+      const assignedTo = url.searchParams.get('assigned_to');
+      const search = url.searchParams.get('search');
+      const page = parseInt(url.searchParams.get('page') || '1');
+      const pageSize = parseInt(url.searchParams.get('pageSize') || '50');
+
+      let q = db().from('ps2_leads').select('*, ps2_users!assigned_to(full_name, outlook_account)', { count: 'exact' })
+        .eq('organization_id', ORG_ID)
+        .order('created_at', { ascending: false })
+        .range((page - 1) * pageSize, page * pageSize - 1);
+
+      if (status) q = q.eq('status', status);
+      if (source) q = q.eq('source', source);
+      if (assignedTo) q = q.eq('assigned_to', assignedTo);
+      if (search) q = q.or(`full_name.ilike.%${search}%,company.ilike.%${search}%,email.ilike.%${search}%`);
+
+      const { data, count, error } = await q;
+      if (error) throw error;
+      return jsonResponse(200, { ok: true, data: { leads: data || [], total: count || 0, page, pageSize } });
+    }
+
+    // ── LEADS READY TO SEND (n8n workflow A) ─────────────────────────────────
+    if (op === 'leads-ready-to-send' && method === 'GET') {
+      // Get active mail config steps
+      const { data: steps } = await db()
+        .from('ps2_mail_sequence_config')
+        .select('*')
+        .eq('organization_id', ORG_ID)
+        .eq('is_active', true)
+        .order('step_number');
+
+      const now = new Date();
+      const { data: leads } = await db()
+        .from('ps2_leads')
+        .select('*, ps2_users!assigned_to(full_name, outlook_account)')
+        .eq('organization_id', ORG_ID)
+        .not('status', 'in', '("responded","meeting_scheduled","converted","discarded")')
+        .not('email', 'is', null);
+
+      const ready = (leads || []).filter(lead => {
+        const lastActivity = lead.last_activity_at ? new Date(lead.last_activity_at) : new Date(lead.created_at);
+        const daysSince = (now.getTime() - lastActivity.getTime()) / 86400000;
+
+        if (lead.status === 'new') return true; // Ready for mail 1
+
+        // Find current step number
+        const statusToStep: Record<string, number> = { mail_1_sent: 1 };
+        for (let i = 1; i <= 10; i++) statusToStep[`follow_up_${i}`] = i + 1;
+        const currentStepNum = statusToStep[lead.status];
+        if (!currentStepNum) return false;
+
+        const nextStep = (steps || []).find(s => s.step_number === currentStepNum + 1);
+        if (!nextStep) return false;
+        return daysSince >= nextStep.day_offset;
+      });
+
+      // Attach the template for the next step
+      const enriched = ready.map(lead => {
+        let nextStepNum = 1;
+        if (lead.status !== 'new') {
+          const statusToStep: Record<string, number> = { mail_1_sent: 1 };
+          for (let i = 1; i <= 10; i++) statusToStep[`follow_up_${i}`] = i + 1;
+          nextStepNum = (statusToStep[lead.status] || 0) + 1;
+        }
+        const step = (steps || []).find(s => s.step_number === nextStepNum);
+        return {
+          ...lead,
+          next_step: step || null,
+          assigned_outlook: (lead as Record<string,unknown>)['ps2_users']
+            ? ((lead as Record<string,unknown>)['ps2_users'] as Record<string,unknown>)['outlook_account']
+            : null,
+        };
+      });
+
+      return jsonResponse(200, { ok: true, data: { leads: enriched, total: enriched.length } });
+    }
+
+    // ── SINGLE LEAD ──────────────────────────────────────────────────────────
+    if (op === 'lead' && id && method === 'GET') {
+      const { data, error } = await db()
+        .from('ps2_leads').select('*').eq('id', id).eq('organization_id', ORG_ID).maybeSingle();
+      if (error) throw error;
+      if (!data) return jsonResponse(404, { ok: false, error: 'Lead not found' });
+      return jsonResponse(200, { ok: true, data: { lead: data } });
+    }
+
+    // ── CREATE LEAD ──────────────────────────────────────────────────────────
+    if (op === 'lead' && method === 'POST') {
+      if (user.role === 'pt_admin') return forbidden();
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      const row = {
+        organization_id: ORG_ID,
+        first_name: body.first_name || null,
+        last_name: body.last_name || null,
+        full_name: body.full_name || [body.first_name, body.last_name].filter(Boolean).join(' ') || null,
+        company: body.company || null,
+        designation: body.designation || null,
+        email: body.email || null,
+        phone: body.phone || null,
+        website: body.website || null,
+        source: body.source || 'manual',
+        assigned_to: body.assigned_to || null,
+        tags: body.tags || [],
+        custom_intro: body.custom_intro || null,
+        notes: body.notes || null,
+        status: 'new',
+        last_activity_at: new Date().toISOString(),
+      };
+      const { data, error } = await db().from('ps2_leads').insert(row).select('*').single();
+      if (error) throw error;
+      await logActivity(user.id, 'lead', data.id, 'lead_created', `New lead: ${data.full_name || data.email} (${data.company})`);
+      // Fire website enrichment webhook if website provided
+      const webhookSettings = await getWebhooks();
+      if (data.website && webhookSettings.sync_sheets) {
+        fetch(webhookSettings.sync_sheets, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event: 'lead.created', lead_id: data.id, website: data.website }),
+        }).catch(() => { /* fire and forget */ });
+      }
+      return jsonResponse(201, { ok: true, data: { lead: data } });
+    }
+
+    // ── PATCH LEAD ───────────────────────────────────────────────────────────
+    if (op === 'lead' && id && method === 'PATCH') {
+      if (user.role === 'pt_admin') return forbidden();
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      const allowed = ['first_name','last_name','full_name','company','designation','email','phone',
+        'website','website_summary','status','assigned_to','tags','custom_intro','notes',
+        'meeting_scheduled_at','last_activity_at'];
+      const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      for (const k of allowed) if (Object.hasOwn(body, k)) patch[k] = body[k];
+      if (Object.hasOwn(body, 'status')) patch.last_activity_at = new Date().toISOString();
+
+      const { data, error } = await db()
+        .from('ps2_leads').update(patch).eq('id', id).eq('organization_id', ORG_ID).select('*').single();
+      if (error) throw error;
+      if (!data) return jsonResponse(404, { ok: false, error: 'Lead not found' });
+      await logActivity(user.id, 'lead', id, 'lead_updated', `Lead updated: ${data.full_name || id}`);
+      return jsonResponse(200, { ok: true, data: { lead: data } });
+    }
+
+    // ── DELETE LEAD ──────────────────────────────────────────────────────────
+    if (op === 'lead' && id && method === 'DELETE') {
+      if (user.role !== 'sahasra_admin') return forbidden('Only sahasra_admin can delete leads');
+      const { error } = await db()
+        .from('ps2_leads').delete().eq('id', id).eq('organization_id', ORG_ID);
+      if (error) throw error;
+      await logActivity(user.id, 'lead', id, 'lead_deleted', `Lead deleted`);
+      return jsonResponse(200, { ok: true });
+    }
+
+    // ── BULK LEADS ───────────────────────────────────────────────────────────
+    if (op === 'leads-bulk' && method === 'POST') {
+      if (user.role === 'pt_admin') return forbidden();
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      const ids = (body.ids as string[]) || [];
+      const action = body.action as string;
+      const payload = body.payload as Record<string, unknown> || {};
+      if (!ids.length || !action) return jsonResponse(400, { ok: false, error: 'ids and action required' });
+
+      if (action === 'delete') {
+        if (user.role !== 'sahasra_admin') return forbidden();
+        const { error } = await db().from('ps2_leads').delete().in('id', ids).eq('organization_id', ORG_ID);
+        if (error) throw error;
+        return jsonResponse(200, { ok: true, data: { affected: ids.length } });
+      }
+      if (action === 'assign' || action === 'tag') {
+        const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+        if (action === 'assign') patch.assigned_to = payload.assigned_to;
+        if (action === 'tag') patch.tags = payload.tags;
+        const { error } = await db().from('ps2_leads').update(patch).in('id', ids).eq('organization_id', ORG_ID);
+        if (error) throw error;
+        return jsonResponse(200, { ok: true, data: { affected: ids.length } });
+      }
+      return jsonResponse(400, { ok: false, error: 'Unknown action' });
+    }
+
+    // ── EMAILS LIST ───────────────────────────────────────────────────────────
+    if (op === 'emails' && method === 'GET') {
+      const leadId = url.searchParams.get('lead_id');
+      const status = url.searchParams.get('status');
+      let q = db().from('ps2_lead_emails').select('*')
+        .order('created_at', { ascending: false }).limit(200);
+      if (leadId) q = q.eq('lead_id', leadId);
+      if (status) q = q.eq('status', status);
+      const { data, error } = await q;
+      if (error) throw error;
+      return jsonResponse(200, { ok: true, data: data || [] });
+    }
+
+    // ── REVIEW DRAFTS ─────────────────────────────────────────────────────────
+    if (op === 'review-drafts' && method === 'GET') {
+      const assignedTo = url.searchParams.get('assigned_to');
+      const { data: emails } = await db()
+        .from('ps2_lead_emails')
+        .select('*, ps2_leads!lead_id(full_name, company, assigned_to)')
+        .eq('status', 'pending_review')
+        .order('created_at', { ascending: false });
+
+      let drafts = emails || [];
+      if (assignedTo) {
+        drafts = drafts.filter(e => {
+          const lead = (e as Record<string,unknown>)['ps2_leads'] as Record<string,unknown>;
+          return lead && lead['assigned_to'] === assignedTo;
+        });
+      }
+      return jsonResponse(200, { ok: true, data: drafts });
+    }
+
+    // ── CREATE EMAIL ──────────────────────────────────────────────────────────
+    if (op === 'email' && method === 'POST') {
+      if (user.role === 'pt_admin') return forbidden();
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      if (!body.lead_id) return jsonResponse(400, { ok: false, error: 'lead_id required' });
+      const row = {
+        lead_id: body.lead_id,
+        direction: body.direction || 'outbound',
+        subject: body.subject || null,
+        body: body.body || null,
+        sentiment: body.sentiment || null,
+        sequence_step: body.sequence_step || null,
+        status: body.status || 'draft',
+        is_ai_draft: Boolean(body.is_ai_draft),
+        sent_at: body.sent_at || null,
+        received_at: body.received_at || null,
+        created_by: user.id,
+      };
+      const { data, error } = await db().from('ps2_lead_emails').insert(row).select('*').single();
+      if (error) throw error;
+
+      // Update lead last_activity_at
+      await db().from('ps2_leads')
+        .update({ last_activity_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq('id', String(body.lead_id));
+
+      const action = row.direction === 'inbound' ? 'reply_received' : 'email_sent';
+      const summary = row.direction === 'inbound'
+        ? `Reply received (sentiment: ${row.sentiment || 'unknown'})`
+        : `Email sent (step ${row.sequence_step || '?'})`;
+      await logActivity(user.id, 'lead_email', String(body.lead_id), action, summary);
+      return jsonResponse(201, { ok: true, data: { email: data } });
+    }
+
+    // ── PATCH EMAIL ───────────────────────────────────────────────────────────
+    if (op === 'email' && id && method === 'PATCH') {
+      if (user.role === 'pt_admin') return forbidden();
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      const allowed = ['status','body','sentiment','sent_at'];
+      const patch: Record<string, unknown> = {};
+      for (const k of allowed) if (Object.hasOwn(body, k)) patch[k] = body[k];
+      const { data, error } = await db()
+        .from('ps2_lead_emails').update(patch).eq('id', id).select('*').single();
+      if (error) throw error;
+      if (!data) return jsonResponse(404, { ok: false, error: 'Email not found' });
+      if (patch.status === 'approved') {
+        await logActivity(user.id, 'lead_email', data.lead_id, 'draft_approved', 'AI draft approved for sending');
+      }
+      return jsonResponse(200, { ok: true, data: { email: data } });
+    }
+
+    // ── MAIL CONFIG ───────────────────────────────────────────────────────────
+    if (op === 'mail-config' && method === 'GET') {
+      const { data, error } = await db()
+        .from('ps2_mail_sequence_config').select('*')
+        .eq('organization_id', ORG_ID).order('step_number');
+      if (error) throw error;
+      return jsonResponse(200, { ok: true, data: data || [] });
+    }
+
+    if (op === 'mail-config' && method === 'PATCH') {
+      if (user.role !== 'sahasra_admin') return forbidden('Only sahasra_admin can edit mail config');
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      const { step_number, ...updates } = body;
+      if (!step_number) return jsonResponse(400, { ok: false, error: 'step_number required' });
+      const allowed = ['label','day_offset','subject_template','body_template','is_active'];
+      const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      for (const k of allowed) if (Object.hasOwn(updates, k)) patch[k] = updates[k];
+      const { data, error } = await db()
+        .from('ps2_mail_sequence_config').update(patch)
+        .eq('organization_id', ORG_ID).eq('step_number', step_number).select('*').single();
+      if (error) throw error;
+      return jsonResponse(200, { ok: true, data });
+    }
+
+    // ── USERS ─────────────────────────────────────────────────────────────────
+    if (op === 'users' && method === 'GET') {
+      if (user.role !== 'sahasra_admin') return forbidden();
+      const { data, error } = await db()
+        .from('ps2_users').select('id, username, full_name, role, outlook_account, is_active, created_at')
+        .eq('organization_id', ORG_ID).order('created_at');
+      if (error) throw error;
+      return jsonResponse(200, { ok: true, data: data || [] });
+    }
+
+    if (op === 'user' && method === 'POST') {
+      if (user.role !== 'sahasra_admin') return forbidden();
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      const username = String(body.username || '').trim();
+      const password = String(body.password || '');
+      if (!username || !password) return jsonResponse(400, { ok: false, error: 'username and password required' });
+      // Use pgcrypto for password hashing
+      const { data, error } = await db().from('ps2_users').insert({
+        organization_id: ORG_ID,
+        username,
+        password_hash: `placeholder_will_be_hashed`, // will be overwritten by RPC
+        full_name: body.full_name || null,
+        role: body.role || 'sahasra_employee',
+        outlook_account: body.outlook_account || null,
+      }).select('id, username, full_name, role, outlook_account, is_active').single();
+      if (error) throw error;
+      // Hash password via pgcrypto update
+      await db().rpc('ps2_set_password', { p_user_id: data.id, p_password: password });
+      return jsonResponse(201, { ok: true, data });
+    }
+
+    if (op === 'user' && id && method === 'PATCH') {
+      if (user.role !== 'sahasra_admin') return forbidden();
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (body.full_name !== undefined) patch.full_name = body.full_name;
+      if (body.role !== undefined) patch.role = body.role;
+      if (body.outlook_account !== undefined) patch.outlook_account = body.outlook_account;
+      if (body.is_active !== undefined) patch.is_active = body.is_active;
+      const { data, error } = await db()
+        .from('ps2_users').update(patch).eq('id', id).eq('organization_id', ORG_ID)
+        .select('id, username, full_name, role, outlook_account, is_active').single();
+      if (error) throw error;
+      if (body.password) {
+        await db().rpc('ps2_set_password', { p_user_id: id, p_password: String(body.password) });
+      }
+      return jsonResponse(200, { ok: true, data });
+    }
+
+    if (op === 'user' && id && method === 'DELETE') {
+      if (user.role !== 'sahasra_admin') return forbidden();
+      if (id === user.id) return forbidden('Cannot delete your own account');
+      const { error } = await db()
+        .from('ps2_users').update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('id', id).eq('organization_id', ORG_ID);
+      if (error) throw error;
+      return jsonResponse(200, { ok: true });
+    }
+
+    // ── PROJECTS ─────────────────────────────────────────────────────────────
+    if (op === 'projects' && method === 'GET') {
+      const { data, error } = await db()
+        .from('ps2_client_projects').select('*')
+        .eq('organization_id', ORG_ID).order('created_at', { ascending: false });
+      if (error) throw error;
+      return jsonResponse(200, { ok: true, data: data || [] });
+    }
+
+    if (op === 'project' && id && method === 'GET') {
+      const { data, error } = await db()
+        .from('ps2_client_projects').select('*').eq('id', id).eq('organization_id', ORG_ID).maybeSingle();
+      if (error) throw error;
+      if (!data) return jsonResponse(404, { ok: false, error: 'Project not found' });
+      const { data: transitions } = await db()
+        .from('ps2_stage_transitions').select('*').eq('project_id', id).order('created_at');
+      return jsonResponse(200, { ok: true, data: { project: data, transitions: transitions || [] } });
+    }
+
+    if (op === 'project' && method === 'POST') {
+      if (user.role === 'pt_admin') return forbidden();
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      if (!body.client_name || !body.project_name) return jsonResponse(400, { ok: false, error: 'client_name and project_name required' });
+      const { data, error } = await db().from('ps2_client_projects').insert({
+        organization_id: ORG_ID,
+        lead_id: body.lead_id || null,
+        client_name: body.client_name,
+        project_name: body.project_name,
+        order_value: body.order_value || null,
+        stage: body.stage || 'enquiry_received',
+        assigned_to: body.assigned_to || null,
+        target_date: body.target_date || null,
+        notes: body.notes || null,
+        quotation_ref: body.quotation_ref || null,
+        stage_entered_at: new Date().toISOString(),
+      }).select('*').single();
+      if (error) throw error;
+      await logActivity(user.id, 'project', data.id, 'project_created', `New project: ${data.project_name} for ${data.client_name}`);
+      return jsonResponse(201, { ok: true, data: { project: data } });
+    }
+
+    if (op === 'project' && id && method === 'PATCH') {
+      if (user.role === 'pt_admin') return forbidden();
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      const allowed = ['client_name','project_name','order_value','assigned_to','target_date','notes','quotation_ref'];
+      const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      for (const k of allowed) if (Object.hasOwn(body, k)) patch[k] = body[k];
+      const { data, error } = await db()
+        .from('ps2_client_projects').update(patch).eq('id', id).eq('organization_id', ORG_ID).select('*').single();
+      if (error) throw error;
+      return jsonResponse(200, { ok: true, data: { project: data } });
+    }
+
+    if (op === 'project-advance' && id && method === 'POST') {
+      if (user.role === 'pt_admin') return forbidden();
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      if (!body.to_stage) return jsonResponse(400, { ok: false, error: 'to_stage required' });
+
+      const { data: existing } = await db()
+        .from('ps2_client_projects').select('stage').eq('id', id).maybeSingle();
+      if (!existing) return jsonResponse(404, { ok: false, error: 'Project not found' });
+
+      const { data, error } = await db()
+        .from('ps2_client_projects').update({
+          stage: body.to_stage,
+          stage_entered_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }).eq('id', id).eq('organization_id', ORG_ID).select('*').single();
+      if (error) throw error;
+
+      await db().from('ps2_stage_transitions').insert({
+        project_id: id,
+        from_stage: existing.stage,
+        to_stage: body.to_stage,
+        notes: body.notes || null,
+        transitioned_by: user.id,
+      });
+      await logActivity(user.id, 'project', id, 'stage_changed', `Project moved to ${body.to_stage}`);
+      return jsonResponse(200, { ok: true, data: { project: data } });
+    }
+
+    // ── CONVERT LEAD → PROJECT ────────────────────────────────────────────────
+    if (op === 'lead-convert' && id && method === 'POST') {
+      if (user.role === 'pt_admin') return forbidden();
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      const { data: lead } = await db()
+        .from('ps2_leads').select('*').eq('id', id).eq('organization_id', ORG_ID).maybeSingle();
+      if (!lead) return jsonResponse(404, { ok: false, error: 'Lead not found' });
+
+      const { data: project, error } = await db().from('ps2_client_projects').insert({
+        organization_id: ORG_ID,
+        lead_id: id,
+        client_name: body.client_name || lead.company || lead.full_name,
+        project_name: body.project_name || `Project for ${lead.company || lead.full_name}`,
+        order_value: body.order_value || null,
+        stage: 'enquiry_received',
+        assigned_to: lead.assigned_to,
+        stage_entered_at: new Date().toISOString(),
+      }).select('*').single();
+      if (error) throw error;
+
+      await db().from('ps2_leads').update({
+        status: 'converted', updated_at: new Date().toISOString(), last_activity_at: new Date().toISOString(),
+      }).eq('id', id);
+      await logActivity(user.id, 'lead', id, 'lead_converted', `Lead converted → project ${project.id}`);
+      return jsonResponse(201, { ok: true, data: { project } });
+    }
+
+    // ── GOOGLE SHEET CONNECTIONS ──────────────────────────────────────────────
+    if (op === 'sheet-connections' && method === 'GET') {
+      const { data, error } = await db()
+        .from('ps2_google_sheet_connections').select('*')
+        .eq('organization_id', ORG_ID).order('created_at');
+      if (error) throw error;
+      return jsonResponse(200, { ok: true, data: data || [] });
+    }
+
+    if (op === 'sheet-connection' && method === 'POST') {
+      if (user.role === 'pt_admin') return forbidden();
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      const { data, error } = await db().from('ps2_google_sheet_connections').insert({
+        organization_id: ORG_ID,
+        sheet_url: body.sheet_url,
+        sheet_id: body.sheet_id || null,
+        tab_name: body.tab_name || 'Sheet1',
+        column_mapping: body.column_mapping || {},
+        sync_interval_hours: body.sync_interval_hours || 24,
+        is_active: true,
+        created_by: user.id,
+      }).select('*').single();
+      if (error) throw error;
+      return jsonResponse(201, { ok: true, data });
+    }
+
+    if (op === 'sheet-connection' && id && method === 'PATCH') {
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      const allowed = ['sheet_id','tab_name','column_mapping','sync_interval_hours','is_active','last_synced_at'];
+      const patch: Record<string, unknown> = {};
+      for (const k of allowed) if (Object.hasOwn(body, k)) patch[k] = body[k];
+      const { data, error } = await db()
+        .from('ps2_google_sheet_connections').update(patch).eq('id', id).eq('organization_id', ORG_ID).select('*').single();
+      if (error) throw error;
+      return jsonResponse(200, { ok: true, data });
+    }
+
+    // ── OUTLOOK ACCOUNTS ──────────────────────────────────────────────────────
+    if (op === 'outlook-accounts' && method === 'GET') {
+      const { data } = await db()
+        .from('ps2_users')
+        .select('id, full_name, outlook_account, is_active')
+        .eq('organization_id', ORG_ID)
+        .eq('is_active', true)
+        .not('outlook_account', 'is', null);
+      const accounts = (data || []).map(u => ({
+        id: u.id,
+        email: u.outlook_account,
+        display_name: u.full_name,
+        is_connected: true,
+        user_id: u.id,
+      }));
+      return jsonResponse(200, { ok: true, data: accounts });
+    }
+
+    // ── SYSTEM SETTINGS ────────────────────────────────────────────────────────
+    if (op === 'settings' && method === 'GET') {
+      if (user.role !== 'pt_admin') return forbidden('Only pt_admin can access system settings');
+      const { data } = await db()
+        .from('ps2_system_settings').select('*').eq('organization_id', ORG_ID);
+      const rows = data || [];
+      const get = (key: string) => rows.find(r => r.key === key)?.value ?? {};
+      const webhooks = get('n8n_webhooks') as Record<string,string>;
+      return jsonResponse(200, {
+        ok: true,
+        data: {
+          ai_prompt_first_email: (get('ai_prompt_first_email') as Record<string,string>).prompt || '',
+          ai_prompt_reply: (get('ai_prompt_reply') as Record<string,string>).prompt || '',
+          ai_prompt_sentiment: (get('ai_prompt_sentiment') as Record<string,string>).prompt || '',
+          n8n_webhooks: {
+            send_email: webhooks?.send_email || '',
+            sync_sheets: webhooks?.sync_sheets || '',
+            process_replies: webhooks?.process_replies || '',
+          },
+          health: {
+            n8n_api_key_configured: Boolean(Deno.env.get('N8N_API_KEY')),
+            anthropic_key_configured: Boolean(Deno.env.get('ANTHROPIC_API_KEY')),
+            supabase_service_key_configured: Boolean(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')),
+          },
+        },
+      });
+    }
+
+    if (op === 'settings' && method === 'PATCH') {
+      if (user.role !== 'pt_admin') return forbidden('Only pt_admin can edit system settings');
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      const upsert = async (key: string, value: unknown) => {
+        await db().from('ps2_system_settings').upsert(
+          { organization_id: ORG_ID, key, value, updated_at: new Date().toISOString() },
+          { onConflict: 'organization_id,key' }
+        );
+      };
+      if (body.ai_prompt_first_email !== undefined) await upsert('ai_prompt_first_email', { prompt: body.ai_prompt_first_email });
+      if (body.ai_prompt_reply !== undefined) await upsert('ai_prompt_reply', { prompt: body.ai_prompt_reply });
+      if (body.ai_prompt_sentiment !== undefined) await upsert('ai_prompt_sentiment', { prompt: body.ai_prompt_sentiment });
+      if (body.n8n_webhooks !== undefined) await upsert('n8n_webhooks', body.n8n_webhooks);
+      return jsonResponse(200, { ok: true });
+    }
+
+    return jsonResponse(404, { ok: false, error: `Unknown op: ${op}` });
+
+  } catch (err) {
+    const status = (err as Error & { status?: number }).status ?? 500;
+    return jsonResponse(status, { ok: false, error: err instanceof Error ? err.message : 'Server error' });
+  }
+});
+
+// ─── Helper: get n8n webhook config ──────────────────────────────────────────
+async function getWebhooks(): Promise<{ send_email: string; sync_sheets: string; process_replies: string }> {
+  const { data } = await db()
+    .from('ps2_system_settings')
+    .select('value').eq('organization_id', ORG_ID).eq('key', 'n8n_webhooks').maybeSingle();
+  const v = (data?.value as Record<string, string>) || {};
+  return { send_email: v.send_email || '', sync_sheets: v.sync_sheets || '', process_replies: v.process_replies || '' };
+}
