@@ -31,6 +31,16 @@ export async function proxy(request: NextRequest) {
       return NextResponse.next();
     }
 
+    // n8n workflows authenticate with x-api-key; route handlers validate it
+    const apiKey = request.headers.get("x-api-key");
+    if (
+      apiKey &&
+      process.env.N8N_API_KEY &&
+      apiKey === process.env.N8N_API_KEY
+    ) {
+      return NextResponse.next();
+    }
+
     if (!session) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },

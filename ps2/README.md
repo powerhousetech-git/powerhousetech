@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PS2 — Lead Management Portal
 
-## Getting Started
+Standalone Next.js App Router portal for **Sahasra Group**, built by **PowerhouseTech**.
 
-First, run the development server:
+## Features
+
+- Custom auth (bcrypt + JWT) with roles: `sahasra_admin`, `sahasra_employee`, `pt_admin`
+- Master lead database (TanStack Table), uploads (PDF / Excel / Google Sheets)
+- Outreach pipeline + mail sequence templates (TipTap)
+- AI draft review queue
+- Client project tracker (Kanban + table)
+- Dashboard metrics & funnel (Recharts)
+- n8n API key auth on selected routes
+
+## Quick start
 
 ```bash
+cd ps2
+cp .env.example .env.local
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 — demo mode is on by default (`PS2_DEMO_MODE=true`).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Demo logins
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Username | Password | Role |
+|----------|----------|------|
+| `sahasra_admin` | `sahasra_admin` | Full app (except system settings) |
+| `sahasra_employee` | `sahasra_employee` | No users / mail-config |
+| `pt_admin` | `pt_admin` | System settings only |
 
-## Learn More
+## Environment
 
-To learn more about Next.js, take a look at the following resources:
+See `.env.example`. For production Supabase (schema in `supabase/migrations/20260903120000_ps2_lead_management.sql`), set `SUPABASE_SERVICE_ROLE_KEY` and `PS2_DEMO_MODE=false`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+n8n calls use header `x-api-key: $N8N_API_KEY`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## PRD
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`products/ps2-lead-management-prd.md`

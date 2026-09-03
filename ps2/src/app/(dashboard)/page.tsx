@@ -62,13 +62,34 @@ export default function DashboardPage() {
     loadData();
   }, [dateFrom, dateTo, source, assignedTo]);
 
+  const conversionRate =
+    stats && stats.total_leads > 0
+      ? `${Math.round((stats.converted_leads / stats.total_leads) * 100)}%`
+      : "0%";
+
   const metrics = stats
     ? [
         { label: "Total Leads", value: stats.total_leads, color: "text-[#1a237e]" },
-        { label: "New", value: stats.new_leads, color: "text-gray-600" },
-        { label: "Sent", value: stats.sent_leads, color: "text-blue-600" },
-        { label: "Responded", value: stats.responded_leads, color: "text-green-600" },
-        { label: "Meetings", value: stats.meetings_scheduled, color: "text-purple-600" },
+        {
+          label: "Active Outreach",
+          value: stats.sent_leads,
+          color: "text-blue-600",
+        },
+        {
+          label: "Responses",
+          value: stats.responded_leads,
+          color: "text-green-600",
+        },
+        {
+          label: "Meetings Scheduled",
+          value: stats.meetings_scheduled,
+          color: "text-purple-600",
+        },
+        {
+          label: "Conversion Rate",
+          value: conversionRate,
+          color: "text-emerald-600",
+        },
       ]
     : [];
 
