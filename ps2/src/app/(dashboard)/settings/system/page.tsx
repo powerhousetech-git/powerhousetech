@@ -6,20 +6,31 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 
 interface SystemSettings {
-  ai_personalization?: { enabled: boolean; model: string };
-  email_sequence?: { auto_send: boolean; review_required: boolean };
-  n8n_webhook?: { url: string; enabled: boolean };
+  ai_prompt_first_email: string;
+  ai_prompt_reply: string;
+  ai_prompt_sentiment: string;
+  n8n_webhooks: {
+    send_email: string;
+    sync_sheets: string;
+    process_replies: string;
+  };
+  health: {
+    api_key_configured: boolean;
+    anthropic_key_configured: boolean;
+    supabase_service_key_configured: boolean;
+  };
 }
 
 export default function SystemSettingsPage() {
   const { user } = useAuth();
-  const [settings, setSettings] = useState<SystemSettings>({});
+  const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
 
   const loadSettings = async () => {
     const res = await fetch("/api/settings/system");
@@ -28,12 +39,12 @@ export default function SystemSettingsPage() {
   };
 
   useEffect(() => {
-    if (user?.role === "sahasra_admin" || user?.role === "pt_admin") {
+    if (user?.role === "pt_admin") {
       loadSettings();
     }
   }, [user]);
 
-  if (user?.role !== "sahasra_admin" && user?.role !== "pt_admin") {
+  if (user?.role !== "pt_admin") {
     return (
       <>
         <Header title="System Settings" userName={user?.full_name ?? ""} userRole={user?.role ?? "sahasra_employee"} />
@@ -43,131 +54,133 @@ export default function SystemSettingsPage() {
   }
 
   const handleSave = async () => {
+    if (!settings) return;
     setSaving(true);
-    await fetch("/api/settings/system", {
+    setMessage("");
+    const res = await fetch("/api/settings/system", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(settings),
     });
+    const json = await res.json();
+    setMessage(json.success ? "Settings saved." : json.error ?? "Failed to save");
     setSaving(false);
   };
+
+  const healthBadge = (ok: boolean) => (
+    <Badge variant={ok ? "default" : "secondary"}>
+      {ok ? "Configured" : "Missing"}
+    </Badge>
+  );
 
   return (
     <>
       <Header title="System Settings" userName={user?.full_name ?? ""} userRole={user?.role ?? "pt_admin"} />
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {!settings ? (
+          <Card><CardContent className="py-10 text-center text-gray-500">Loading settings…</CardContent></Card>
+        ) : (
+          <>
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">AI Personalization</CardTitle>
+            <CardTitle className="text-base">AI Prompt Templates</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={settings.ai_personalization?.enabled ?? false}
-                onCheckedChange={(v) =>
-                  setSettings({
-                    ...settings,
-                    ai_personalization: {
-                      ...settings.ai_personalization,
-                      enabled: v,
-                      model: settings.ai_personalization?.model ?? "claude-sonnet",
-                    },
-                  })
-                }
-              />
-              <Label>Enable AI personalization for email drafts</Label>
-            </div>
             <div>
-              <Label>AI Model</Label>
-              <Input
-                value={settings.ai_personalization?.model ?? ""}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    ai_personalization: {
-                      enabled: settings.ai_personalization?.enabled ?? true,
-                      model: e.target.value,
-                    },
-                  })
-                }
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Email Sequence</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={settings.email_sequence?.auto_send ?? false}
-                onCheckedChange={(v) =>
-                  setSettings({
-                    ...settings,
-                    email_sequence: {
-                      ...settings.email_sequence,
-                      auto_send: v,
-                      review_required: settings.email_sequence?.review_required ?? true,
-                    },
-                  })
-                }
-              />
-              <Label>Auto-send approved emails</Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={settings.email_sequence?.review_required ?? true}
-                onCheckedChange={(v) =>
-                  setSettings({
-                    ...settings,
-                    email_sequence: {
-                      auto_send: settings.email_sequence?.auto_send ?? false,
-                      review_required: v,
-                    },
-                  })
-                }
-              />
-              <Label>Require manual review for AI drafts</Label>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">n8n Webhook</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={settings.n8n_webhook?.enabled ?? false}
-                onCheckedChange={(v) =>
-                  setSettings({
-                    ...settings,
-                    n8n_webhook: {
-                      url: settings.n8n_webhook?.url ?? "",
-                      enabled: v,
-                    },
-                  })
-                }
-              />
-              <Label>Enable n8n webhook integration</Label>
-            </div>
-            <div>
-              <Label>Webhook URL</Label>
+              <Label>First Email Prompt</Label>
               <Textarea
-                value={settings.n8n_webhook?.url ?? ""}
+                rows={4}
+                value={settings.ai_prompt_first_email}
+                onChange={(e) =>
+                  setSettings({ ...settings, ai_prompt_first_email: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label>Reply Draft Prompt</Label>
+              <Textarea
+                rows={4}
+                value={settings.ai_prompt_reply}
+                onChange={(e) =>
+                  setSettings({ ...settings, ai_prompt_reply: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label>Sentiment Classification Prompt</Label>
+              <Textarea
+                rows={4}
+                value={settings.ai_prompt_sentiment}
+                onChange={(e) =>
+                  setSettings({ ...settings, ai_prompt_sentiment: e.target.value })
+                }
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">n8n Webhook URLs</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label>Send Email Webhook</Label>
+              <Textarea
+                rows={2}
+                value={settings.n8n_webhooks.send_email}
                 onChange={(e) =>
                   setSettings({
                     ...settings,
-                    n8n_webhook: {
-                      enabled: settings.n8n_webhook?.enabled ?? true,
-                      url: e.target.value,
-                    },
+                    n8n_webhooks: { ...settings.n8n_webhooks, send_email: e.target.value },
                   })
                 }
               />
+            </div>
+            <div>
+              <Label>Google Sheets Sync Webhook</Label>
+              <Textarea
+                rows={2}
+                value={settings.n8n_webhooks.sync_sheets}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    n8n_webhooks: { ...settings.n8n_webhooks, sync_sheets: e.target.value },
+                  })
+                }
+              />
+            </div>
+            <div>
+              <Label>Reply Processing Webhook</Label>
+              <Input
+                value={settings.n8n_webhooks.process_replies}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    n8n_webhooks: { ...settings.n8n_webhooks, process_replies: e.target.value },
+                  })
+                }
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">System Health Indicators</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span>n8n API key configured</span>
+              {healthBadge(settings.health.api_key_configured)}
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Anthropic API key configured</span>
+              {healthBadge(settings.health.anthropic_key_configured)}
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Supabase service role configured</span>
+              {healthBadge(settings.health.supabase_service_key_configured)}
             </div>
           </CardContent>
         </Card>
@@ -175,6 +188,9 @@ export default function SystemSettingsPage() {
         <Button onClick={handleSave} disabled={saving}>
           {saving ? "Saving..." : "Save Settings"}
         </Button>
+        {message && <p className="text-sm text-gray-600">{message}</p>}
+          </>
+        )}
       </div>
     </>
   );
