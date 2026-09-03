@@ -576,8 +576,9 @@ body {
 }
 
 .row-actions {
-  width: 44px;
+  width: 72px;
   text-align: right;
+  white-space: nowrap;
 }
 
 .btn-icon {
@@ -587,6 +588,11 @@ body {
   font-size: 14px;
   opacity: 0.7;
   padding: 4px 6px;
+}
+
+.btn-icon.btn-open {
+  color: var(--accent);
+  opacity: 0.9;
 }
 
 .btn-icon:hover {

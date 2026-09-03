@@ -15,6 +15,7 @@
     charts: [],
   };
 
+  var PM_PROFILES = ['Sahasra_1', 'Sahasra_2', 'Sahasra_3', 'Sahasra_4', 'Sahasra_5'];
   var previewTimer = null;
 
   var STEPS = [
@@ -745,11 +746,26 @@
     loadCostingsHome();
   }
 
-  function summaryPanelHtml(r) {
+  function summaryMetrics(r) {
     var currency = r.currency || 'USD';
     var calcM = r.calc_margin;
     var calcQ = r.calc_quote_price;
     var calcV = r.calc_value_addition;
+    if (
+      (calcM == null || calcQ == null || calcV == null) &&
+      state.profile &&
+      state.profile.defaults
+    ) {
+      var live = SahasraCompute.computeCosting(r, state.profile.defaults);
+      if (calcM == null) calcM = live.margin;
+      if (calcQ == null) calcQ = live.quote_price_per_unit;
+      if (calcV == null) calcV = live.value_addition_pct;
+    }
+    return { currency: currency, calcM: calcM, calcQ: calcQ, calcV: calcV };
+  }
+
+  function summaryPanelHtml(r) {
+    var m = summaryMetrics(r);
     return (
       '<tr class="summary-row" data-summary-for="' +
       r.id +
@@ -759,17 +775,17 @@
       '</div>' +
       '<table class="mini-table"><thead><tr><th>Metric</th><th>Calculated</th><th>True value</th></tr></thead><tbody>' +
       '<tr><td>Margin</td><td>' +
-      esc(fmtMoney(calcM, currency)) +
+      esc(fmtMoney(m.calcM, m.currency)) +
       '</td><td>' +
-      esc(fmtMoney(r.true_margin, currency)) +
+      esc(fmtMoney(r.true_margin, m.currency)) +
       '</td></tr>' +
       '<tr><td>Quote price</td><td>' +
-      esc(fmtMoney(calcQ, currency)) +
+      esc(fmtMoney(m.calcQ, m.currency)) +
       '</td><td>' +
-      esc(fmtMoney(r.true_quote_price, currency)) +
+      esc(fmtMoney(r.true_quote_price, m.currency)) +
       '</td></tr>' +
       '<tr><td>Value addition</td><td>' +
-      esc(SahasraFormat.percent(calcV, 1)) +
+      esc(SahasraFormat.percent(m.calcV, 1)) +
       '</td><td>' +
       esc(SahasraFormat.percent(r.true_value_addition, 1)) +
       '</td></tr>' +
@@ -895,6 +911,9 @@
           '</td><td>' +
           new Date(r.updated_at).toLocaleString() +
           '</td><td class="row-actions">' +
+          '<button type="button" class="btn-icon btn-open" data-open="' +
+          r.id +
+          '" title="Open / edit">✎</button>' +
           '<button type="button" class="btn-icon btn-delete" data-delete="' +
           r.id +
           '" title="Delete">🗑</button></td></tr>';
@@ -908,7 +927,7 @@
   function bindCostingsTable() {
     document.querySelectorAll('.costing-row').forEach(function (tr) {
       tr.addEventListener('click', function (e) {
-        if (e.target.closest('[data-delete]')) return;
+        if (e.target.closest('[data-delete]') || e.target.closest('[data-open]')) return;
         var id = tr.getAttribute('data-id');
         var st = tr.getAttribute('data-status');
         if (st === 'final') {
@@ -917,6 +936,12 @@
           return;
         }
         location.hash = '#/costing/' + id;
+      });
+    });
+    document.querySelectorAll('[data-open]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        location.hash = '#/costing/' + btn.getAttribute('data-open');
       });
     });
     document.querySelectorAll('[data-delete]').forEach(function (btn) {
@@ -1001,16 +1026,10 @@
     state.costing = res.data.costing;
     if (!Array.isArray(state.costing.na_fields)) state.costing.na_fields = [];
     var st = state.costing.status === 'submitted' ? 'final' : state.costing.status;
-    if (st === 'final') {
-      // Final costings open as expandable summary on home, not wizard.
-      state.expandedId = id;
-      location.hash = '#/costings';
-      return;
-    }
     state.wizardStep = state.costing.current_step || 1;
     if (state.wizardStep > 7) state.wizardStep = 7;
     recompute();
-    if (state.wizardStep >= 7 || st === 'in_review') renderReview();
+    if (st === 'final' || st === 'in_review' || state.wizardStep >= 7) renderReview();
     else renderCostingWizard();
   }
 
@@ -1395,11 +1414,15 @@
       .join('');
 
     var byPm = s.by_creator || {};
-    var pmHtml = Object.keys(byPm)
-      .map(function (k) {
-        return '<div class="kpi"><div class="kpi-label">' + esc(k) + '</div><div class="kpi-val">' + byPm[k] + '</div></div>';
-      })
-      .join('');
+    var pmHtml = PM_PROFILES.map(function (k) {
+      return (
+        '<div class="kpi"><div class="kpi-label">' +
+        esc(k) +
+        '</div><div class="kpi-val">' +
+        (byPm[k] || 0) +
+        '</div></div>'
+      );
+    }).join('');
 
     $('main-content').innerHTML =
       '<div class="kpi-row"><div class="kpi"><div class="kpi-label">Total costings</div><div class="kpi-val">' +
@@ -1408,7 +1431,7 @@
       statusHtml +
       '</p>' +
       '<h3>By project manager</h3><div class="kpi-row">' +
-      (pmHtml || '<p class="muted">No data</p>') +
+      pmHtml +
       '</div>' +
       '<div class="charts-grid">' +
       '<div class="chart-card"><h4>Margins (calc vs true)</h4><canvas id="chart-margin" height="160"></canvas></div>' +
@@ -1474,7 +1497,7 @@
 
     var pmCharts = $('pm-charts');
     if (pmCharts) {
-      var pms = Object.keys(byPm);
+      var pms = PM_PROFILES.slice();
       pmCharts.innerHTML = pms
         .map(function (pm, idx) {
           return (
@@ -1485,23 +1508,29 @@
             '" height="140"></canvas></div>'
           );
         })
-        .join('') || '<p class="muted">No PM data yet.</p>';
+        .join('');
       pms.forEach(function (pm, idx) {
         var subset = chartRows.filter(function (r) {
           return r.created_by === pm;
         });
-        var plabels = subset.map(function (r, i) {
-          return (r.assembly_name || '#' + (i + 1)).slice(0, 14);
-        });
+        var plabels = subset.length
+          ? subset.map(function (r, i) {
+              return (r.assembly_name || '#' + (i + 1)).slice(0, 14);
+            })
+          : ['—'];
         buildLineChart(
           'chart-pm-' + idx,
           plabels,
-          subset.map(function (r) {
-            return r.calc_quote_price;
-          }),
-          subset.map(function (r) {
-            return r.true_quote_price;
-          }),
+          subset.length
+            ? subset.map(function (r) {
+                return r.calc_quote_price;
+              })
+            : [null],
+          subset.length
+            ? subset.map(function (r) {
+                return r.true_quote_price;
+              })
+            : [null],
           'Calculated',
           'True',
         );
@@ -1513,14 +1542,15 @@
   function renderLeadershipTable(rows) {
     if (!rows.length) return '<p class="muted">No costings yet.</p>';
     return (
-      '<table class="data-table costings-table"><thead><tr><th>Client</th><th>Assembly</th><th>Created by</th><th>Status</th><th>Deviation</th><th>Updated</th></tr></thead><tbody>' +
+      '<table class="data-table costings-table"><thead><tr><th>Client</th><th>Assembly</th><th>Created by</th><th>Status</th><th>Deviation</th><th>Updated</th><th></th></tr></thead><tbody>' +
       rows
         .map(function (r) {
           var st = r.status === 'submitted' ? 'final' : r.status;
           var expanded = state.expandedId === r.id;
+          var m = summaryMetrics(r);
           var dev = '—';
-          if (r.calc_quote_price != null && r.true_quote_price != null && Number(r.calc_quote_price)) {
-            var d = ((Number(r.true_quote_price) - Number(r.calc_quote_price)) / Number(r.calc_quote_price)) * 100;
+          if (m.calcQ != null && r.true_quote_price != null && Number(m.calcQ)) {
+            var d = ((Number(r.true_quote_price) - Number(m.calcQ)) / Number(m.calcQ)) * 100;
             dev = (d >= 0 ? '+' : '') + d.toFixed(1) + '% quote';
           }
           var row =
@@ -1541,7 +1571,10 @@
             esc(dev) +
             '</td><td>' +
             new Date(r.updated_at).toLocaleString() +
-            '</td></tr>';
+            '</td><td class="row-actions">' +
+            '<button type="button" class="btn-icon btn-open" data-open="' +
+            r.id +
+            '" title="Open / edit">✎</button></td></tr>';
           if (expanded) row += summaryPanelHtml(r);
           return row;
         })
@@ -1552,10 +1585,17 @@
 
   function bindLeadershipTable() {
     document.querySelectorAll('.leadership-row').forEach(function (tr) {
-      tr.addEventListener('click', function () {
+      tr.addEventListener('click', function (e) {
+        if (e.target.closest('[data-open]')) return;
         var id = tr.getAttribute('data-id');
         state.expandedId = state.expandedId === id ? null : id;
         loadAdminDashboard();
+      });
+    });
+    document.querySelectorAll('.leadership-row [data-open]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        location.hash = '#/costing/' + btn.getAttribute('data-open');
       });
     });
     document.querySelectorAll('[data-true-form]').forEach(function (form) {
