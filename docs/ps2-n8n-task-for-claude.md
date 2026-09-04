@@ -139,7 +139,9 @@ n8n Cloud workflows are deployed. Portal settings store these URLs:
 
 **Q1–Q3 answers:** enrichment uses Workflow D URL with `{ event, lead_id, website }`; n8n re-fetches the lead by ID; replies are Gmail-polled (no portal webhook required).
 
-**Workflow C upsert:** `POST ?op=leads-import` `{ source:"google_sheet", leads:[...] }`.
+**Workflow C upsert:** `POST ?op=leads-import` `{ source:"google_sheet", upsert:true, leads:[...] }` — Claude confirmed applied 2026-09-04.
+
+**Workflow B match:** `GET ?op=lead-by-email&email=` — Claude confirmed applied 2026-09-04.
 
 See `docs/ps2-n8n-handshake.md`.
 
