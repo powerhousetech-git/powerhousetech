@@ -466,6 +466,16 @@ Deno.serve(async (req) => {
       let body: Record<string, unknown> = {};
       try { body = await req.json(); } catch { /* */ }
       const source = String(body.source || 'manual');
+      const fullName = String(body.full_name || [body.first_name, body.last_name].filter(Boolean).join(' ') || '').trim();
+      const email = body.email ? String(body.email).trim() : '';
+      const company = body.company ? String(body.company).trim() : '';
+      // Manual / single-row creates require a name and either email or company
+      if (source === 'manual' || !Array.isArray((body as { leads?: unknown }).leads)) {
+        if (!fullName) return jsonResponse(400, { ok: false, error: 'full_name is required' });
+        if (!email && !company) {
+          return jsonResponse(400, { ok: false, error: 'email or company is required' });
+        }
+      }
       const row = leadRowFromBody(body, source);
       const { data, error } = await db().from('ps2_leads').insert(row).select('*').single();
       if (error) throw error;
@@ -582,8 +592,13 @@ Deno.serve(async (req) => {
 
       for (const item of incoming) {
         const email = item.email ? String(item.email).trim().toLowerCase() : '';
-        const full = item.full_name || [item.first_name, item.last_name].filter(Boolean).join(' ');
-        if (!email && !full && !item.company && !item.phone) { failed += 1; continue; }
+        const full = String(item.full_name || [item.first_name, item.last_name].filter(Boolean).join(' ') || '').trim();
+        const company = item.company ? String(item.company).trim() : '';
+        // Single-row manual empties: require name + (email or company). Bulk imports stay lenient.
+        if (incoming.length === 1 && source === 'manual') {
+          if (!full || (!email && !company)) { failed += 1; continue; }
+        }
+        if (!email && !full && !company && !item.phone) { failed += 1; continue; }
         const hit = email ? existingByEmail.get(email) : undefined;
         if (hit && !upsert) { duplicates += 1; continue; }
         const row = leadRowFromBody(item, source, { upload_batch_id: batchId });
@@ -805,7 +820,7 @@ Deno.serve(async (req) => {
       const assignedTo = url.searchParams.get('assigned_to');
       const { data: emails } = await db()
         .from('ps2_lead_emails')
-        .select('*, ps2_leads!lead_id(full_name, company, assigned_to)')
+        .select('*, ps2_leads!lead_id(id, full_name, company, assigned_to)')
         .eq('status', 'pending_review')
         .order('created_at', { ascending: false });
 
@@ -816,7 +831,36 @@ Deno.serve(async (req) => {
           return lead && lead['assigned_to'] === assignedTo;
         });
       }
-      return jsonResponse(200, { ok: true, data: drafts });
+
+      const leadIds = [...new Set(drafts.map(d => d.lead_id).filter(Boolean))] as string[];
+      const inboundsByLead = new Map<string, Record<string, unknown>[]>();
+      if (leadIds.length) {
+        const { data: inbounds } = await db()
+          .from('ps2_lead_emails')
+          .select('id, lead_id, subject, body, sentiment, received_at, created_at, thread_id, direction')
+          .in('lead_id', leadIds)
+          .eq('direction', 'inbound')
+          .order('created_at', { ascending: false });
+        for (const row of inbounds || []) {
+          const lid = String(row.lead_id);
+          const list = inboundsByLead.get(lid) || [];
+          list.push(row as Record<string, unknown>);
+          inboundsByLead.set(lid, list);
+        }
+      }
+
+      const enriched = drafts.map(d => {
+        const lid = String(d.lead_id || '');
+        const list = inboundsByLead.get(lid) || [];
+        let related: Record<string, unknown> | null = null;
+        if (d.thread_id) {
+          related = list.find(r => r.thread_id === d.thread_id) || null;
+        }
+        if (!related) related = list[0] || null;
+        return { ...d, related_inbound: related };
+      });
+
+      return jsonResponse(200, { ok: true, data: enriched });
     }
 
     // ── CREATE EMAIL ──────────────────────────────────────────────────────────
