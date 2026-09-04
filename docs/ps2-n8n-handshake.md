@@ -5,6 +5,20 @@
 
 Demo: Gmail. Production: swap to Outlook when Sahasra IT confirms O365.
 
+## Demo sample leads (master sheet + portal)
+
+Claude keeps these five inbox addresses in the Google Sheet master. Portal/Supabase mirror for testing uses the same emails only (old Acme/Nova/Coastal seed rows removed):
+
+| Email | Demo company |
+|---|---|
+| `shreyas09here@gmail.com` | Syska LED Lights |
+| `shreyassinha.work@gmail.com` | Havells India Ltd |
+| `shreyass0904@gmail.com` | Exicom Tele-Systems |
+| `sinhay0206@gmail.com` | Polycab India |
+| `sheyassinha.ss04@gmail.com` | KEI Industries |
+
+Sheet: `https://docs.google.com/spreadsheets/d/1UxKqqC5unE3CwTMqgpB3SMARfxIIw2sVSZQUuz3SclU` (tab `Sheet1`). Lead identity = **Email**.
+
 ## Locked answers
 
 | Question | Answer |
