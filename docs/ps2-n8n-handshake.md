@@ -39,6 +39,9 @@ Portal "Run now" buttons call `POST ?op=trigger-n8n` which POSTs these URLs.
 | B | `lead-by-email`, `lead`, `email`, `settings` | ✓ Fixed |
 | C | `sheet-connections`, `leads-import`, `sheet-connection` | ✓ Fixed |
 | D | `lead` GET + PATCH | ✓ |
+| E (optional) | `lead-attachment` → webhook `extract_pdf` with `{ event: "lead.attachment", lead_id, attachment_id, filename, content_type, content_base64 }` | reserved |
+
+Portal also exposes `POST ?op=lead-attachment` to attach a photo/PDF to an existing lead. Set `run_ocr: true` to forward to `extract_pdf`.
 
 ## Go-live checklist (n8n)
 

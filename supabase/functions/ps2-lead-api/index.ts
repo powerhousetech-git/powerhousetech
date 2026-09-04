@@ -486,8 +486,8 @@ Deno.serve(async (req) => {
         'website','website_summary','status','assigned_to','tags','custom_intro','notes',
         'meeting_scheduled_at','last_activity_at','attachments'];
       const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      for (const k of allowed) if (Object.hasOwn(body, k)) patch[k] = body[k];
-      if (Object.hasOwn(body, 'status')) patch.last_activity_at = new Date().toISOString();
+      for (const k of allowed) if (Object.prototype.hasOwnProperty.call(body, k)) patch[k] = body[k];
+      if (Object.prototype.hasOwnProperty.call(body, 'status')) patch.last_activity_at = new Date().toISOString();
 
       const { data, error } = await db()
         .from('ps2_leads').update(patch).eq('id', id).eq('organization_id', ORG_ID).select('*').single();
@@ -861,7 +861,7 @@ Deno.serve(async (req) => {
       try { body = await req.json(); } catch { /* */ }
       const allowed = ['status','body','sentiment','sent_at'];
       const patch: Record<string, unknown> = {};
-      for (const k of allowed) if (Object.hasOwn(body, k)) patch[k] = body[k];
+      for (const k of allowed) if (Object.prototype.hasOwnProperty.call(body, k)) patch[k] = body[k];
       const { data, error } = await db()
         .from('ps2_lead_emails').update(patch).eq('id', id).select('*').single();
       if (error) throw error;
@@ -889,7 +889,7 @@ Deno.serve(async (req) => {
       if (!step_number) return jsonResponse(400, { ok: false, error: 'step_number required' });
       const allowed = ['label','day_offset','subject_template','body_template','is_active'];
       const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      for (const k of allowed) if (Object.hasOwn(updates, k)) patch[k] = updates[k];
+      for (const k of allowed) if (Object.prototype.hasOwnProperty.call(updates, k)) patch[k] = updates[k];
       const { data, error } = await db()
         .from('ps2_mail_sequence_config').update(patch)
         .eq('organization_id', ORG_ID).eq('step_number', step_number).select('*').single();
@@ -1006,7 +1006,7 @@ Deno.serve(async (req) => {
       try { body = await req.json(); } catch { /* */ }
       const allowed = ['client_name','project_name','order_value','assigned_to','target_date','notes','quotation_ref'];
       const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      for (const k of allowed) if (Object.hasOwn(body, k)) patch[k] = body[k];
+      for (const k of allowed) if (Object.prototype.hasOwnProperty.call(body, k)) patch[k] = body[k];
       const { data, error } = await db()
         .from('ps2_client_projects').update(patch).eq('id', id).eq('organization_id', ORG_ID).select('*').single();
       if (error) throw error;
@@ -1102,7 +1102,7 @@ Deno.serve(async (req) => {
       try { body = await req.json(); } catch { /* */ }
       const allowed = ['sheet_id','tab_name','column_mapping','sync_interval_hours','is_active','last_synced_at'];
       const patch: Record<string, unknown> = {};
-      for (const k of allowed) if (Object.hasOwn(body, k)) patch[k] = body[k];
+      for (const k of allowed) if (Object.prototype.hasOwnProperty.call(body, k)) patch[k] = body[k];
       const { data, error } = await db()
         .from('ps2_google_sheet_connections').update(patch).eq('id', id).eq('organization_id', ORG_ID).select('*').single();
       if (error) throw error;
