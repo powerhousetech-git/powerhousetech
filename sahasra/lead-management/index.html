@@ -25,7 +25,10 @@
           <input name="username" id="login-username" autocomplete="username" required />
         </label>
         <label>Password
-          <input name="password" id="login-password" type="password" autocomplete="current-password" required />
+          <div class="password-field">
+            <input name="password" id="login-password" type="password" autocomplete="current-password" required />
+            <button type="button" class="btn btn-ghost btn-sm password-toggle" onclick="window.PS2App && window.PS2App.togglePassword('login-password', this)">Show</button>
+          </div>
         </label>
         <button type="submit" class="btn btn-primary btn-block" id="btn-login">Sign In</button>
       </form>
@@ -128,8 +131,8 @@
 
   <div id="toast" class="toast"></div>
 
-  <script src="/sahasra/lead-management/js/config.js?v=4"></script>
-  <script src="/sahasra/lead-management/js/api.js?v=4"></script>
-  <script src="/sahasra/lead-management/js/app.js?v=4"></script>
+  <script src="/sahasra/lead-management/js/config.js?v=5"></script>
+  <script src="/sahasra/lead-management/js/api.js?v=5"></script>
+  <script src="/sahasra/lead-management/js/app.js?v=5"></script>
 </body>
 </html>

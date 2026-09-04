@@ -76,6 +76,10 @@
 
   /* ─ Nav ──────────────────────────────────────────────────────────────────── */
   function setView(v) {
+    if (v === 'capture' && state.view === 'sheets') {
+      state.captureTab = 'pdf';
+    }
+    if (v === 'sheets') state.captureTab = 'sheets';
     state.view = v;
     document.querySelectorAll('.nav-link').forEach(function(a){ a.classList.toggle('active', a.dataset.view === v); });
     renderView(v);
@@ -117,6 +121,14 @@
     setView(hash);
   }
 
+  function togglePassword(inputId, btn) {
+    var input = $(inputId);
+    if (!input) return;
+    var show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    if (btn) btn.textContent = show ? 'Hide' : 'Show';
+  }
+
   function signOut() {
     PS2Api.clearToken();
     state.user = null;
@@ -139,7 +151,11 @@
     else if (v === 'settings') renderSettings();
     else if (v === 'users') renderUsers();
     else if (v === 'outlook') renderOutlook();
-    else if (v === 'sheets') { state.captureTab = 'sheets'; renderCapture(); }
+    else if (v === 'sheets') {
+      state.captureTab = 'sheets';
+      state.view = 'sheets';
+      renderCapture();
+    }
   }
 
   /* ─────────────────────────────────────────────────────────────────────────
@@ -198,20 +214,27 @@
   }
 
   function n8nRunPanel() {
-    return '<div class="panel" style="margin-bottom:18px"><div class="panel-head"><h2>n8n automations</h2>' +
-      '<span style="font-size:12px;color:var(--muted)">Demo: Gmail · Production: Outlook later</span></div>' +
+    return '<div class="panel" style="margin-bottom:18px"><div class="panel-head"><h2>n8n automations</h2></div>' +
       '<div style="padding:14px 18px;display:flex;gap:10px;flex-wrap:wrap">' +
-        '<button class="btn btn-primary btn-sm" onclick="window.PS2App.triggerN8n(\'send_email\')">Run email sequence (A)</button>' +
-        '<button class="btn btn-sm" onclick="window.PS2App.triggerN8n(\'process_replies\')">Re-run reply ingest (B)</button>' +
-        '<button class="btn btn-sm" onclick="window.PS2App.triggerN8n(\'sync_sheets\')">Sync Google Sheets (C)</button>' +
+        '<button class="btn btn-primary btn-sm" id="n8n-btn-send_email" onclick="window.PS2App.triggerN8n(\'send_email\')">Run email sequence (A)</button>' +
+        '<button class="btn btn-sm" id="n8n-btn-process_replies" onclick="window.PS2App.triggerN8n(\'process_replies\')">Re-run reply ingest (B)</button>' +
+        '<button class="btn btn-sm" id="n8n-btn-sync_sheets" onclick="window.PS2App.triggerN8n(\'sync_sheets\')">Sync Google Sheets (C)</button>' +
       '</div>' +
       '<p style="padding:0 18px 14px;margin:0;font-size:12px;color:var(--muted)">Website enrichment (D) fires automatically when a lead is saved with a website. Workflows must be Active in n8n.</p></div>';
   }
 
   async function triggerN8n(workflow) {
-    var res = await PS2Api.triggerN8n({ workflow: workflow });
-    if (!res.ok) { toast(res.data.error || 'Trigger failed — is the webhook URL set and workflow Active?', true); return; }
-    toast('Triggered ' + workflow + ' → n8n');
+    var btn = $('n8n-btn-' + workflow);
+    var prev = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
+    toast('Triggering ' + workflow + '…');
+    try {
+      var res = await PS2Api.triggerN8n({ workflow: workflow });
+      if (!res.ok) { toast(res.data.error || 'Trigger failed — is the webhook URL set and workflow Active?', true); return; }
+      toast('Triggered ' + workflow + ' → n8n');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = prev; }
+    }
   }
 
   /* ─────────────────────────────────────────────────────────────────────────
@@ -274,6 +297,16 @@
     main.querySelectorAll('.tab').forEach(function(btn){
       btn.addEventListener('click', function(){
         state.captureTab = btn.dataset.tab;
+        if (btn.dataset.tab === 'sheets') {
+          state.view = 'sheets';
+          location.hash = 'sheets';
+        } else {
+          state.view = 'capture';
+          location.hash = 'capture';
+        }
+        document.querySelectorAll('.nav-link').forEach(function(a){
+          a.classList.toggle('active', a.dataset.view === state.view);
+        });
         renderCapture();
       });
     });
@@ -590,7 +623,11 @@
   function showLeadPanel(lead, emails) {
     closeDetail();
     var locked = state.user && state.user.role === 'pt_admin';
-    var pendingDraft = emails.find(function(e){ return e.is_ai_draft && e.status === 'pending_review' && e.direction === 'outbound'; });
+    var isAdmin = state.user && state.user.role === 'sahasra_admin';
+    var sortedEmails = (emails || []).slice().sort(function(a, b){
+      return new Date(a.sent_at || a.received_at || a.created_at) - new Date(b.sent_at || b.received_at || b.created_at);
+    });
+    var pendingDraft = sortedEmails.find(function(e){ return e.is_ai_draft && e.status === 'pending_review' && e.direction === 'outbound'; });
     var websiteHtml = lead.website
       ? '<a href="' + esc(lead.website) + '" target="_blank" rel="noopener" style="color:var(--gold)">' + esc(lead.website) + '</a>'
       : '—';
@@ -603,7 +640,7 @@
           '<div><h2>' + esc(lead.full_name || '—') + '</h2><p style="margin:0;color:var(--muted);font-size:13px">' + esc(lead.company || '') + ' · ' + statusBadge(lead.status) + '</p></div>' +
           '<button type="button" class="btn btn-sm btn-ghost" id="btn-close-detail">✕ Close</button>' +
         '</div>' +
-        (pendingDraft ? draftCard(pendingDraft, lead) : '') +
+        (pendingDraft ? draftCard(pendingDraft, lead, sortedEmails) : '') +
         (lead.status === 'meeting_scheduled' ? meetingOutcomeCard(lead) : '') +
         '<div class="detail-cols">' +
           detailField('Email', lead.email) +
@@ -620,7 +657,7 @@
 
         '<div class="pipeline-history">' +
           '<h3>Outreach pipeline</h3>' +
-          pipelineHistoryHtml(lead, emails) +
+          pipelineHistoryHtml(lead, sortedEmails) +
         '</div>' +
 
         '<div style="margin-top:18px">' +
@@ -637,24 +674,27 @@
         (!locked ? '<div class="lead-actions">' +
           '<p class="lead-actions-hint"><strong>Schedule meeting</strong> — use after a positive reply or when the prospect agrees to talk. Sets status to Meeting; after the call, convert or discard.</p>' +
           '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+            '<button type="button" class="btn btn-sm" onclick="window.PS2App.openEditLead(\'' + lead.id + '\')">Edit lead</button>' +
             (lead.status !== 'meeting_scheduled' && lead.status !== 'converted' && lead.status !== 'discarded'
               ? '<button type="button" class="btn btn-sm" onclick="window.PS2App.scheduleMeeting(\'' + lead.id + '\')">Schedule meeting</button>' : '') +
-            (lead.status !== 'converted' && lead.status !== 'meeting_scheduled'
+            (lead.status !== 'converted'
               ? '<button type="button" class="btn btn-sm btn-primary" onclick="window.PS2App.convertLead(\'' + lead.id + '\')">Mark converted</button>' : '') +
-            (lead.status !== 'discarded' && lead.status !== 'meeting_scheduled'
+            (lead.status !== 'discarded'
               ? '<button type="button" class="btn btn-sm btn-danger" onclick="window.PS2App.discardLead(\'' + lead.id + '\')">Discard</button>' : '') +
             '<button type="button" class="btn btn-sm btn-ghost" onclick="window.PS2App.editLeadWebsite(\'' + lead.id + '\')">Edit website</button>' +
+            (isAdmin
+              ? '<button type="button" class="btn btn-sm btn-danger" onclick="window.PS2App.deleteLead(\'' + lead.id + '\')">Delete lead</button>' : '') +
           '</div></div>' : '') +
 
         '<div class="email-timeline" style="margin-top:22px">' +
           '<h3 style="font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Email detail</h3>' +
-          (emails.length === 0 ? '<p style="color:var(--muted);font-size:13px">No emails recorded yet.</p>' : '') +
-          emails.map(function(e){
+          (sortedEmails.length === 0 ? '<p style="color:var(--muted);font-size:13px">No emails recorded yet.</p>' : '') +
+          sortedEmails.map(function(e){
             var dir = e.direction === 'inbound' ? '← Reply' : '→ Outbound';
             var dirColor = e.direction === 'inbound' ? 'var(--green)' : 'var(--gold)';
             return '<div class="email-item"><div class="email-meta">' +
               '<span style="color:' + dirColor + ';font-weight:600">' + dir + '</span>' +
-              (e.sequence_step ? '<span>' + esc(sequenceLabel(e.sequence_step)) + '</span>' : '') +
+              (e.sequence_step != null && e.sequence_step !== '' ? '<span>' + esc(sequenceLabel(e.sequence_step)) + '</span>' : '') +
               sentimentBadge(e.sentiment) +
               '<span class="badge ' + (e.status==='sent'?'badge-green':e.status==='pending_review'?'badge-gold':'badge-gray') + '">' + e.status + '</span>' +
               '<span>' + fmtDateTime(e.sent_at || e.received_at || e.created_at) + '</span></div>' +
@@ -679,11 +719,18 @@
   function fmtDateTime(ts) {
     if (!ts) return '—';
     try {
-      return new Date(ts).toLocaleString(undefined, {
-        year: 'numeric', month: 'short', day: 'numeric',
+      return new Date(ts).toLocaleString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric',
         hour: '2-digit', minute: '2-digit',
       });
     } catch (_) { return String(ts); }
+  }
+
+  function isOutboundSent(e) {
+    if (!e || e.direction !== 'outbound') return false;
+    if (e.status === 'sent') return true;
+    if (e.sent_at && e.status !== 'rejected' && e.status !== 'pending_review' && e.status !== 'draft') return true;
+    return false;
   }
 
   function pipelineHistoryHtml(lead, emails) {
@@ -695,15 +742,14 @@
       kind: 'created',
     });
 
-    (emails || []).filter(function(e){ return e.direction === 'outbound' && e.status === 'sent'; })
-      .forEach(function(e){
-        events.push({
-          t: e.sent_at || e.created_at,
-          title: sequenceLabel(e.sequence_step || 1) + ' sent',
-          detail: e.subject || '',
-          kind: 'sent',
-        });
+    (emails || []).filter(isOutboundSent).forEach(function(e){
+      events.push({
+        t: e.sent_at || e.created_at,
+        title: sequenceLabel(e.sequence_step != null ? e.sequence_step : 1) + ' sent',
+        detail: e.subject || '',
+        kind: 'sent',
       });
+    });
 
     (emails || []).filter(function(e){ return e.direction === 'inbound'; })
       .forEach(function(e){
@@ -730,12 +776,12 @@
       events.push({ t: lead.updated_at || lead.last_activity_at, title: 'Discarded', detail: '', kind: 'discarded' });
     }
 
-    events.sort(function(a, b){ return new Date(a.t) - new Date(b.t); });
+    events.sort(function(a, b){
+      var ta = a.t ? new Date(a.t).getTime() : 0;
+      var tb = b.t ? new Date(b.t).getTime() : 0;
+      return ta - tb;
+    });
 
-    if (events.length === 1 && emails.length === 0) {
-      return '<p style="color:var(--muted);font-size:13px;margin:0">No outreach yet — waiting for Mail 1.</p>' +
-        '<ul class="pipe-list">' + pipeItem(events[0]) + '</ul>';
-    }
     return '<ul class="pipe-list">' + events.map(pipeItem).join('') + '</ul>';
   }
 
@@ -757,9 +803,41 @@
       '</div></div>';
   }
 
-  function draftCard(email, lead) {
+  function findRelatedInbound(draft, emails) {
+    if (draft && draft.related_inbound) return draft.related_inbound;
+    var list = emails || [];
+    var inbound = list.filter(function(e){ return e.direction === 'inbound'; });
+    if (!inbound.length) return null;
+    if (draft && draft.thread_id) {
+      var byThread = inbound.filter(function(e){ return e.thread_id === draft.thread_id; });
+      if (byThread.length) inbound = byThread;
+    }
+    inbound.sort(function(a, b){
+      return new Date(b.received_at || b.created_at) - new Date(a.received_at || a.created_at);
+    });
+    return inbound[0] || null;
+  }
+
+  function inboundSnippetHtml(inbound) {
+    if (!inbound) return '<div class="inbound-snippet muted">No related inbound email found for this draft.</div>';
+    return '<div class="inbound-snippet">' +
+      '<div class="inbound-snippet-label">Original inbound email</div>' +
+      '<div class="email-meta" style="margin-bottom:6px">' +
+        '<span style="color:var(--green);font-weight:600">← Reply</span>' +
+        sentimentBadge(inbound.sentiment) +
+        '<span>' + fmtDateTime(inbound.received_at || inbound.created_at) + '</span>' +
+      '</div>' +
+      '<div class="email-subject">' + esc(inbound.subject || '(no subject)') + '</div>' +
+      '<div class="email-body">' + esc((inbound.body || '').slice(0, 360)) + ((inbound.body || '').length > 360 ? '…' : '') + '</div>' +
+    '</div>';
+  }
+
+  function draftCard(email, lead, emails) {
+    var inbound = findRelatedInbound(email, emails);
     return '<div class="draft-card">' +
-      '<h4>🤖 AI Draft — Pending Review</h4>' +
+      '<h4>AI Draft — Pending Review</h4>' +
+      inboundSnippetHtml(inbound) +
+      '<div class="inbound-snippet-label" style="margin-top:10px">AI draft</div>' +
       '<div class="draft-body">' + esc((email.body||'').slice(0,400)) + '</div>' +
       '<div style="display:flex;gap:8px">' +
         '<button class="btn btn-sm btn-primary" onclick="window.PS2App.approveDraft(\'' + email.id + '\',\'' + lead.id + '\')">Approve & Queue</button>' +
@@ -780,25 +858,42 @@
     var leads = (res.ok && res.data.data && res.data.data.leads) || [];
 
     var columns = [
-      { key:'new', label:'New' }, { key:'mail_1_sent', label:'Mail 1 Sent' },
-      { key:'responded', label:'Responded' }, { key:'meeting_scheduled', label:'Meeting' },
-      { key:'converted', label:'Converted' }, { key:'discarded', label:'Discarded' },
+      { key: 'new', label: 'New' },
+      { key: 'mail_1_sent', label: 'Mail 1 Sent' },
+      { key: 'follow_up_1', label: 'FU 1' },
+      { key: 'follow_up_2', label: 'FU 2' },
+      { key: 'follow_up_3', label: 'FU 3' },
+      { key: 'follow_up_4', label: 'FU 4' },
+      { key: 'follow_up_5', label: 'FU 5' },
+      { key: 'later_fus', label: 'Later FUs', match: ['follow_up_6','follow_up_7','follow_up_8','follow_up_9','follow_up_10'] },
+      { key: 'responded', label: 'Responded' },
+      { key: 'meeting_scheduled', label: 'Meeting' },
+      { key: 'converted', label: 'Converted' },
+      { key: 'discarded', label: 'Discarded' },
     ];
 
+    function leadsForCol(col) {
+      if (col.match) return leads.filter(function(l){ return col.match.indexOf(l.status) !== -1; });
+      return leads.filter(function(l){ return l.status === col.key; });
+    }
+
     main.innerHTML =
-      '<div class="page-head"><div><h1 class="page-title">Pipeline</h1></div></div>' +
+      '<div class="page-head"><div><h1 class="page-title">Pipeline</h1><p class="page-sub">Click a card to open lead detail</p></div></div>' +
       '<div class="tabs"><button class="tab active" onclick="this.parentElement.querySelectorAll(\'.tab\').forEach(t=>t.classList.remove(\'active\')); this.classList.add(\'active\'); document.getElementById(\'pipeline-kanban\').classList.remove(\'hidden\'); document.getElementById(\'pipeline-funnel\').classList.add(\'hidden\')">Kanban</button>' +
       '<button class="tab" onclick="this.parentElement.querySelectorAll(\'.tab\').forEach(t=>t.classList.remove(\'active\')); this.classList.add(\'active\'); document.getElementById(\'pipeline-kanban\').classList.add(\'hidden\'); document.getElementById(\'pipeline-funnel\').classList.remove(\'hidden\')">Funnel</button></div>' +
       '<div id="pipeline-kanban" class="kanban-board">' +
         columns.map(function(col){
-          var colLeads = leads.filter(function(l){ return col.key==='mail_1_sent' ? SENT_STATUSES.includes(l.status) : l.status === col.key; });
+          var colLeads = leadsForCol(col);
           return '<div class="kanban-col">' +
             '<div class="kanban-col-head">' + esc(col.label) + '<span style="color:var(--muted)">' + colLeads.length + '</span></div>' +
             '<div class="kanban-col-body">' +
               colLeads.map(function(l){
-                return '<div class="kanban-card" onclick="window.PS2App.openLead(\'' + l.id + '\')">' +
+                return '<div class="kanban-card" role="button" tabindex="0" onclick="window.PS2App.openLead(\'' + l.id + '\')">' +
                   '<div class="card-name">' + esc(l.full_name || '—') + '</div>' +
-                  '<div class="card-company">' + esc(l.company || '') + '</div></div>';
+                  '<div class="card-company">' + esc(l.company || '') + '</div>' +
+                  (col.key === 'later_fus' || (col.key && col.key.indexOf('follow_up') === 0)
+                    ? '<div class="card-val">' + esc(STATUS_LABELS[l.status] || l.status) + '</div>' : '') +
+                  '</div>';
               }).join('') +
               (colLeads.length === 0 ? '<p style="color:var(--muted);font-size:12px;text-align:center;margin:8px 0">Empty</p>' : '') +
             '</div></div>';
@@ -806,7 +901,7 @@
       '</div>' +
       '<div id="pipeline-funnel" class="hidden"><div class="panel"><div class="panel-head"><h2>Status Funnel</h2></div><div style="padding:20px"><div class="funnel">' +
         columns.map(function(col){
-          var count = col.key==='mail_1_sent' ? leads.filter(function(l){return SENT_STATUSES.includes(l.status);}).length : leads.filter(function(l){return l.status===col.key;}).length;
+          var count = leadsForCol(col).length;
           var w = Math.round((count / Math.max(1, leads.length)) * 100);
           return '<div class="funnel-row"><span class="funnel-label">' + esc(col.label) + '</span><div class="funnel-bar-wrap"><div class="funnel-bar" style="width:' + w + '%"></div></div><span class="funnel-count">' + count + '</span></div>';
         }).join('') +
@@ -824,15 +919,18 @@
 
     main.innerHTML =
       '<div class="page-head"><div><h1 class="page-title">Review Drafts</h1><p class="page-sub">AI-generated reply drafts awaiting approval</p></div></div>' +
-      (drafts.length === 0 ? '<div class="panel"><div style="padding:32px;text-align:center;color:var(--muted)">No pending drafts 🎉</div></div>' : '') +
+      (drafts.length === 0 ? '<div class="panel"><div style="padding:32px;text-align:center;color:var(--muted)">No pending drafts</div></div>' : '') +
       drafts.map(function(draft){
         var lead = draft.ps2_leads || {};
+        var inbound = draft.related_inbound || null;
         return '<div class="review-card">' +
           '<div class="review-card-head">' +
             '<div><h3>' + esc(lead.full_name || lead.company || 'Unknown') + ' — ' + esc(lead.company || '') + '</h3>' +
             '<p style="margin:2px 0;font-size:12px;color:var(--muted)">' + esc(draft.subject || '') + '</p></div>' +
             sentimentBadge(draft.sentiment) +
           '</div>' +
+          inboundSnippetHtml(inbound) +
+          '<div class="inbound-snippet-label" style="margin-top:12px">AI draft</div>' +
           '<div class="draft-body">' + esc(draft.body || '') + '</div>' +
           '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
             '<button class="btn btn-sm btn-primary" onclick="window.PS2App.approveDraft(\'' + draft.id + '\',\'' + lead.id + '\')">Approve & Queue</button>' +
@@ -898,7 +996,7 @@
     var isAdmin = state.user && state.user.role === 'sahasra_admin';
 
     main.innerHTML =
-      '<div class="page-head"><div><h1 class="page-title">Mail Configuration</h1><p class="page-sub">Email sequence — up to 11 steps</p></div></div>' +
+      '<div class="page-head"><div><h1 class="page-title">Mail Configuration</h1><p class="page-sub">Email sequence — default active: Mail 1 + Follow-ups 1–4 (later steps optional)</p></div></div>' +
       '<div class="panel"><table class="data-table"><thead><tr><th>#</th><th>Label</th><th>Day Offset</th><th>Active</th><th></th></tr></thead><tbody class="mail-steps-body">' +
         steps.map(function(s){
           return '<tr class="mail-step-row" data-step="' + s.step_number + '">' +
@@ -1046,38 +1144,84 @@
     if (m) m.remove();
   }
 
+  function leadContactValid(fullName, email, company) {
+    if (!fullName) return 'Full name is required';
+    if (!email && !company) return 'Email or company is required';
+    return null;
+  }
+
+  function leadFormFields(prefix, lead) {
+    lead = lead || {};
+    return '<label class="field-label">Full Name *<input id="' + prefix + '-name" value="' + esc(lead.full_name || '') + '" placeholder="Priya Sharma" required /></label>' +
+      '<label class="field-label">Company<input id="' + prefix + '-company" value="' + esc(lead.company || '') + '" placeholder="Acme Corp" /></label>' +
+      '<label class="field-label">Email<input id="' + prefix + '-email" type="email" value="' + esc(lead.email || '') + '" /></label>' +
+      '<p style="font-size:12px;color:var(--muted);margin:-6px 0 10px">Require full name and either email or company.</p>' +
+      '<label class="field-label">Phone<input id="' + prefix + '-phone" value="' + esc(lead.phone || '') + '" /></label>' +
+      '<label class="field-label">Designation<input id="' + prefix + '-desig" value="' + esc(lead.designation || '') + '" /></label>' +
+      '<label class="field-label">Website<input id="' + prefix + '-website" type="url" value="' + esc(lead.website || '') + '" /></label>' +
+      '<label class="field-label">Source<select id="' + prefix + '-source">' +
+        ['manual','business_card','excel','google_sheet'].map(function(s){
+          return '<option value="' + s + '"' + ((lead.source || 'manual') === s ? ' selected' : '') + '>' +
+            (s === 'business_card' ? 'Business Card' : s === 'google_sheet' ? 'Google Sheet' : s.charAt(0).toUpperCase() + s.slice(1)) +
+            '</option>';
+        }).join('') +
+      '</select></label>' +
+      '<label class="field-label">Notes<textarea id="' + prefix + '-notes">' + esc(lead.notes || '') + '</textarea></label>';
+  }
+
+  function readLeadForm(prefix) {
+    return {
+      full_name: ($(prefix + '-name') || {value:''}).value.trim(),
+      company: ($(prefix + '-company') || {value:''}).value.trim(),
+      email: ($(prefix + '-email') || {value:''}).value.trim(),
+      phone: ($(prefix + '-phone') || {value:''}).value.trim(),
+      designation: ($(prefix + '-desig') || {value:''}).value.trim(),
+      website: ($(prefix + '-website') || {value:''}).value.trim(),
+      source: ($(prefix + '-source') || {value:'manual'}).value,
+      notes: ($(prefix + '-notes') || {value:''}).value.trim(),
+    };
+  }
+
   function openAddLead() {
     openModal('<div class="modal-card"><h2>Add Lead</h2><div class="form-panel">' +
-      '<label class="field-label">Full Name<input id="nl-name" placeholder="Priya Sharma" /></label>' +
-      '<label class="field-label">Company<input id="nl-company" placeholder="Acme Corp" /></label>' +
-      '<label class="field-label">Email<input id="nl-email" type="email" /></label>' +
-      '<label class="field-label">Phone<input id="nl-phone" /></label>' +
-      '<label class="field-label">Designation<input id="nl-desig" /></label>' +
-      '<label class="field-label">Website<input id="nl-website" type="url" /></label>' +
-      '<label class="field-label">Source<select id="nl-source"><option value="manual">Manual</option><option value="business_card">Business Card</option><option value="excel">Excel</option><option value="google_sheet">Google Sheet</option></select></label>' +
-      '<label class="field-label">Notes<textarea id="nl-notes"></textarea></label>' +
+      leadFormFields('nl', { source: 'manual' }) +
       '<div class="form-actions"><button class="btn btn-primary" onclick="window.PS2App.submitAddLead()">Save Lead</button><button class="btn btn-ghost" onclick="window.PS2App.closeModal()">Cancel</button></div>' +
     '</div></div>');
   }
 
   async function submitAddLead() {
-    var body = {
-      full_name: $('nl-name').value.trim(),
-      company: $('nl-company').value.trim(),
-      email: $('nl-email').value.trim(),
-      phone: $('nl-phone').value.trim(),
-      designation: $('nl-desig').value.trim(),
-      website: $('nl-website').value.trim(),
-      source: $('nl-source').value,
-      notes: $('nl-notes').value.trim(),
-    };
-    if (!body.full_name && !body.email) { toast('Name or email required', true); return; }
+    var body = readLeadForm('nl');
+    var err = leadContactValid(body.full_name, body.email, body.company);
+    if (err) { toast(err, true); return; }
     var res = await PS2Api.createLead(body);
     if (!res.ok) { toast(res.data.error || 'Failed to save', true); return; }
     toast('Lead saved');
     closeModal();
     if (state.view === 'capture' || state.view === 'sheets') renderCapture();
     else renderLeads();
+  }
+
+  function openEditLead(leadId) {
+    var lead = state.selectedLead || {};
+    if (leadId && lead.id !== leadId) {
+      // keep using selectedLead when ids match; otherwise wait for reload
+    }
+    openModal('<div class="modal-card"><h2>Edit Lead</h2><div class="form-panel">' +
+      leadFormFields('el', lead) +
+      '<div class="form-actions"><button class="btn btn-primary" onclick="window.PS2App.submitEditLead(\'' + (leadId || lead.id) + '\')">Save changes</button>' +
+      '<button class="btn btn-ghost" onclick="window.PS2App.closeModal()">Cancel</button></div>' +
+    '</div></div>');
+  }
+
+  async function submitEditLead(leadId) {
+    var body = readLeadForm('el');
+    var err = leadContactValid(body.full_name, body.email, body.company);
+    if (err) { toast(err, true); return; }
+    var res = await PS2Api.patchLead(leadId, body);
+    if (!res.ok) { toast(res.data.error || 'Failed to save', true); return; }
+    toast('Lead updated');
+    closeModal();
+    openLeadDetail(leadId);
   }
 
   function openAddProject() {
@@ -1270,10 +1414,10 @@
     var val = existing.toISOString().slice(0, 16);
     openModal('<div class="modal-card"><h2>Schedule meeting</h2><div class="form-panel">' +
       '<p style="font-size:13px;color:var(--muted);margin:0 0 12px">Use when the prospect agreed to a call or meeting. After it happens, open the lead and choose Convert or Discard.</p>' +
-      '<label class="field-label">Date &amp; time' +
+      '<label class="field-label">Date &amp; time (DD/MM style in your browser)' +
         '<input id="mt-when" type="datetime-local" value="' + val + '" required />' +
       '</label>' +
-      '<p style="font-size:12px;color:var(--muted);margin:0">Format: YYYY-MM-DD and 24h time (browser picker).</p>' +
+      '<p style="font-size:12px;color:var(--muted);margin:0">Use the calendar picker — shown in your browser’s locale (typically day/month for India).</p>' +
       '<div class="form-actions"><button class="btn btn-primary" onclick="window.PS2App.submitScheduleMeeting(\'' + leadId + '\')">Save meeting</button>' +
       '<button class="btn btn-ghost" onclick="window.PS2App.closeModal()">Cancel</button></div></div></div>');
   }
@@ -1357,15 +1501,21 @@
   async function convertLead(leadId) {
     var lead = state.selectedLead || {};
     openModal('<div class="modal-card"><h2>Convert to project</h2><div class="form-panel">' +
-      '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">Creates a client tracker card at Enquiry Received.</p>' +
+      '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">Creates a client tracker card at Enquiry Received. Confirm carefully — this marks the lead as converted.</p>' +
       '<label class="field-label">Client name<input id="cv-client" value="' + esc(lead.company || lead.full_name || '') + '" /></label>' +
       '<label class="field-label">Project name<input id="cv-project" placeholder="e.g. Transformer supply" /></label>' +
       '<label class="field-label">Order value (₹, optional)<input id="cv-value" type="number" /></label>' +
+      '<label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:8px 0 4px">' +
+        '<input type="checkbox" id="cv-confirm" /> I confirm — convert this lead to a project</label>' +
       '<div class="form-actions"><button class="btn btn-primary" onclick="window.PS2App.submitConvert(\'' + leadId + '\')">Convert</button>' +
       '<button class="btn btn-ghost" onclick="window.PS2App.closeModal()">Cancel</button></div></div></div>');
   }
 
   async function submitConvert(leadId) {
+    if (!($('cv-confirm') || {}).checked) {
+      toast('Please confirm conversion before continuing', true);
+      return;
+    }
     var body = {
       client_name: ($('cv-client') || {value:''}).value.trim() || undefined,
       project_name: ($('cv-project') || {value:''}).value.trim() || undefined,
@@ -1373,19 +1523,39 @@
     };
     var res = await PS2Api.convertLead(leadId, body);
     if (!res.ok) { toast(res.data.error || 'Failed', true); return; }
-    toast('Converted → project created');
+    var project = res.data.data && res.data.data.project;
+    toast(project && project.id
+      ? 'Converted → project created. Opening Client Tracker…'
+      : 'Converted → project created');
     closeModal();
     closeDetail();
-    renderLeads();
+    if (project && project.id) {
+      setView('tracker');
+      location.hash = 'tracker';
+      setTimeout(function(){ openProject(project.id); }, 400);
+    } else {
+      renderLeads();
+    }
   }
 
   async function discardLead(leadId) {
-    if (!confirm('Discard this lead?')) return;
+    if (!confirm('Discard this lead permanently from the active pipeline?\n\nThis cannot be undone from the UI.')) return;
     var res = await PS2Api.patchLead(leadId, { status: 'discarded' });
     if (!res.ok) { toast('Failed', true); return; }
     toast('Lead discarded');
     closeDetail();
-    renderLeads();
+    if (state.view === 'pipeline') renderPipeline();
+    else renderLeads();
+  }
+
+  async function deleteLead(leadId) {
+    if (!confirm('Delete this lead forever? Emails and attachments linked to it may also be removed.\n\nOnly sahasra_admin can do this.')) return;
+    var res = await PS2Api.deleteLead(leadId);
+    if (!res.ok) { toast(res.data.error || 'Delete failed', true); return; }
+    toast('Lead deleted');
+    closeDetail();
+    if (state.view === 'pipeline') renderPipeline();
+    else renderLeads();
   }
 
   async function openLead(id) {
@@ -1502,6 +1672,7 @@
   // Expose public API for onclick handlers
   window.PS2App = {
     openAddLead: openAddLead, submitAddLead: submitAddLead,
+    openEditLead: openEditLead, submitEditLead: submitEditLead,
     openAddProject: openAddProject, submitAddProject: submitAddProject,
     openAddUser: openAddUser, submitAddUser: submitAddUser,
     openAddSheet: openAddSheet, submitAddSheet: submitAddSheet,
@@ -1510,13 +1681,14 @@
     closeModal: closeModal,
     approveDraft: approveDraft, rejectDraft: rejectDraft, editDraft: editDraft, saveAndApproveDraft: saveAndApproveDraft,
     scheduleMeeting: scheduleMeeting, submitScheduleMeeting: submitScheduleMeeting,
-    convertLead: convertLead, submitConvert: submitConvert, discardLead: discardLead,
+    convertLead: convertLead, submitConvert: submitConvert, discardLead: discardLead, deleteLead: deleteLead,
     triggerN8n: triggerN8n,
     closeDetail: closeDetail,
     openLeadUpload: openLeadUpload, submitLeadUpload: submitLeadUpload,
     editLeadWebsite: editLeadWebsite, saveLeadWebsite: saveLeadWebsite,
     openLead: openLead, openProject: openProject, advanceStage: advanceStage,
     deactivateUser: deactivateUser, toggleSheet: toggleSheet,
+    togglePassword: togglePassword,
   };
 
   bindEvents();
