@@ -34,10 +34,12 @@ Columns: Name, Email, Phone, Company, Designation, Website, Source, Status, Foll
 | `process_replies` | `…/webhook/ps2-process-replies` | WF-B |
 | `sync_sheets` | `…/webhook/ps2-sync-sheets` | WF-C |
 | `enrich_website` | `…/webhook/ps2-website-enrichment` | WF-D |
-| **`add_lead`** | `…/webhook/ps2-add-lead` | **NEW — Claude to create** |
-| **`update_lead`** | `…/webhook/ps2-update-lead` | **NEW — Claude to create** |
+| **`add_lead`** | `…/webhook/ps2-add-lead` | Active · n8n id `uZuVpnEK1RzHtRbW` |
+| **`update_lead`** | `…/webhook/ps2-update-lead` | Active · n8n id `5S6x13Zgf0XULy5B` |
 
 Portal sends both `x-api-key` and `Shreyas09` with the shared key.
+
+**Verified 2026-09-04:** add-lead appends a sheet row; update-lead `appendOrUpdate` by Email (status → `meeting_scheduled` confirmed).
 
 ### Add lead body
 ```json
