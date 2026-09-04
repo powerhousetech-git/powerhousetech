@@ -48,6 +48,7 @@
     importLeads: (body) => req('POST', 'leads-import', body),
     ingestFile: (body) => req('POST', 'ingest-file', body),
     uploadBatches: () => req('GET', 'upload-batches'),
+    triggerN8n: (body) => req('POST', 'trigger-n8n', body),
     leadsReadyToSend: () => req('GET', 'leads-ready-to-send'),
     convertLead: (id, body) => req('POST', 'lead-convert', body, 'id=' + id),
 

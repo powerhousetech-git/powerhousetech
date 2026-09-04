@@ -174,7 +174,12 @@ async function getN8nApiKey(): Promise<string> {
 function fireN8n(url: string, body: unknown, apiKey: string) {
   if (!url) return;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (apiKey) headers['x-api-key'] = apiKey;
+  if (apiKey) {
+    // Handshake standard is x-api-key. Also send Shreyas09 until n8n webhook
+    // Header Auth credential is renamed to match the handshake.
+    headers['x-api-key'] = apiKey;
+    headers['Shreyas09'] = apiKey;
+  }
   fetch(url, { method: 'POST', headers, body: JSON.stringify(body) }).catch(() => { /* fire and forget */ });
 }
 
@@ -684,6 +689,40 @@ Deno.serve(async (req) => {
         .order('created_at', { ascending: false }).limit(30);
       if (error) throw error;
       return jsonResponse(200, { ok: true, data: data || [] });
+    }
+
+    // ── TRIGGER N8N (portal "Run now" buttons → n8n webhooks) ────────────────
+    if (op === 'trigger-n8n' && method === 'POST') {
+      if (user.role === 'pt_admin') return forbidden();
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      const which = String(body.workflow || body.which || '');
+      const allowed: Record<string, keyof Webhooks> = {
+        send_email: 'send_email',
+        process_replies: 'process_replies',
+        sync_sheets: 'sync_sheets',
+        enrich_website: 'enrich_website',
+        extract_pdf: 'extract_pdf',
+      };
+      const key = allowed[which];
+      if (!key) {
+        return jsonResponse(400, {
+          ok: false,
+          error: 'workflow must be one of: send_email, process_replies, sync_sheets, enrich_website, extract_pdf',
+        });
+      }
+      const [wh, apiKey] = await Promise.all([getWebhooks(), getN8nApiKey()]);
+      const url = wh[key];
+      if (!url) return jsonResponse(400, { ok: false, error: `Webhook URL not configured for ${which}` });
+      const payload = (body.payload as Record<string, unknown>) || {
+        event: 'portal.trigger',
+        workflow: which,
+        triggered_by: user.username,
+        triggered_at: new Date().toISOString(),
+      };
+      fireN8n(url, payload, apiKey);
+      await logActivity(user.id, 'n8n', which, 'n8n_triggered', `Triggered n8n workflow: ${which}`);
+      return jsonResponse(200, { ok: true, data: { workflow: which, url, fired: true } });
     }
 
     // ── EMAILS LIST ───────────────────────────────────────────────────────────

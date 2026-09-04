@@ -169,6 +169,7 @@
         kpi('Converted', s.converted_leads || 0, 'gold') +
         kpi('Discarded', s.discarded_leads || 0, '') +
       '</div>' +
+      (state.user && state.user.role !== 'pt_admin' ? n8nRunPanel() : '') +
       '<div style="display:grid;grid-template-columns:1fr 340px;gap:18px">' +
         '<div class="panel">' +
           '<div class="panel-head"><h2>Pipeline Funnel</h2></div>' +
@@ -194,6 +195,23 @@
   function kpi(label, val, colorClass, hint) {
     return '<div class="kpi"><div class="kpi-label">' + esc(label) + '</div><div class="kpi-val ' + (colorClass || '') + '">' + val + '</div>' +
       (hint ? '<div class="kpi-hint">' + esc(hint) + '</div>' : '') + '</div>';
+  }
+
+  function n8nRunPanel() {
+    return '<div class="panel" style="margin-bottom:18px"><div class="panel-head"><h2>n8n automations</h2>' +
+      '<span style="font-size:12px;color:var(--muted)">Demo: Gmail · Production: Outlook later</span></div>' +
+      '<div style="padding:14px 18px;display:flex;gap:10px;flex-wrap:wrap">' +
+        '<button class="btn btn-primary btn-sm" onclick="window.PS2App.triggerN8n(\'send_email\')">Run email sequence (A)</button>' +
+        '<button class="btn btn-sm" onclick="window.PS2App.triggerN8n(\'process_replies\')">Re-run reply ingest (B)</button>' +
+        '<button class="btn btn-sm" onclick="window.PS2App.triggerN8n(\'sync_sheets\')">Sync Google Sheets (C)</button>' +
+      '</div>' +
+      '<p style="padding:0 18px 14px;margin:0;font-size:12px;color:var(--muted)">Website enrichment (D) fires automatically when a lead is saved with a website. Workflows must be Active in n8n.</p></div>';
+  }
+
+  async function triggerN8n(workflow) {
+    var res = await PS2Api.triggerN8n({ workflow: workflow });
+    if (!res.ok) { toast(res.data.error || 'Trigger failed — is the webhook URL set and workflow Active?', true); return; }
+    toast('Triggered ' + workflow + ' → n8n');
   }
 
   /* ─────────────────────────────────────────────────────────────────────────
@@ -1317,6 +1335,7 @@
     approveDraft: approveDraft, rejectDraft: rejectDraft, editDraft: editDraft, saveAndApproveDraft: saveAndApproveDraft,
     scheduleMeeting: scheduleMeeting, submitScheduleMeeting: submitScheduleMeeting,
     convertLead: convertLead, submitConvert: submitConvert, discardLead: discardLead,
+    triggerN8n: triggerN8n,
     openLead: openLead, openProject: openProject, advanceStage: advanceStage,
     deactivateUser: deactivateUser, toggleSheet: toggleSheet,
   };
