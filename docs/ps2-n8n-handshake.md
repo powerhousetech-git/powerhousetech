@@ -1,51 +1,74 @@
-# PS2 — Portal ↔ n8n handshake
+# PS2 — Portal ↔ n8n handshake (v6)
 
 **Updated:** 2026-09-04  
-**Status:** Endpoint contract aligned. Live connection blocked on n8n ops (credentials + Active toggle).
+**Architecture:** Google Sheet = master lead DB. Supabase Edge Function = auth, settings, mail config, drafts, email log, client projects.
 
-Demo: Gmail. Production: swap to Outlook when Sahasra IT confirms O365.
+## Master sheet
 
-## Locked answers
-
-| Question | Answer |
+| Item | Value |
 |---|---|
-| Website enrichment URL | `POST …/webhook/ps2-website-enrichment` with `{ event, lead_id, website }` |
-| Payload | ID + website only. n8n `GET ?op=lead&id=` for full row |
-| Reply polling | Gmail every 15 min for demo. No portal webhook for B. Outlook later |
+| Sheet ID | `1UxKqqC5unE3CwTMqgpB3SMARfxIIw2sVSZQUuz3SclU` |
+| URL | https://docs.google.com/spreadsheets/d/1UxKqqC5unE3CwTMqgpB3SMARfxIIw2sVSZQUuz3SclU |
+| Tab | `Sheet1` (rotate every ~1000 rows) |
+| Lead identity | **Email** (not UUID) |
 
-## Webhooks (System Settings)
+Columns: Name, Email, Phone, Company, Designation, Website, Source, Status, Follow Up Count, Website Summary, Last Email Sent, Created At, Notes.
 
-| Key | URL | n8n ID |
+## Portal behaviour (v6)
+
+| Page | Data source |
+|---|---|
+| Dashboard KPIs / funnel | Sheet via `GET ?op=sheet-leads` |
+| Leads Database | Read-only sheet iframe (`htmlview`) |
+| Pipeline Kanban | Sheet rows (portal-built) |
+| Capture / status edits | n8n webhooks `ps2-add-lead` / `ps2-update-lead` |
+| Website enrichment | `POST …/ps2-website-enrichment` body `{ event, email, website }` |
+| Review AI Replies | Supabase drafts / emails |
+| Mail config, users, projects | Supabase |
+
+## Webhooks
+
+| Key | URL | Owner |
 |---|---|---|
-| `send_email` | `…/webhook/ps2-send-email` | `4LukaFFhxKQMceTf` |
-| `process_replies` | `…/webhook/ps2-process-replies` | `3P7CsPNybLQfCVoB` |
-| `sync_sheets` | `…/webhook/ps2-sync-sheets` | `W0HLYxXT3BcFBARU` |
-| `enrich_website` | `…/webhook/ps2-website-enrichment` | `OEKnJlD68UwnFoPj` |
-| `extract_pdf` | _(empty — WF-E)_ | — |
+| `send_email` | `…/webhook/ps2-send-email` | WF-A |
+| `process_replies` | `…/webhook/ps2-process-replies` | WF-B |
+| `sync_sheets` | `…/webhook/ps2-sync-sheets` | WF-C |
+| `enrich_website` | `…/webhook/ps2-website-enrichment` | WF-D |
+| **`add_lead`** | `…/webhook/ps2-add-lead` | **NEW — Claude to create** |
+| **`update_lead`** | `…/webhook/ps2-update-lead` | **NEW — Claude to create** |
 
-Portal "Run now" buttons call `POST ?op=trigger-n8n` which POSTs these URLs.
+Portal sends both `x-api-key` and `Shreyas09` with the shared key.
 
-## Auth — important
+### Add lead body
+```json
+{ "action": "create", "event": "lead.create", "name": "…", "email": "…", "company": "…", "phone": "…", "designation": "…", "website": "…", "source": "manual|csv|pdf|sheets", "notes": "…" }
+```
 
-- **n8n → portal:** every HTTP Request node must send header `x-api-key: <shared key>`. Assign the Header Auth credential manually on each node.
-- **portal → n8n webhooks:** portal sends **both** `x-api-key` and `Shreyas09` with the same key value (compat until the n8n webhook credential header name is renamed to `x-api-key`).
-- Preferred long-term: webhook Header Auth name = `x-api-key` only.
+### Update lead body
+```json
+{ "action": "update", "event": "lead.update", "email": "priya@…", "status": "meeting_scheduled|converted|discarded|…", "name": "…", "company": "…", … }
+```
+Match sheet row by **Email**; `appendOrUpdate`.
 
-## Confirmed endpoints
+### Enrichment body (changed in v6)
+```json
+{ "event": "lead.created", "email": "priya@syska.co.in", "website": "https://www.syska.co.in" }
+```
 
-| Workflow | Ops | Status |
-|---|---|---|
-| A | `leads-ready-to-send`, `lead`, `email`, `mail-config`, `settings`, `outlook-accounts` | ✓ |
-| B | `lead-by-email`, `lead`, `email`, `settings` | ✓ Fixed |
-| C | `sheet-connections`, `leads-import`, `sheet-connection` | ✓ Fixed |
-| D | `lead` GET + PATCH | ✓ |
-| E (optional) | `lead-attachment` → webhook `extract_pdf` with `{ event: "lead.attachment", lead_id, attachment_id, filename, content_type, content_base64 }` | reserved |
+## Edge Function ops still used by portal
 
-Portal also exposes `POST ?op=lead-attachment` to attach a photo/PDF to an existing lead. Set `run_ocr: true` to forward to `extract_pdf`.
+`login`, `me`, `sheet-leads`, `portal-settings`, `settings`, `mail-config`, `review-drafts`, `email` PATCH, `projects`, `users`, `sheet-connections`, `activity`, `trigger-n8n`, `health`
 
-## Go-live checklist (n8n)
+Legacy lead CRUD ops remain for transition but portal no longer uses them for master data.
 
-1. Rename webhook credential header from `Shreyas09` → `x-api-key` (portal already dual-sends).
-2. Assign Header Auth on every outbound HTTP Request node (~15 nodes).
-3. Toggle all 4 workflows **Active**.
-4. Demo on Gmail; swap A/B to Outlook for Sahasra production.
+## n8n status (from Claude 2026-09-04)
+
+WF-A / B / D rewired to Google Sheets READ + `appendOrUpdate` by Email. WF-C unchanged (already writes master sheet). Settings / email log still hit Supabase.
+
+## Go-live checklist (Claude / n8n)
+
+1. Create **`ps2-add-lead`** webhook — append row to Sheet1.
+2. Create **`ps2-update-lead`** webhook — `appendOrUpdate` by Email.
+3. Confirm WF-D enrichment uses `{ email, website }` (not `lead_id`).
+4. Keep Header Auth on all HTTP nodes; workflows Active.
+5. Sheet sharing: Anyone with the link → Viewer (portal CSV proxy + iframe).
