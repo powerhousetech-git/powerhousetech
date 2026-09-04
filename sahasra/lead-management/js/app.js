@@ -12,6 +12,8 @@
     selectedLead: null,
     selectedProject: null,
     reviewDrafts: [],
+    captureTab: 'pdf',
+    excel: { headers: [], rows: [], mapping: {}, filename: '' },
   };
 
   /* ─ DOM helpers ──────────────────────────────────────────────────────────── */
@@ -128,6 +130,7 @@
     if (!main) return;
     main.innerHTML = '<p style="color:var(--muted);padding:20px">Loading…</p>';
     if (v === 'dashboard') renderDashboard();
+    else if (v === 'capture') renderCapture();
     else if (v === 'leads') renderLeads();
     else if (v === 'pipeline') renderPipeline();
     else if (v === 'review-drafts') renderReviewDrafts();
@@ -136,7 +139,7 @@
     else if (v === 'settings') renderSettings();
     else if (v === 'users') renderUsers();
     else if (v === 'outlook') renderOutlook();
-    else if (v === 'sheets') renderSheets();
+    else if (v === 'sheets') { state.captureTab = 'sheets'; renderCapture(); }
   }
 
   /* ─────────────────────────────────────────────────────────────────────────
@@ -150,15 +153,23 @@
     var funnel = s.funnel || [];
     var maxFunnel = Math.max(1, ...funnel.map(function(f){ return f.count; }));
 
+    var rate = s.conversion_rate != null ? s.conversion_rate + '%' : '—';
+    var rateHint = (s.converted_leads || 0) + ' of ' + (s.contacted_leads || 0) + ' contacted';
     main.innerHTML =
-      '<div class="page-head"><div><h1 class="page-title">Dashboard</h1><p class="page-sub">Pipeline overview — Sahasra Group</p></div></div>' +
+      '<div class="page-head"><div><h1 class="page-title">Dashboard</h1><p class="page-sub">Leadership view — Mail 1s, follow-ups, responses, conversion</p></div></div>' +
+      '<div class="kpi-row">' +
+        kpi('Mail 1s sent', s.mail_1_sent || 0, 'blue') +
+        kpi('Follow-ups sent', s.follow_ups_sent || 0, '') +
+        kpi('Responses', s.responses || s.responded_leads || 0, 'green') +
+        kpi('Conversion rate', rate, 'gold', rateHint) +
+      '</div>' +
       '<div class="kpi-row">' +
         kpi('Total Leads', s.total_leads || 0, '') +
-        kpi('Active Outreach', s.sent_leads || 0, 'blue') +
-        kpi('Responses', s.responded_leads || 0, 'green') +
         kpi('Meetings', s.meetings_scheduled || 0, 'purple') +
         kpi('Converted', s.converted_leads || 0, 'gold') +
+        kpi('Discarded', s.discarded_leads || 0, '') +
       '</div>' +
+      (state.user && state.user.role !== 'pt_admin' ? n8nRunPanel() : '') +
       '<div style="display:grid;grid-template-columns:1fr 340px;gap:18px">' +
         '<div class="panel">' +
           '<div class="panel-head"><h2>Pipeline Funnel</h2></div>' +
@@ -181,8 +192,327 @@
       '</div>';
   }
 
-  function kpi(label, val, colorClass) {
-    return '<div class="kpi"><div class="kpi-label">' + esc(label) + '</div><div class="kpi-val ' + colorClass + '">' + val + '</div></div>';
+  function kpi(label, val, colorClass, hint) {
+    return '<div class="kpi"><div class="kpi-label">' + esc(label) + '</div><div class="kpi-val ' + (colorClass || '') + '">' + val + '</div>' +
+      (hint ? '<div class="kpi-hint">' + esc(hint) + '</div>' : '') + '</div>';
+  }
+
+  function n8nRunPanel() {
+    return '<div class="panel" style="margin-bottom:18px"><div class="panel-head"><h2>n8n automations</h2>' +
+      '<span style="font-size:12px;color:var(--muted)">Demo: Gmail · Production: Outlook later</span></div>' +
+      '<div style="padding:14px 18px;display:flex;gap:10px;flex-wrap:wrap">' +
+        '<button class="btn btn-primary btn-sm" onclick="window.PS2App.triggerN8n(\'send_email\')">Run email sequence (A)</button>' +
+        '<button class="btn btn-sm" onclick="window.PS2App.triggerN8n(\'process_replies\')">Re-run reply ingest (B)</button>' +
+        '<button class="btn btn-sm" onclick="window.PS2App.triggerN8n(\'sync_sheets\')">Sync Google Sheets (C)</button>' +
+      '</div>' +
+      '<p style="padding:0 18px 14px;margin:0;font-size:12px;color:var(--muted)">Website enrichment (D) fires automatically when a lead is saved with a website. Workflows must be Active in n8n.</p></div>';
+  }
+
+  async function triggerN8n(workflow) {
+    var res = await PS2Api.triggerN8n({ workflow: workflow });
+    if (!res.ok) { toast(res.data.error || 'Trigger failed — is the webhook URL set and workflow Active?', true); return; }
+    toast('Triggered ' + workflow + ' → n8n');
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     CAPTURE (PDF cards, Excel, Google Sheets)
+  ──────────────────────────────────────────────────────────────────────────── */
+  var EXCEL_FIELDS = [
+    { key: 'full_name', label: 'Full name' },
+    { key: 'first_name', label: 'First name' },
+    { key: 'last_name', label: 'Last name' },
+    { key: 'company', label: 'Company' },
+    { key: 'designation', label: 'Designation' },
+    { key: 'email', label: 'Email' },
+    { key: 'phone', label: 'Phone' },
+    { key: 'website', label: 'Website' },
+    { key: 'notes', label: 'Notes' },
+    { key: 'custom_intro', label: 'Custom intro' },
+  ];
+  var FIELD_ALIASES = {
+    full_name: ['name','full name','contact','contact name','lead name','person'],
+    first_name: ['first','first name','firstname','given name'],
+    last_name: ['last','last name','lastname','surname'],
+    company: ['company','organisation','organization','firm','account','org'],
+    designation: ['designation','title','job title','role','position'],
+    email: ['email','e-mail','mail','email address','e mail'],
+    phone: ['phone','mobile','tel','telephone','contact number','cell'],
+    website: ['website','url','web','site','www'],
+    notes: ['notes','note','comments','remark','remarks'],
+    custom_intro: ['intro','custom intro','met at','source note','context'],
+  };
+
+  async function renderCapture() {
+    var main = $('main-content');
+    var tab = state.captureTab || 'pdf';
+    var batchesRes = await PS2Api.uploadBatches();
+    var batches = (batchesRes.ok && batchesRes.data.data) || [];
+    var tabs = [
+      { id: 'pdf', label: 'Business cards (PDF)' },
+      { id: 'excel', label: 'Excel / CSV' },
+      { id: 'sheets', label: 'Google Sheets' },
+    ];
+    main.innerHTML =
+      '<div class="page-head"><div><h1 class="page-title">Capture</h1>' +
+        '<p class="page-sub">Exhibition cards, spreadsheet upload, and live sheet sync into the master DB</p></div>' +
+        '<button class="btn btn-primary btn-sm" onclick="window.PS2App.openAddLead()">+ Add one lead</button></div>' +
+      '<div class="tabs">' +
+        tabs.map(function(t){
+          return '<button class="tab' + (tab===t.id?' active':'') + '" data-tab="' + t.id + '">' + t.label + '</button>';
+        }).join('') +
+      '</div>' +
+      '<div id="capture-body"></div>' +
+      (batches.length ? '<div class="panel" style="margin-top:18px"><div class="panel-head"><h2>Recent uploads</h2></div>' +
+        '<table class="data-table"><thead><tr><th>File</th><th>Source</th><th>Imported</th><th>Duplicates</th><th>When</th></tr></thead><tbody>' +
+        batches.map(function(b){
+          return '<tr><td>' + esc(b.filename || '—') + '</td><td>' + esc(b.source_type) + '</td>' +
+            '<td>' + (b.imported_count||0) + ' / ' + (b.total_records||0) + '</td>' +
+            '<td>' + (b.duplicate_count||0) + '</td><td>' + relTime(b.created_at) + '</td></tr>';
+        }).join('') +
+        '</tbody></table></div>' : '');
+
+    main.querySelectorAll('.tab').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        state.captureTab = btn.dataset.tab;
+        renderCapture();
+      });
+    });
+    var body = $('capture-body');
+    if (tab === 'excel') renderExcelCapture(body);
+    else if (tab === 'sheets') renderSheetsCapture(body);
+    else renderPdfCapture(body);
+  }
+
+  function renderPdfCapture(el) {
+    el.innerHTML =
+      '<div class="panel"><div class="panel-head"><h2>PDF / image business cards</h2></div>' +
+        '<div style="padding:18px">' +
+          '<div class="drop-zone" id="pdf-drop">' +
+            '<div class="drop-zone-icon">📇</div>' +
+            '<p><strong>Drop exhibition cards here</strong></p>' +
+            '<p>PDF, PNG, or JPG — queued for n8n extraction, or add the contact manually</p>' +
+            '<input type="file" id="pdf-file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/*" multiple hidden />' +
+          '</div>' +
+          '<p id="pdf-status" style="font-size:13px;color:var(--muted);margin:12px 0 0"></p>' +
+        '</div></div>';
+    bindDropZone($('pdf-drop'), $('pdf-file'), handlePdfFiles);
+  }
+
+  function renderExcelCapture(el) {
+    var ex = state.excel;
+    var mappingHtml = '';
+    if (ex.headers.length) {
+      mappingHtml =
+        '<div class="map-grid">' +
+        EXCEL_FIELDS.map(function(f){
+          var sel = ex.mapping[f.key] || '';
+          return '<label class="field-label">' + esc(f.label) + '</label>' +
+            '<select data-map="' + f.key + '"><option value="">— skip —</option>' +
+            ex.headers.map(function(h, i){
+              return '<option value="' + i + '"' + (String(sel)===String(i)?' selected':'') + '>' + esc(h || ('Column ' + (i+1))) + '</option>';
+            }).join('') + '</select>';
+        }).join('') +
+        '</div>' +
+        '<div style="padding:0 18px 12px;display:flex;gap:8px;align-items:center">' +
+          '<button class="btn btn-primary" id="btn-import-excel">Import ' + ex.rows.length + ' rows</button>' +
+          '<span id="excel-import-status" style="font-size:13px;color:var(--muted)"></span>' +
+        '</div>' +
+        '<div class="panel" style="margin:0 18px 18px"><table class="data-table"><thead><tr>' +
+          ex.headers.slice(0,8).map(function(h){ return '<th>' + esc(h) + '</th>'; }).join('') +
+        '</tr></thead><tbody>' +
+        ex.rows.slice(0,8).map(function(r){
+          return '<tr>' + r.slice(0,8).map(function(c){ return '<td>' + esc(c) + '</td>'; }).join('') + '</tr>';
+        }).join('') +
+        '</tbody></table></div>';
+    }
+    el.innerHTML =
+      '<div class="panel"><div class="panel-head"><h2>Excel or CSV</h2></div>' +
+        '<div style="padding:18px">' +
+          '<div class="drop-zone" id="xlsx-drop">' +
+            '<div class="drop-zone-icon">📊</div>' +
+            '<p><strong>Drop a spreadsheet</strong></p>' +
+            '<p>.xlsx, .xls, or .csv — map columns, then import into the master DB</p>' +
+            '<input type="file" id="xlsx-file" accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />' +
+          '</div>' +
+        '</div>' + mappingHtml + '</div>';
+    bindDropZone($('xlsx-drop'), $('xlsx-file'), handleExcelFiles);
+    el.querySelectorAll('select[data-map]').forEach(function(sel){
+      sel.addEventListener('change', function(){
+        state.excel.mapping[sel.dataset.map] = sel.value === '' ? '' : Number(sel.value);
+      });
+    });
+    var btn = $('btn-import-excel');
+    if (btn) btn.addEventListener('click', submitExcelImport);
+  }
+
+  async function renderSheetsCapture(el) {
+    var res = await PS2Api.sheetConnections();
+    var conns = (res.ok && res.data.data) || [];
+    var addBtn = state.user && state.user.role !== 'pt_admin'
+      ? '<button class="btn btn-primary btn-sm" onclick="window.PS2App.openAddSheet()">+ Connect Sheet</button>' : '';
+    el.innerHTML =
+      '<div class="page-head" style="margin-bottom:14px"><div>' +
+        '<p class="page-sub" style="margin:0">Website enquiry forms and other live sheets. n8n Workflow C pulls new rows every 6 hours (or the interval you set).</p></div>' + addBtn + '</div>' +
+      '<div class="panel"><table class="data-table"><thead><tr><th>Sheet URL</th><th>Tab</th><th>Sync Interval</th><th>Last Synced</th><th>Active</th><th></th></tr></thead><tbody>' +
+        conns.map(function(c){
+          return '<tr><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis"><a href="' + esc(c.sheet_url) + '" target="_blank" style="color:var(--gold)">' + esc((c.sheet_url||'').slice(0,56)) + '…</a></td>' +
+            '<td>' + esc(c.tab_name||'—') + '</td>' +
+            '<td>' + c.sync_interval_hours + 'h</td>' +
+            '<td>' + relTime(c.last_synced_at) + '</td>' +
+            '<td><label><input type="checkbox" ' + (c.is_active?'checked':'') + ' onchange="window.PS2App.toggleSheet(\'' + c.id + '\',this.checked)" /></label></td>' +
+            '<td><button class="btn-icon btn-danger" onclick="window.PS2App.toggleSheet(\'' + c.id + '\',false)">✕</button></td></tr>';
+        }).join('') +
+      (conns.length===0?'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">No connections yet — website queries land here once a sheet is connected</td></tr>':'') +
+      '</tbody></table></div>';
+  }
+
+  function bindDropZone(zone, input, onFiles) {
+    if (!zone || !input) return;
+    zone.addEventListener('click', function(){ input.click(); });
+    zone.addEventListener('dragover', function(e){ e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', function(){ zone.classList.remove('drag-over'); });
+    zone.addEventListener('drop', function(e){
+      e.preventDefault(); zone.classList.remove('drag-over');
+      onFiles(e.dataTransfer.files);
+    });
+    input.addEventListener('change', function(){ onFiles(input.files); });
+  }
+
+  function fileToBase64(file) {
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onload = function(){
+        var s = String(reader.result || '');
+        var i = s.indexOf(',');
+        resolve(i >= 0 ? s.slice(i + 1) : s);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handlePdfFiles(fileList) {
+    var files = Array.prototype.slice.call(fileList || []);
+    var status = $('pdf-status');
+    if (!files.length) return;
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i];
+      if (status) status.textContent = 'Uploading ' + f.name + '…';
+      try {
+        var b64 = await fileToBase64(f);
+        var res = await PS2Api.ingestFile({ filename: f.name, content_type: f.type || 'application/pdf', content_base64: b64 });
+        if (!res.ok) { toast(res.data.error || 'Upload failed', true); continue; }
+        toast(res.data.data && res.data.data.message ? res.data.data.message : 'Uploaded ' + f.name);
+      } catch (err) {
+        toast('Could not read ' + f.name, true);
+      }
+    }
+    renderCapture();
+  }
+
+  function parseCsv(text) {
+    var rows = [];
+    var row = [];
+    var cur = '';
+    var inQ = false;
+    for (var i = 0; i < text.length; i++) {
+      var c = text[i];
+      if (inQ) {
+        if (c === '"') {
+          if (text[i+1] === '"') { cur += '"'; i++; }
+          else inQ = false;
+        } else cur += c;
+      } else {
+        if (c === '"') inQ = true;
+        else if (c === ',' || c === '\t') { row.push(cur); cur = ''; }
+        else if (c === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+        else if (c !== '\r') cur += c;
+      }
+    }
+    if (cur.length || row.length) { row.push(cur); rows.push(row); }
+    return rows.filter(function(r){ return r.some(function(x){ return String(x).trim(); }); });
+  }
+
+  function autoMapHeaders(headers) {
+    var mapping = {};
+    var used = {};
+    EXCEL_FIELDS.forEach(function(f){
+      var aliases = FIELD_ALIASES[f.key] || [f.key];
+      for (var i = 0; i < headers.length; i++) {
+        if (used[i]) continue;
+        var h = String(headers[i] || '').trim().toLowerCase();
+        if (aliases.indexOf(h) >= 0) { mapping[f.key] = i; used[i] = true; break; }
+      }
+    });
+    return mapping;
+  }
+
+  function loadXlsx(cb) {
+    if (window.XLSX) { cb(); return; }
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    s.onload = cb;
+    s.onerror = function(){ toast('Could not load spreadsheet parser', true); };
+    document.head.appendChild(s);
+  }
+
+  async function handleExcelFiles(fileList) {
+    var file = fileList && fileList[0];
+    if (!file) return;
+    var name = file.name || 'upload.csv';
+    var isCsv = /\.csv$/i.test(name) || file.type === 'text/csv';
+    if (isCsv) {
+      var text = await file.text();
+      applyExcelGrid(name, parseCsv(text));
+      return;
+    }
+    loadXlsx(function(){
+      var reader = new FileReader();
+      reader.onload = function(){
+        try {
+          var wb = window.XLSX.read(new Uint8Array(reader.result), { type: 'array' });
+          var sheet = wb.Sheets[wb.SheetNames[0]];
+          var grid = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+          applyExcelGrid(name, grid);
+        } catch (e) {
+          toast('Could not parse spreadsheet', true);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  function applyExcelGrid(filename, grid) {
+    var rows = (grid || []).filter(function(r){ return (r||[]).some(function(c){ return String(c).trim(); }); });
+    if (rows.length < 2) { toast('Need a header row plus data', true); return; }
+    var headers = rows[0].map(function(h){ return String(h || '').trim(); });
+    var data = rows.slice(1).map(function(r){
+      return headers.map(function(_, i){ return r[i] == null ? '' : String(r[i]).trim(); });
+    });
+    state.excel = { headers: headers, rows: data, mapping: autoMapHeaders(headers), filename: filename };
+    renderCapture();
+  }
+
+  async function submitExcelImport() {
+    var ex = state.excel;
+    var status = $('excel-import-status');
+    var leads = ex.rows.map(function(r){
+      var o = {};
+      EXCEL_FIELDS.forEach(function(f){
+        var idx = ex.mapping[f.key];
+        if (idx === '' || idx == null) return;
+        o[f.key] = r[idx] || '';
+      });
+      return o;
+    }).filter(function(o){ return o.full_name || o.email || o.company || o.phone; });
+    if (!leads.length) { toast('Map at least name, email, company, or phone', true); return; }
+    if (status) status.textContent = 'Importing ' + leads.length + '…';
+    var res = await PS2Api.importLeads({ source: 'excel', filename: ex.filename, leads: leads });
+    if (!res.ok) { toast(res.data.error || 'Import failed', true); return; }
+    var d = res.data.data || {};
+    toast('Imported ' + (d.imported||0) + ' · ' + (d.duplicates||0) + ' duplicates');
+    state.excel = { headers: [], rows: [], mapping: {}, filename: '' };
+    renderCapture();
   }
 
   /* ─────────────────────────────────────────────────────────────────────────
@@ -201,7 +531,10 @@
     state.leadsTotal = total;
 
     var addBtn = state.user && state.user.role !== 'pt_admin'
-      ? '<button class="btn btn-primary btn-sm" onclick="window.PS2App.openAddLead()">+ Add Lead</button>' : '';
+      ? '<div style="display:flex;gap:8px">' +
+          '<button class="btn btn-sm" onclick="window.PS2App.openLeadUpload()">Upload card / PDF</button>' +
+          '<button class="btn btn-primary btn-sm" onclick="window.PS2App.openAddLead()">+ Add Lead</button>' +
+        '</div>' : '';
 
     main.innerHTML =
       '<div class="page-head"><div><h1 class="page-title">Leads</h1><p class="page-sub">Master database · ' + total + ' total</p></div>' + addBtn + '</div>' +
@@ -241,55 +574,90 @@
   }
 
   async function openLeadDetail(id) {
-    var lead = state.leads.find(function(l){ return l.id === id; });
-    if (!lead) { var r = await PS2Api.getLead(id); if (!r.ok) return; lead = r.data.data.lead; }
+    var r = await PS2Api.getLead(id);
+    if (!r.ok) { toast('Could not load lead', true); return; }
+    var lead = r.data.data.lead;
     var emailsRes = await PS2Api.listEmails(id);
     var emails = (emailsRes.ok && emailsRes.data.data) || [];
     state.selectedLead = lead;
     showLeadPanel(lead, emails);
   }
 
+  function closeDetail() {
+    document.querySelectorAll('.detail-backdrop, .detail-panel').forEach(function(el){ el.remove(); });
+  }
+
   function showLeadPanel(lead, emails) {
-    var existing = document.querySelector('.detail-backdrop');
-    if (existing) existing.remove();
+    closeDetail();
     var locked = state.user && state.user.role === 'pt_admin';
     var pendingDraft = emails.find(function(e){ return e.is_ai_draft && e.status === 'pending_review' && e.direction === 'outbound'; });
+    var websiteHtml = lead.website
+      ? '<a href="' + esc(lead.website) + '" target="_blank" rel="noopener" style="color:var(--gold)">' + esc(lead.website) + '</a>'
+      : '—';
+    var attachments = lead.attachments || [];
 
     var html =
       '<div class="detail-backdrop" id="detail-backdrop"></div>' +
       '<div class="detail-panel" id="detail-panel">' +
         '<div class="detail-header">' +
           '<div><h2>' + esc(lead.full_name || '—') + '</h2><p style="margin:0;color:var(--muted);font-size:13px">' + esc(lead.company || '') + ' · ' + statusBadge(lead.status) + '</p></div>' +
-          '<button class="btn btn-sm btn-ghost" onclick="document.getElementById(\'detail-backdrop\').click()">✕ Close</button>' +
+          '<button type="button" class="btn btn-sm btn-ghost" id="btn-close-detail">✕ Close</button>' +
         '</div>' +
         (pendingDraft ? draftCard(pendingDraft, lead) : '') +
+        (lead.status === 'meeting_scheduled' ? meetingOutcomeCard(lead) : '') +
         '<div class="detail-cols">' +
           detailField('Email', lead.email) +
           detailField('Phone', lead.phone) +
           detailField('Designation', lead.designation) +
           detailField('Source', lead.source) +
-          detailField('Tags', (lead.tags||[]).join(', ')) +
-          detailField('Meeting', fmtDate(lead.meeting_scheduled_at)) +
+          '<div class="detail-field"><label>Website</label><span>' + websiteHtml + '</span></div>' +
+          detailField('Meeting', lead.meeting_scheduled_at ? fmtDateTime(lead.meeting_scheduled_at) : '—') +
+          detailField('Tags', (lead.tags||[]).join(', ') || '—') +
+          detailField('Last activity', relTime(lead.last_activity_at)) +
         '</div>' +
         (lead.notes ? '<div style="margin-top:14px"><label style="font-size:11px;color:var(--muted);text-transform:uppercase">Notes</label><p style="font-size:13px;margin:4px 0">' + esc(lead.notes) + '</p></div>' : '') +
-        (lead.website_summary ? '<div style="margin-top:10px"><label style="font-size:11px;color:var(--muted);text-transform:uppercase">Website Summary</label><p style="font-size:13px;margin:4px 0;color:var(--muted)">' + esc(lead.website_summary) + '</p></div>' : '') +
-        (!locked ? '<div style="display:flex;gap:8px;margin-top:18px">' +
-          (lead.status !== 'meeting_scheduled' ? '<button class="btn btn-sm" onclick="window.PS2App.scheduleMeeting(\'' + lead.id + '\')">Schedule Meeting</button>' : '') +
-          (lead.status !== 'converted' ? '<button class="btn btn-sm btn-primary" onclick="window.PS2App.convertLead(\'' + lead.id + '\')">Mark Converted</button>' : '') +
-          (lead.status !== 'discarded' ? '<button class="btn btn-sm btn-danger" onclick="window.PS2App.discardLead(\'' + lead.id + '\')">Discard</button>' : '') +
-        '</div>' : '') +
+        (lead.website_summary ? '<div style="margin-top:10px"><label style="font-size:11px;color:var(--muted);text-transform:uppercase">Website summary (AI)</label><p style="font-size:13px;margin:4px 0;color:var(--muted)">' + esc(lead.website_summary) + '</p></div>' : '') +
+
+        '<div class="pipeline-history">' +
+          '<h3>Outreach pipeline</h3>' +
+          pipelineHistoryHtml(lead, emails) +
+        '</div>' +
+
+        '<div style="margin-top:18px">' +
+          '<h3 style="font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px">Attachments</h3>' +
+          (attachments.length === 0 ? '<p style="color:var(--muted);font-size:13px;margin:0 0 10px">No photos or PDFs on this lead yet.</p>' : '') +
+          attachments.map(function(a){
+            return '<div class="attach-row"><span>' + esc(a.filename || 'file') + '</span>' +
+              '<span class="attach-meta">' + esc(a.content_type || '') + ' · ' + relTime(a.uploaded_at) +
+              (a.ocr_requested ? ' · OCR requested' : '') + '</span></div>';
+          }).join('') +
+          (!locked ? '<div style="margin-top:10px"><button type="button" class="btn btn-sm" onclick="window.PS2App.openLeadUpload(\'' + lead.id + '\')">Upload photo / PDF</button></div>' : '') +
+        '</div>' +
+
+        (!locked ? '<div class="lead-actions">' +
+          '<p class="lead-actions-hint"><strong>Schedule meeting</strong> — use after a positive reply or when the prospect agrees to talk. Sets status to Meeting; after the call, convert or discard.</p>' +
+          '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+            (lead.status !== 'meeting_scheduled' && lead.status !== 'converted' && lead.status !== 'discarded'
+              ? '<button type="button" class="btn btn-sm" onclick="window.PS2App.scheduleMeeting(\'' + lead.id + '\')">Schedule meeting</button>' : '') +
+            (lead.status !== 'converted' && lead.status !== 'meeting_scheduled'
+              ? '<button type="button" class="btn btn-sm btn-primary" onclick="window.PS2App.convertLead(\'' + lead.id + '\')">Mark converted</button>' : '') +
+            (lead.status !== 'discarded' && lead.status !== 'meeting_scheduled'
+              ? '<button type="button" class="btn btn-sm btn-danger" onclick="window.PS2App.discardLead(\'' + lead.id + '\')">Discard</button>' : '') +
+            '<button type="button" class="btn btn-sm btn-ghost" onclick="window.PS2App.editLeadWebsite(\'' + lead.id + '\')">Edit website</button>' +
+          '</div></div>' : '') +
+
         '<div class="email-timeline" style="margin-top:22px">' +
-          '<h3 style="font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Email Timeline</h3>' +
-          (emails.length === 0 ? '<p style="color:var(--muted);font-size:13px">No emails yet.</p>' : '') +
+          '<h3 style="font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Email detail</h3>' +
+          (emails.length === 0 ? '<p style="color:var(--muted);font-size:13px">No emails recorded yet.</p>' : '') +
           emails.map(function(e){
-            var dir = e.direction === 'inbound' ? '← Inbound' : '→ Outbound';
+            var dir = e.direction === 'inbound' ? '← Reply' : '→ Outbound';
             var dirColor = e.direction === 'inbound' ? 'var(--green)' : 'var(--gold)';
             return '<div class="email-item"><div class="email-meta">' +
               '<span style="color:' + dirColor + ';font-weight:600">' + dir + '</span>' +
-              (e.sequence_step ? '<span>Step ' + e.sequence_step + '</span>' : '') +
+              (e.sequence_step ? '<span>' + esc(sequenceLabel(e.sequence_step)) + '</span>' : '') +
               sentimentBadge(e.sentiment) +
               '<span class="badge ' + (e.status==='sent'?'badge-green':e.status==='pending_review'?'badge-gold':'badge-gray') + '">' + e.status + '</span>' +
-              '<span>' + relTime(e.sent_at || e.received_at || e.created_at) + '</span></div>' +
+              '<span>' + fmtDateTime(e.sent_at || e.received_at || e.created_at) + '</span></div>' +
               '<div class="email-subject">' + esc(e.subject || '(no subject)') + '</div>' +
               '<div class="email-body">' + esc((e.body||'').slice(0,240)) + ((e.body||'').length>240?'…':'') + '</div></div>';
           }).join('') +
@@ -297,10 +665,96 @@
       '</div>';
 
     document.body.insertAdjacentHTML('beforeend', html);
-    $('detail-backdrop').addEventListener('click', function(){
-      document.getElementById('detail-backdrop').remove();
-      document.getElementById('detail-panel').remove();
+    $('btn-close-detail').addEventListener('click', function(e){ e.preventDefault(); closeDetail(); });
+    $('detail-backdrop').addEventListener('click', closeDetail);
+  }
+
+  function sequenceLabel(step) {
+    var n = Number(step);
+    if (n === 1) return 'Mail 1';
+    if (n > 1) return 'Follow-up ' + (n - 1);
+    return 'Step ' + step;
+  }
+
+  function fmtDateTime(ts) {
+    if (!ts) return '—';
+    try {
+      return new Date(ts).toLocaleString(undefined, {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      });
+    } catch (_) { return String(ts); }
+  }
+
+  function pipelineHistoryHtml(lead, emails) {
+    var events = [];
+    events.push({
+      t: lead.created_at,
+      title: 'Lead created',
+      detail: 'Source: ' + (lead.source || '—'),
+      kind: 'created',
     });
+
+    (emails || []).filter(function(e){ return e.direction === 'outbound' && e.status === 'sent'; })
+      .forEach(function(e){
+        events.push({
+          t: e.sent_at || e.created_at,
+          title: sequenceLabel(e.sequence_step || 1) + ' sent',
+          detail: e.subject || '',
+          kind: 'sent',
+        });
+      });
+
+    (emails || []).filter(function(e){ return e.direction === 'inbound'; })
+      .forEach(function(e){
+        events.push({
+          t: e.received_at || e.created_at,
+          title: 'Reply received',
+          detail: (e.sentiment ? 'Sentiment: ' + e.sentiment + '. ' : '') + (e.subject || ''),
+          kind: 'reply',
+        });
+      });
+
+    if (lead.meeting_scheduled_at) {
+      events.push({
+        t: lead.meeting_scheduled_at,
+        title: 'Meeting scheduled',
+        detail: fmtDateTime(lead.meeting_scheduled_at),
+        kind: 'meeting',
+      });
+    }
+    if (lead.status === 'converted') {
+      events.push({ t: lead.updated_at || lead.last_activity_at, title: 'Converted', detail: 'Moved to client tracker', kind: 'converted' });
+    }
+    if (lead.status === 'discarded') {
+      events.push({ t: lead.updated_at || lead.last_activity_at, title: 'Discarded', detail: '', kind: 'discarded' });
+    }
+
+    events.sort(function(a, b){ return new Date(a.t) - new Date(b.t); });
+
+    if (events.length === 1 && emails.length === 0) {
+      return '<p style="color:var(--muted);font-size:13px;margin:0">No outreach yet — waiting for Mail 1.</p>' +
+        '<ul class="pipe-list">' + pipeItem(events[0]) + '</ul>';
+    }
+    return '<ul class="pipe-list">' + events.map(pipeItem).join('') + '</ul>';
+  }
+
+  function pipeItem(ev) {
+    return '<li class="pipe-item pipe-' + esc(ev.kind) + '">' +
+      '<div class="pipe-dot"></div>' +
+      '<div><div class="pipe-title">' + esc(ev.title) + '</div>' +
+      (ev.detail ? '<div class="pipe-detail">' + esc(ev.detail) + '</div>' : '') +
+      '<div class="pipe-time">' + fmtDateTime(ev.t) + '</div></div></li>';
+  }
+
+  function meetingOutcomeCard(lead) {
+    return '<div class="meeting-outcome">' +
+      '<h4 style="margin:0 0 6px">After the meeting</h4>' +
+      '<p style="margin:0 0 12px;font-size:13px;color:var(--muted)">Is this client moving forward with Sahasra?</p>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+        '<button class="btn btn-sm btn-primary" onclick="window.PS2App.convertLead(\'' + lead.id + '\')">Yes — convert to project</button>' +
+        '<button class="btn btn-sm btn-danger" onclick="window.PS2App.discardLead(\'' + lead.id + '\')">No — discard</button>' +
+      '</div></div>';
   }
 
   function draftCard(email, lead) {
@@ -481,9 +935,19 @@
 
       '<div class="settings-card">' +
         '<h3>n8n Webhook URLs</h3>' +
-        webhookField('Send Email Webhook', 'wh-send-email', s.n8n_webhooks && s.n8n_webhooks.send_email) +
-        webhookField('Google Sheets Sync Webhook', 'wh-sync-sheets', s.n8n_webhooks && s.n8n_webhooks.sync_sheets) +
-        webhookField('Reply Processing Webhook', 'wh-process-replies', s.n8n_webhooks && s.n8n_webhooks.process_replies) +
+        webhookField('Send Email Webhook (Workflow A)', 'wh-send-email', s.n8n_webhooks && s.n8n_webhooks.send_email) +
+        webhookField('Reply Processing Webhook (Workflow B)', 'wh-process-replies', s.n8n_webhooks && s.n8n_webhooks.process_replies) +
+        webhookField('Google Sheets Sync Webhook (Workflow C)', 'wh-sync-sheets', s.n8n_webhooks && s.n8n_webhooks.sync_sheets) +
+        webhookField('Website Enrichment Webhook (Workflow D)', 'wh-enrich-website', s.n8n_webhooks && s.n8n_webhooks.enrich_website) +
+        webhookField('PDF Card Extraction Webhook (optional)', 'wh-extract-pdf', s.n8n_webhooks && s.n8n_webhooks.extract_pdf) +
+        '<p style="font-size:12px;color:var(--muted);margin:8px 0 0">Reply ingestion is polled by n8n (Gmail every 15 min). The B webhook is for a manual re-run only.</p>' +
+      '</div>' +
+
+      '<div class="settings-card">' +
+        '<h3>n8n API key</h3>' +
+        healthRow('Shared key (n8n ↔ portal)', h.n8n_api_key_configured) +
+        '<label style="font-size:12px;color:var(--muted);display:block;margin:10px 0 4px">Set or rotate key (leave blank to keep current)</label>' +
+        '<input id="n8n-api-key" type="password" autocomplete="off" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font:inherit;font-size:13px" placeholder="Paste N8N_API_KEY" />' +
       '</div>' +
 
       '<div class="settings-card">' +
@@ -612,7 +1076,8 @@
     if (!res.ok) { toast(res.data.error || 'Failed to save', true); return; }
     toast('Lead saved');
     closeModal();
-    renderLeads();
+    if (state.view === 'capture' || state.view === 'sheets') renderCapture();
+    else renderLeads();
   }
 
   function openAddProject() {
@@ -687,7 +1152,8 @@
     if (!res.ok) { toast(res.data.error || 'Failed', true); return; }
     toast('Connection added');
     closeModal();
-    renderSheets();
+    state.captureTab = 'sheets';
+    renderCapture();
   }
 
   function editMailStep(stepNum) {
@@ -742,11 +1208,15 @@
         send_email: ($('wh-send-email') || {value:''}).value,
         sync_sheets: ($('wh-sync-sheets') || {value:''}).value,
         process_replies: ($('wh-process-replies') || {value:''}).value,
+        enrich_website: ($('wh-enrich-website') || {value:''}).value,
+        extract_pdf: ($('wh-extract-pdf') || {value:''}).value,
       },
       ai_prompt_first_email: ($('pt-first-email') || {value:''}).value,
       ai_prompt_reply: ($('pt-reply') || {value:''}).value,
       ai_prompt_sentiment: ($('pt-sentiment') || {value:''}).value,
     };
+    var keyEl = $('n8n-api-key');
+    if (keyEl && keyEl.value.trim()) body.n8n_api_key = keyEl.value.trim();
     var res = await PS2Api.patchSettings(body);
     if (!res.ok) { toast(res.data.error || 'Failed to save', true); return; }
     toast('Settings saved');
@@ -793,23 +1263,119 @@
   }
 
   async function scheduleMeeting(leadId) {
-    var d = prompt('Meeting date/time (ISO or readable):');
-    if (!d) return;
-    var res = await PS2Api.patchLead(leadId, { status: 'meeting_scheduled', meeting_scheduled_at: new Date(d).toISOString() });
+    var lead = state.selectedLead || {};
+    var existing = lead.meeting_scheduled_at ? new Date(lead.meeting_scheduled_at) : new Date();
+    if (!lead.meeting_scheduled_at) existing.setHours(existing.getHours() + 24, 0, 0, 0);
+    existing.setMinutes(existing.getMinutes() - existing.getTimezoneOffset());
+    var val = existing.toISOString().slice(0, 16);
+    openModal('<div class="modal-card"><h2>Schedule meeting</h2><div class="form-panel">' +
+      '<p style="font-size:13px;color:var(--muted);margin:0 0 12px">Use when the prospect agreed to a call or meeting. After it happens, open the lead and choose Convert or Discard.</p>' +
+      '<label class="field-label">Date &amp; time' +
+        '<input id="mt-when" type="datetime-local" value="' + val + '" required />' +
+      '</label>' +
+      '<p style="font-size:12px;color:var(--muted);margin:0">Format: YYYY-MM-DD and 24h time (browser picker).</p>' +
+      '<div class="form-actions"><button class="btn btn-primary" onclick="window.PS2App.submitScheduleMeeting(\'' + leadId + '\')">Save meeting</button>' +
+      '<button class="btn btn-ghost" onclick="window.PS2App.closeModal()">Cancel</button></div></div></div>');
+  }
+
+  async function submitScheduleMeeting(leadId) {
+    var raw = $('mt-when') && $('mt-when').value;
+    if (!raw) { toast('Pick a date and time', true); return; }
+    var res = await PS2Api.patchLead(leadId, { status: 'meeting_scheduled', meeting_scheduled_at: new Date(raw).toISOString() });
     if (!res.ok) { toast('Failed', true); return; }
     toast('Meeting scheduled');
     closeModal();
-    renderLeads();
+    closeDetail();
+    openLeadDetail(leadId);
+  }
+
+  function editLeadWebsite(leadId) {
+    var lead = state.selectedLead || {};
+    openModal('<div class="modal-card"><h2>Website</h2><div class="form-panel">' +
+      '<label class="field-label">URL<input id="lw-url" type="url" placeholder="https://…" value="' + esc(lead.website || '') + '" /></label>' +
+      '<div class="form-actions"><button class="btn btn-primary" onclick="window.PS2App.saveLeadWebsite(\'' + leadId + '\')">Save</button>' +
+      '<button class="btn btn-ghost" onclick="window.PS2App.closeModal()">Cancel</button></div></div></div>');
+  }
+
+  async function saveLeadWebsite(leadId) {
+    var website = ($('lw-url') || { value: '' }).value.trim();
+    var res = await PS2Api.patchLead(leadId, { website: website || null });
+    if (!res.ok) { toast(res.data.error || 'Failed', true); return; }
+    toast('Website saved');
+    closeModal();
+    if (website) {
+      await PS2Api.triggerN8n({ workflow: 'enrich_website', payload: { event: 'lead.created', lead_id: leadId, website: website } });
+    }
+    openLeadDetail(leadId);
+  }
+
+  function openLeadUpload(preselectedLeadId) {
+    var leads = state.leads || [];
+    var leadOpts = leads.map(function(l){
+      return '<option value="' + l.id + '"' + (preselectedLeadId === l.id ? ' selected' : '') + '>' +
+        esc(l.full_name || l.email || l.id) + (l.company ? ' · ' + esc(l.company) : '') + '</option>';
+    }).join('');
+    if (preselectedLeadId && !leads.some(function(l){ return l.id === preselectedLeadId; })) {
+      leadOpts = '<option value="' + preselectedLeadId + '" selected>Current lead</option>' + leadOpts;
+    }
+    openModal('<div class="modal-card"><h2>Upload photo / PDF</h2><div class="form-panel">' +
+      '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">Attach a business card image or PDF to a lead. OCR via n8n (WF-E) is optional and only runs if configured.</p>' +
+      '<label class="field-label">Lead<select id="lu-lead">' + leadOpts + '</select></label>' +
+      '<label class="field-label">File<input id="lu-file" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/*" /></label>' +
+      '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)">' +
+        '<input type="checkbox" id="lu-ocr" /> Request OCR extraction (needs WF-E)</label>' +
+      '<div class="form-actions"><button class="btn btn-primary" onclick="window.PS2App.submitLeadUpload()">Upload</button>' +
+      '<button class="btn btn-ghost" onclick="window.PS2App.closeModal()">Cancel</button></div></div></div>');
+  }
+
+  async function submitLeadUpload() {
+    var leadId = ($('lu-lead') || {}).value;
+    var fileInput = $('lu-file');
+    var file = fileInput && fileInput.files && fileInput.files[0];
+    var runOcr = ($('lu-ocr') || {}).checked;
+    if (!leadId) { toast('Pick a lead', true); return; }
+    if (!file) { toast('Pick a file', true); return; }
+    try {
+      var b64 = await fileToBase64(file);
+      var res = await PS2Api.attachLeadFile({
+        lead_id: leadId,
+        filename: file.name,
+        content_type: file.type || 'application/octet-stream',
+        content_base64: b64,
+        run_ocr: !!runOcr,
+      });
+      if (!res.ok) { toast(res.data.error || 'Upload failed', true); return; }
+      toast((res.data.data && res.data.data.message) || 'Uploaded');
+      closeModal();
+      if (document.getElementById('detail-panel')) openLeadDetail(leadId);
+      else renderLeads();
+    } catch (err) {
+      toast('Could not read file', true);
+    }
   }
 
   async function convertLead(leadId) {
-    var client = prompt('Client name (or press Enter to use company name):');
-    var project = prompt('Project name:');
-    if (project === null) return;
-    var res = await PS2Api.convertLead(leadId, { client_name: client || undefined, project_name: project || undefined });
+    var lead = state.selectedLead || {};
+    openModal('<div class="modal-card"><h2>Convert to project</h2><div class="form-panel">' +
+      '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">Creates a client tracker card at Enquiry Received.</p>' +
+      '<label class="field-label">Client name<input id="cv-client" value="' + esc(lead.company || lead.full_name || '') + '" /></label>' +
+      '<label class="field-label">Project name<input id="cv-project" placeholder="e.g. Transformer supply" /></label>' +
+      '<label class="field-label">Order value (₹, optional)<input id="cv-value" type="number" /></label>' +
+      '<div class="form-actions"><button class="btn btn-primary" onclick="window.PS2App.submitConvert(\'' + leadId + '\')">Convert</button>' +
+      '<button class="btn btn-ghost" onclick="window.PS2App.closeModal()">Cancel</button></div></div></div>');
+  }
+
+  async function submitConvert(leadId) {
+    var body = {
+      client_name: ($('cv-client') || {value:''}).value.trim() || undefined,
+      project_name: ($('cv-project') || {value:''}).value.trim() || undefined,
+      order_value: ($('cv-value') || {value:''}).value || undefined,
+    };
+    var res = await PS2Api.convertLead(leadId, body);
     if (!res.ok) { toast(res.data.error || 'Failed', true); return; }
     toast('Converted → project created');
-    document.getElementById('detail-backdrop') && document.getElementById('detail-backdrop').click();
+    closeModal();
+    closeDetail();
     renderLeads();
   }
 
@@ -818,7 +1384,7 @@
     var res = await PS2Api.patchLead(leadId, { status: 'discarded' });
     if (!res.ok) { toast('Failed', true); return; }
     toast('Lead discarded');
-    document.getElementById('detail-backdrop') && document.getElementById('detail-backdrop').click();
+    closeDetail();
     renderLeads();
   }
 
@@ -836,8 +1402,7 @@
   }
 
   function showProjectDetail(p, transitions) {
-    var existing = document.querySelector('.detail-backdrop');
-    if (existing) existing.remove();
+    closeDetail();
     var stages = STAGE_ORDER.slice(0,7);
     var currentIdx = stages.indexOf(p.stage);
 
@@ -856,7 +1421,7 @@
         '<div class="detail-header">' +
           '<div><h2>' + esc(p.project_name) + '</h2>' +
             '<p style="margin:2px 0;color:var(--muted);font-size:13px">' + esc(p.client_name) + ' · ' + stageBadge(p.stage) + (p.order_value ? ' · ' + fmtMoney(p.order_value) : '') + '</p></div>' +
-          '<button class="btn btn-sm btn-ghost" onclick="document.getElementById(\'detail-backdrop\').click()">✕ Close</button>' +
+          '<button type="button" class="btn btn-sm btn-ghost" id="btn-close-detail">✕ Close</button>' +
         '</div>' +
         stepperHtml +
         (nextStages.length ? '<div style="margin-bottom:16px"><select id="next-stage" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font:inherit;margin-right:8px">' +
@@ -875,10 +1440,8 @@
       '</div>';
 
     document.body.insertAdjacentHTML('beforeend', html);
-    $('detail-backdrop').addEventListener('click', function(){
-      document.getElementById('detail-backdrop').remove();
-      document.getElementById('detail-panel').remove();
-    });
+    $('btn-close-detail').addEventListener('click', function(e){ e.preventDefault(); closeDetail(); });
+    $('detail-backdrop').addEventListener('click', closeDetail);
   }
 
   async function advanceStage(projectId) {
@@ -888,8 +1451,7 @@
     var res = await PS2Api.advanceProject(projectId, { to_stage: toStage, notes: notes || null });
     if (!res.ok) { toast(res.data.error || 'Failed', true); return; }
     toast('Stage advanced');
-    var p = res.data.data.project;
-    document.getElementById('detail-backdrop') && document.getElementById('detail-backdrop').click();
+    closeDetail();
     openProject(projectId);
   }
 
@@ -904,7 +1466,8 @@
   async function toggleSheet(id, active) {
     await PS2Api.patchSheetConnection(id, { is_active: active });
     toast(active ? 'Connection enabled' : 'Connection disabled');
-    renderSheets();
+    state.captureTab = 'sheets';
+    renderCapture();
   }
 
   /* ─ Boot ─────────────────────────────────────────────────────────────────── */
@@ -946,7 +1509,12 @@
     saveSettings: saveSettings,
     closeModal: closeModal,
     approveDraft: approveDraft, rejectDraft: rejectDraft, editDraft: editDraft, saveAndApproveDraft: saveAndApproveDraft,
-    scheduleMeeting: scheduleMeeting, convertLead: convertLead, discardLead: discardLead,
+    scheduleMeeting: scheduleMeeting, submitScheduleMeeting: submitScheduleMeeting,
+    convertLead: convertLead, submitConvert: submitConvert, discardLead: discardLead,
+    triggerN8n: triggerN8n,
+    closeDetail: closeDetail,
+    openLeadUpload: openLeadUpload, submitLeadUpload: submitLeadUpload,
+    editLeadWebsite: editLeadWebsite, saveLeadWebsite: saveLeadWebsite,
     openLead: openLead, openProject: openProject, advanceStage: advanceStage,
     deactivateUser: deactivateUser, toggleSheet: toggleSheet,
   };

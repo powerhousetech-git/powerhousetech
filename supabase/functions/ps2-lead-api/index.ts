@@ -86,10 +86,10 @@ const N8N_ACTOR: SessionUser = {
 };
 
 async function resolveUser(req: Request): Promise<SessionUser | null> {
-  // n8n API key
+  // n8n API key (Edge secret preferred; DB fallback so handshake can land without CLI)
   const apiKey = n8nApiKey(req);
   if (apiKey) {
-    const expected = Deno.env.get('N8N_API_KEY');
+    const expected = await getN8nApiKey();
     if (expected && apiKey === expected) return N8N_ACTOR;
   }
 
@@ -136,6 +136,88 @@ async function logActivity(
     summary,
   });
 }
+
+type Webhooks = {
+  send_email: string;
+  sync_sheets: string;
+  process_replies: string;
+  enrich_website: string;
+  extract_pdf: string;
+};
+
+async function getWebhooks(): Promise<Webhooks> {
+  const { data } = await db()
+    .from('ps2_system_settings')
+    .select('value').eq('organization_id', ORG_ID).eq('key', 'n8n_webhooks').maybeSingle();
+  const v = (data?.value as Record<string, string>) || {};
+  return {
+    send_email: v.send_email || '',
+    sync_sheets: v.sync_sheets || '',
+    process_replies: v.process_replies || '',
+    enrich_website: v.enrich_website || '',
+    extract_pdf: v.extract_pdf || '',
+  };
+}
+
+async function getN8nApiKey(): Promise<string> {
+  const envKey = Deno.env.get('N8N_API_KEY') || '';
+  if (envKey) return envKey;
+  const { data } = await db()
+    .from('ps2_system_settings')
+    .select('value').eq('organization_id', ORG_ID).eq('key', 'n8n_api_key').maybeSingle();
+  const v = data?.value as Record<string, string> | string | null;
+  if (!v) return '';
+  if (typeof v === 'string') return v;
+  return v.key || '';
+}
+
+function fireN8n(url: string, body: unknown, apiKey: string) {
+  if (!url) return;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (apiKey) {
+    // Handshake standard is x-api-key. Also send Shreyas09 until n8n webhook
+    // Header Auth credential is renamed to match the handshake.
+    headers['x-api-key'] = apiKey;
+    headers['Shreyas09'] = apiKey;
+  }
+  fetch(url, { method: 'POST', headers, body: JSON.stringify(body) }).catch(() => { /* fire and forget */ });
+}
+
+function leadRowFromBody(
+  body: Record<string, unknown>,
+  source: string,
+  extra: Record<string, unknown> = {},
+) {
+  const first = (body.first_name as string) || null;
+  const last = (body.last_name as string) || null;
+  const full = (body.full_name as string)
+    || [first, last].filter(Boolean).join(' ')
+    || null;
+  return {
+    organization_id: ORG_ID,
+    first_name: first,
+    last_name: last,
+    full_name: full,
+    company: body.company || null,
+    designation: body.designation || null,
+    email: body.email ? String(body.email).trim() : null,
+    phone: body.phone || null,
+    website: body.website || null,
+    source,
+    assigned_to: body.assigned_to || null,
+    tags: body.tags || [],
+    custom_intro: body.custom_intro || null,
+    notes: body.notes || null,
+    status: 'new',
+    last_activity_at: new Date().toISOString(),
+    ...extra,
+  };
+}
+
+const FOLLOW_UP_STATUSES = Array.from({ length: 10 }, (_, i) => `follow_up_${i + 1}`);
+const MAIL1_OR_LATER = [
+  'mail_1_sent', ...FOLLOW_UP_STATUSES, 'responded', 'meeting_scheduled', 'converted',
+];
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
@@ -202,6 +284,8 @@ Deno.serve(async (req) => {
     return forbidden('pt_admin can only access system settings');
   }
 
+  const isN8n = user.username === N8N_ACTOR.username;
+
   try {
 
     // ── ME ──────────────────────────────────────────────────────────────────
@@ -222,23 +306,44 @@ Deno.serve(async (req) => {
       const sent = all.filter(l => SENT_STATUSES.includes(l.status)).length;
       const { data: projects } = await db()
         .from('ps2_client_projects').select('stage').eq('organization_id', ORG_ID);
+      const { data: emails } = await db()
+        .from('ps2_lead_emails').select('sequence_step, status, direction, lead_id');
+      const sentOut = (emails || []).filter(e => e.direction === 'outbound' && e.status === 'sent');
+      const mail1FromEmail = new Set(sentOut.filter(e => e.sequence_step === 1).map(e => e.lead_id)).size;
+      const followFromEmail = sentOut.filter(e => (e.sequence_step || 0) >= 2).length;
+      const inboundCount = (emails || []).filter(e => e.direction === 'inbound').length;
+      const mail1FromStatus = all.filter(l => MAIL1_OR_LATER.includes(l.status)).length;
+      const followFromStatus = all.filter(l => FOLLOW_UP_STATUSES.includes(l.status)).length;
+      const responsesFromStatus = (byStatus['responded'] || 0)
+        + (byStatus['meeting_scheduled'] || 0)
+        + (byStatus['converted'] || 0);
+      const contacted = all.filter(l => l.status !== 'new').length;
+      const converted = byStatus['converted'] || 0;
+      const conversionRate = contacted > 0
+        ? Math.round((converted / contacted) * 1000) / 10
+        : 0;
       return jsonResponse(200, {
         ok: true,
         data: {
           total_leads: total,
           new_leads: byStatus['new'] || 0,
           sent_leads: sent,
-          responded_leads: byStatus['responded'] || 0,
+          mail_1_sent: mail1FromEmail || mail1FromStatus,
+          follow_ups_sent: followFromEmail || followFromStatus,
+          responded_leads: inboundCount || (byStatus['responded'] || 0),
+          responses: inboundCount || responsesFromStatus,
           meetings_scheduled: byStatus['meeting_scheduled'] || 0,
-          converted_leads: byStatus['converted'] || 0,
+          converted_leads: converted,
           discarded_leads: byStatus['discarded'] || 0,
+          contacted_leads: contacted,
+          conversion_rate: conversionRate,
           active_projects: (projects || []).filter(p => !['completed','on_hold'].includes(p.stage)).length,
           funnel: [
             { status: 'new', label: 'New', count: byStatus['new'] || 0 },
-            { status: 'sent', label: 'Sent', count: sent },
-            { status: 'responded', label: 'Responded', count: byStatus['responded'] || 0 },
+            { status: 'sent', label: 'Mail 1 / Follow-up', count: (mail1FromEmail || mail1FromStatus) },
+            { status: 'responded', label: 'Responded', count: inboundCount || responsesFromStatus },
             { status: 'meeting', label: 'Meeting', count: byStatus['meeting_scheduled'] || 0 },
-            { status: 'converted', label: 'Converted', count: byStatus['converted'] || 0 },
+            { status: 'converted', label: 'Converted', count: converted },
           ],
         },
       });
@@ -345,40 +450,29 @@ Deno.serve(async (req) => {
       return jsonResponse(200, { ok: true, data: { lead: data } });
     }
 
+    if (op === 'lead-by-email' && method === 'GET') {
+      const email = (url.searchParams.get('email') || '').trim().toLowerCase();
+      if (!email) return jsonResponse(400, { ok: false, error: 'email required' });
+      const { data, error } = await db()
+        .from('ps2_leads').select('*').eq('organization_id', ORG_ID).ilike('email', email).maybeSingle();
+      if (error) throw error;
+      if (!data) return jsonResponse(404, { ok: false, error: 'Lead not found' });
+      return jsonResponse(200, { ok: true, data: { lead: data } });
+    }
+
     // ── CREATE LEAD ──────────────────────────────────────────────────────────
     if (op === 'lead' && method === 'POST') {
       if (user.role === 'pt_admin') return forbidden();
       let body: Record<string, unknown> = {};
       try { body = await req.json(); } catch { /* */ }
-      const row = {
-        organization_id: ORG_ID,
-        first_name: body.first_name || null,
-        last_name: body.last_name || null,
-        full_name: body.full_name || [body.first_name, body.last_name].filter(Boolean).join(' ') || null,
-        company: body.company || null,
-        designation: body.designation || null,
-        email: body.email || null,
-        phone: body.phone || null,
-        website: body.website || null,
-        source: body.source || 'manual',
-        assigned_to: body.assigned_to || null,
-        tags: body.tags || [],
-        custom_intro: body.custom_intro || null,
-        notes: body.notes || null,
-        status: 'new',
-        last_activity_at: new Date().toISOString(),
-      };
+      const source = String(body.source || 'manual');
+      const row = leadRowFromBody(body, source);
       const { data, error } = await db().from('ps2_leads').insert(row).select('*').single();
       if (error) throw error;
       await logActivity(user.id, 'lead', data.id, 'lead_created', `New lead: ${data.full_name || data.email} (${data.company})`);
-      // Fire website enrichment webhook if website provided
-      const webhookSettings = await getWebhooks();
-      if (data.website && webhookSettings.sync_sheets) {
-        fetch(webhookSettings.sync_sheets, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ event: 'lead.created', lead_id: data.id, website: data.website }),
-        }).catch(() => { /* fire and forget */ });
+      if (data.website) {
+        const [wh, key] = await Promise.all([getWebhooks(), getN8nApiKey()]);
+        fireN8n(wh.enrich_website, { event: 'lead.created', lead_id: data.id, website: data.website }, key);
       }
       return jsonResponse(201, { ok: true, data: { lead: data } });
     }
@@ -390,10 +484,10 @@ Deno.serve(async (req) => {
       try { body = await req.json(); } catch { /* */ }
       const allowed = ['first_name','last_name','full_name','company','designation','email','phone',
         'website','website_summary','status','assigned_to','tags','custom_intro','notes',
-        'meeting_scheduled_at','last_activity_at'];
+        'meeting_scheduled_at','last_activity_at','attachments'];
       const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      for (const k of allowed) if (Object.hasOwn(body, k)) patch[k] = body[k];
-      if (Object.hasOwn(body, 'status')) patch.last_activity_at = new Date().toISOString();
+      for (const k of allowed) if (Object.prototype.hasOwnProperty.call(body, k)) patch[k] = body[k];
+      if (Object.prototype.hasOwnProperty.call(body, 'status')) patch.last_activity_at = new Date().toISOString();
 
       const { data, error } = await db()
         .from('ps2_leads').update(patch).eq('id', id).eq('organization_id', ORG_ID).select('*').single();
@@ -438,6 +532,259 @@ Deno.serve(async (req) => {
         return jsonResponse(200, { ok: true, data: { affected: ids.length } });
       }
       return jsonResponse(400, { ok: false, error: 'Unknown action' });
+    }
+
+    // ── BULK IMPORT (Excel / Sheets / n8n upsert) ────────────────────────────
+    if (op === 'leads-import' && method === 'POST') {
+      if (user.role === 'pt_admin') return forbidden();
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      const incoming = (body.leads as Record<string, unknown>[]) || [];
+      const source = String(body.source || 'excel');
+      if (!['business_card', 'excel', 'google_sheet', 'manual'].includes(source)) {
+        return jsonResponse(400, { ok: false, error: 'Invalid source' });
+      }
+      if (!incoming.length) return jsonResponse(400, { ok: false, error: 'leads array required' });
+
+      let batchId = (body.batch_id as string) || null;
+      if (!batchId) {
+        const { data: batch, error: bErr } = await db().from('ps2_upload_batches').insert({
+          organization_id: ORG_ID,
+          source_type: source,
+          filename: body.filename || null,
+          total_records: incoming.length,
+          imported_count: 0,
+          duplicate_count: 0,
+          failed_count: 0,
+          uploaded_by: user.id,
+        }).select('id').single();
+        if (bErr) throw bErr;
+        batchId = batch.id;
+      }
+
+      const emails = incoming
+        .map(l => l.email ? String(l.email).trim().toLowerCase() : '')
+        .filter(Boolean);
+      const { data: existingRows } = emails.length
+        ? await db().from('ps2_leads').select('id, email').eq('organization_id', ORG_ID)
+        : { data: [] as { id: string; email: string | null }[] };
+      const existingByEmail = new Map(
+        (existingRows || [])
+          .filter(r => r.email)
+          .map(r => [String(r.email).trim().toLowerCase(), r]),
+      );
+
+      const upsert = body.upsert === true || source === 'google_sheet';
+      const toInsert: Record<string, unknown>[] = [];
+      const toUpdate: { id: string; row: Record<string, unknown> }[] = [];
+      let duplicates = 0;
+      let failed = 0;
+
+      for (const item of incoming) {
+        const email = item.email ? String(item.email).trim().toLowerCase() : '';
+        const full = item.full_name || [item.first_name, item.last_name].filter(Boolean).join(' ');
+        if (!email && !full && !item.company && !item.phone) { failed += 1; continue; }
+        const hit = email ? existingByEmail.get(email) : undefined;
+        if (hit && !upsert) { duplicates += 1; continue; }
+        const row = leadRowFromBody(item, source, { upload_batch_id: batchId });
+        if (email) row.email = email;
+        if (hit && upsert) {
+          toUpdate.push({ id: hit.id, row: {
+            first_name: row.first_name, last_name: row.last_name, full_name: row.full_name,
+            company: row.company, designation: row.designation, phone: row.phone,
+            website: row.website, notes: row.notes, custom_intro: row.custom_intro,
+            updated_at: new Date().toISOString(),
+          }});
+        } else {
+          toInsert.push(row);
+          if (email) existingByEmail.set(email, { id: 'pending', email });
+        }
+      }
+
+      let imported = 0;
+      const created: { id: string; website: string | null }[] = [];
+      if (toInsert.length) {
+        const { data: inserted, error } = await db().from('ps2_leads').insert(toInsert).select('id, website');
+        if (error) throw error;
+        imported += (inserted || []).length;
+        for (const r of inserted || []) created.push(r);
+      }
+      for (const u of toUpdate) {
+        const { error } = await db().from('ps2_leads').update(u.row).eq('id', u.id).eq('organization_id', ORG_ID);
+        if (error) { failed += 1; continue; }
+        imported += 1;
+      }
+
+      await db().from('ps2_upload_batches').update({
+        total_records: incoming.length,
+        imported_count: imported,
+        duplicate_count: duplicates,
+        failed_count: failed,
+      }).eq('id', batchId);
+
+      await logActivity(user.id, 'lead', batchId, 'leads_imported',
+        `Imported ${imported} leads from ${source} (${duplicates} duplicates, ${failed} failed)`);
+
+      if (created.some(c => c.website)) {
+        const [wh, key] = await Promise.all([getWebhooks(), getN8nApiKey()]);
+        for (const c of created) {
+          if (c.website) fireN8n(wh.enrich_website, { event: 'lead.created', lead_id: c.id, website: c.website }, key);
+        }
+      }
+
+      return jsonResponse(200, {
+        ok: true,
+        data: { batch_id: batchId, imported, duplicates, failed, total: incoming.length },
+      });
+    }
+
+    // ── INGEST FILE (PDF business cards → n8n Workflow extract) ──────────────
+    if (op === 'ingest-file' && method === 'POST') {
+      if (user.role === 'pt_admin') return forbidden();
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      const filename = String(body.filename || 'upload.bin');
+      const contentType = String(body.content_type || 'application/pdf');
+      const contentBase64 = String(body.content_base64 || '');
+      if (!contentBase64) return jsonResponse(400, { ok: false, error: 'content_base64 required' });
+      if (contentBase64.length > 5_000_000) return jsonResponse(413, { ok: false, error: 'File too large (max ~3.5MB)' });
+
+      const { data: batch, error } = await db().from('ps2_upload_batches').insert({
+        organization_id: ORG_ID,
+        source_type: 'business_card',
+        filename,
+        storage_path: contentType,
+        total_records: 0,
+        imported_count: 0,
+        duplicate_count: 0,
+        failed_count: 0,
+        uploaded_by: user.id,
+      }).select('*').single();
+      if (error) throw error;
+
+      const [wh, key] = await Promise.all([getWebhooks(), getN8nApiKey()]);
+      const forwarded = Boolean(wh.extract_pdf);
+      if (forwarded) {
+        fireN8n(wh.extract_pdf, {
+          event: 'pdf.uploaded',
+          batch_id: batch.id,
+          filename,
+          content_type: contentType,
+          content_base64: contentBase64,
+        }, key);
+      }
+      await logActivity(user.id, 'lead', batch.id, 'file_ingested', `Uploaded ${filename} (business card)`);
+      return jsonResponse(200, {
+        ok: true,
+        data: { batch, forwarded, message: forwarded
+          ? 'Queued for n8n extraction'
+          : 'Saved. Set extract_pdf webhook (or add leads manually) — card OCR workflow is not deployed yet.' },
+      });
+    }
+
+    // ── LEAD ATTACHMENT (photo / PDF on a specific lead) ─────────────────────
+    if (op === 'lead-attachment' && method === 'POST') {
+      if (user.role === 'pt_admin') return forbidden();
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      const leadId = String(body.lead_id || id || '');
+      const filename = String(body.filename || 'attachment.bin');
+      const contentType = String(body.content_type || 'application/octet-stream');
+      const contentBase64 = String(body.content_base64 || '');
+      const runOcr = body.run_ocr === true;
+      if (!leadId) return jsonResponse(400, { ok: false, error: 'lead_id required' });
+      if (!contentBase64) return jsonResponse(400, { ok: false, error: 'content_base64 required' });
+      if (contentBase64.length > 5_000_000) return jsonResponse(413, { ok: false, error: 'File too large (max ~3.5MB)' });
+
+      const { data: lead } = await db()
+        .from('ps2_leads').select('id, attachments, full_name').eq('id', leadId).eq('organization_id', ORG_ID).maybeSingle();
+      if (!lead) return jsonResponse(404, { ok: false, error: 'Lead not found' });
+
+      const attachment = {
+        id: crypto.randomUUID(),
+        filename,
+        content_type: contentType,
+        uploaded_at: new Date().toISOString(),
+        uploaded_by: user.id,
+        size_approx: Math.round(contentBase64.length * 0.75),
+        ocr_requested: runOcr,
+      };
+      const next = [...((lead.attachments as unknown[]) || []), attachment];
+      const { data: updated, error } = await db().from('ps2_leads').update({
+        attachments: next,
+        updated_at: new Date().toISOString(),
+        last_activity_at: new Date().toISOString(),
+      }).eq('id', leadId).select('*').single();
+      if (error) throw error;
+
+      const [wh, key] = await Promise.all([getWebhooks(), getN8nApiKey()]);
+      let forwarded = false;
+      if (runOcr && wh.extract_pdf) {
+        forwarded = true;
+        fireN8n(wh.extract_pdf, {
+          event: 'lead.attachment',
+          lead_id: leadId,
+          attachment_id: attachment.id,
+          filename,
+          content_type: contentType,
+          content_base64: contentBase64,
+        }, key);
+      }
+      await logActivity(user.id, 'lead', leadId, 'attachment_added', `Attached ${filename} to ${lead.full_name || leadId}`);
+      return jsonResponse(200, {
+        ok: true,
+        data: {
+          lead: updated,
+          attachment,
+          forwarded,
+          message: forwarded
+            ? 'Attached and queued for OCR'
+            : (runOcr ? 'Attached. OCR webhook (extract_pdf / WF-E) not configured yet.' : 'Attached to lead'),
+        },
+      });
+    }
+
+    // ── UPLOAD BATCHES ────────────────────────────────────────────────────────
+    if (op === 'upload-batches' && method === 'GET') {
+      const { data, error } = await db().from('ps2_upload_batches')
+        .select('*').eq('organization_id', ORG_ID)
+        .order('created_at', { ascending: false }).limit(30);
+      if (error) throw error;
+      return jsonResponse(200, { ok: true, data: data || [] });
+    }
+
+    // ── TRIGGER N8N (portal "Run now" buttons → n8n webhooks) ────────────────
+    if (op === 'trigger-n8n' && method === 'POST') {
+      if (user.role === 'pt_admin') return forbidden();
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      const which = String(body.workflow || body.which || '');
+      const allowed: Record<string, keyof Webhooks> = {
+        send_email: 'send_email',
+        process_replies: 'process_replies',
+        sync_sheets: 'sync_sheets',
+        enrich_website: 'enrich_website',
+        extract_pdf: 'extract_pdf',
+      };
+      const key = allowed[which];
+      if (!key) {
+        return jsonResponse(400, {
+          ok: false,
+          error: 'workflow must be one of: send_email, process_replies, sync_sheets, enrich_website, extract_pdf',
+        });
+      }
+      const [wh, apiKey] = await Promise.all([getWebhooks(), getN8nApiKey()]);
+      const url = wh[key];
+      if (!url) return jsonResponse(400, { ok: false, error: `Webhook URL not configured for ${which}` });
+      const payload = (body.payload as Record<string, unknown>) || {
+        event: 'portal.trigger',
+        workflow: which,
+        triggered_by: user.username,
+        triggered_at: new Date().toISOString(),
+      };
+      fireN8n(url, payload, apiKey);
+      await logActivity(user.id, 'n8n', which, 'n8n_triggered', `Triggered n8n workflow: ${which}`);
+      return jsonResponse(200, { ok: true, data: { workflow: which, url, fired: true } });
     }
 
     // ── EMAILS LIST ───────────────────────────────────────────────────────────
@@ -514,7 +861,7 @@ Deno.serve(async (req) => {
       try { body = await req.json(); } catch { /* */ }
       const allowed = ['status','body','sentiment','sent_at'];
       const patch: Record<string, unknown> = {};
-      for (const k of allowed) if (Object.hasOwn(body, k)) patch[k] = body[k];
+      for (const k of allowed) if (Object.prototype.hasOwnProperty.call(body, k)) patch[k] = body[k];
       const { data, error } = await db()
         .from('ps2_lead_emails').update(patch).eq('id', id).select('*').single();
       if (error) throw error;
@@ -542,7 +889,7 @@ Deno.serve(async (req) => {
       if (!step_number) return jsonResponse(400, { ok: false, error: 'step_number required' });
       const allowed = ['label','day_offset','subject_template','body_template','is_active'];
       const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      for (const k of allowed) if (Object.hasOwn(updates, k)) patch[k] = updates[k];
+      for (const k of allowed) if (Object.prototype.hasOwnProperty.call(updates, k)) patch[k] = updates[k];
       const { data, error } = await db()
         .from('ps2_mail_sequence_config').update(patch)
         .eq('organization_id', ORG_ID).eq('step_number', step_number).select('*').single();
@@ -659,7 +1006,7 @@ Deno.serve(async (req) => {
       try { body = await req.json(); } catch { /* */ }
       const allowed = ['client_name','project_name','order_value','assigned_to','target_date','notes','quotation_ref'];
       const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      for (const k of allowed) if (Object.hasOwn(body, k)) patch[k] = body[k];
+      for (const k of allowed) if (Object.prototype.hasOwnProperty.call(body, k)) patch[k] = body[k];
       const { data, error } = await db()
         .from('ps2_client_projects').update(patch).eq('id', id).eq('organization_id', ORG_ID).select('*').single();
       if (error) throw error;
@@ -755,7 +1102,7 @@ Deno.serve(async (req) => {
       try { body = await req.json(); } catch { /* */ }
       const allowed = ['sheet_id','tab_name','column_mapping','sync_interval_hours','is_active','last_synced_at'];
       const patch: Record<string, unknown> = {};
-      for (const k of allowed) if (Object.hasOwn(body, k)) patch[k] = body[k];
+      for (const k of allowed) if (Object.prototype.hasOwnProperty.call(body, k)) patch[k] = body[k];
       const { data, error } = await db()
         .from('ps2_google_sheet_connections').update(patch).eq('id', id).eq('organization_id', ORG_ID).select('*').single();
       if (error) throw error;
@@ -782,12 +1129,15 @@ Deno.serve(async (req) => {
 
     // ── SYSTEM SETTINGS ────────────────────────────────────────────────────────
     if (op === 'settings' && method === 'GET') {
-      if (user.role !== 'pt_admin') return forbidden('Only pt_admin can access system settings');
+      if (user.role !== 'pt_admin' && !isN8n) return forbidden('Only pt_admin can access system settings');
       const { data } = await db()
         .from('ps2_system_settings').select('*').eq('organization_id', ORG_ID);
       const rows = data || [];
       const get = (key: string) => rows.find(r => r.key === key)?.value ?? {};
       const webhooks = get('n8n_webhooks') as Record<string,string>;
+      const dbKey = get('n8n_api_key') as Record<string,string> | string;
+      const dbKeyStr = typeof dbKey === 'string' ? dbKey : (dbKey?.key || '');
+      const keyConfigured = Boolean(Deno.env.get('N8N_API_KEY') || dbKeyStr);
       return jsonResponse(200, {
         ok: true,
         data: {
@@ -798,9 +1148,17 @@ Deno.serve(async (req) => {
             send_email: webhooks?.send_email || '',
             sync_sheets: webhooks?.sync_sheets || '',
             process_replies: webhooks?.process_replies || '',
+            enrich_website: webhooks?.enrich_website || '',
+            extract_pdf: webhooks?.extract_pdf || '',
+          },
+          n8n_workflows: {
+            send_email: '4LukaFFhxKQMceTf',
+            process_replies: '3P7CsPNybLQfCVoB',
+            sync_sheets: 'W0HLYxXT3BcFBARU',
+            enrich_website: 'OEKnJlD68UwnFoPj',
           },
           health: {
-            n8n_api_key_configured: Boolean(Deno.env.get('N8N_API_KEY')),
+            n8n_api_key_configured: keyConfigured,
             anthropic_key_configured: Boolean(Deno.env.get('ANTHROPIC_API_KEY')),
             supabase_service_key_configured: Boolean(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')),
           },
@@ -821,7 +1179,12 @@ Deno.serve(async (req) => {
       if (body.ai_prompt_first_email !== undefined) await upsert('ai_prompt_first_email', { prompt: body.ai_prompt_first_email });
       if (body.ai_prompt_reply !== undefined) await upsert('ai_prompt_reply', { prompt: body.ai_prompt_reply });
       if (body.ai_prompt_sentiment !== undefined) await upsert('ai_prompt_sentiment', { prompt: body.ai_prompt_sentiment });
-      if (body.n8n_webhooks !== undefined) await upsert('n8n_webhooks', body.n8n_webhooks);
+      if (body.n8n_webhooks !== undefined) {
+        const incoming = body.n8n_webhooks as Record<string, string>;
+        const current = await getWebhooks();
+        await upsert('n8n_webhooks', { ...current, ...incoming });
+      }
+      if (body.n8n_api_key) await upsert('n8n_api_key', { key: String(body.n8n_api_key) });
       return jsonResponse(200, { ok: true });
     }
 
@@ -832,12 +1195,3 @@ Deno.serve(async (req) => {
     return jsonResponse(status, { ok: false, error: err instanceof Error ? err.message : 'Server error' });
   }
 });
-
-// ─── Helper: get n8n webhook config ──────────────────────────────────────────
-async function getWebhooks(): Promise<{ send_email: string; sync_sheets: string; process_replies: string }> {
-  const { data } = await db()
-    .from('ps2_system_settings')
-    .select('value').eq('organization_id', ORG_ID).eq('key', 'n8n_webhooks').maybeSingle();
-  const v = (data?.value as Record<string, string>) || {};
-  return { send_email: v.send_email || '', sync_sheets: v.sync_sheets || '', process_replies: v.process_replies || '' };
-}

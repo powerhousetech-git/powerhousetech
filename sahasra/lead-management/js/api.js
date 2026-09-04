@@ -45,6 +45,11 @@
     patchLead: (id, body) => req('PATCH', 'lead', body, 'id=' + id),
     deleteLead: (id) => req('DELETE', 'lead', null, 'id=' + id),
     bulkLeads: (body) => req('POST', 'leads-bulk', body),
+    importLeads: (body) => req('POST', 'leads-import', body),
+    ingestFile: (body) => req('POST', 'ingest-file', body),
+    uploadBatches: () => req('GET', 'upload-batches'),
+    triggerN8n: (body) => req('POST', 'trigger-n8n', body),
+    attachLeadFile: (body) => req('POST', 'lead-attachment', body),
     leadsReadyToSend: () => req('GET', 'leads-ready-to-send'),
     convertLead: (id, body) => req('POST', 'lead-convert', body, 'id=' + id),
 
