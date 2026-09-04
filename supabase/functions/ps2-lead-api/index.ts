@@ -201,7 +201,11 @@ function mapSheetRow(headers: string[], cells: string[], rowNumber: number) {
   const get = (...aliases: string[]) => {
     for (const a of aliases) {
       const i = idx[headerKey(a)];
-      if (i != null && cells[i] != null && String(cells[i]).trim()) return String(cells[i]).trim();
+      if (i != null && cells[i] != null && String(cells[i]).trim()) {
+        const v = String(cells[i]).trim();
+        if (/^#ERROR!?$/i.test(v) || v === '#N/A' || v === '#REF!') return '';
+        return v;
+      }
     }
     return '';
   };
