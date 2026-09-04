@@ -143,7 +143,13 @@ type Webhooks = {
   process_replies: string;
   enrich_website: string;
   extract_pdf: string;
+  add_lead: string;
+  update_lead: string;
 };
+
+const MASTER_SHEET_ID = '1UxKqqC5unE3CwTMqgpB3SMARfxIIw2sVSZQUuz3SclU';
+const MASTER_SHEET_GID = '0';
+const N8N_BASE_DEFAULT = 'https://shreyas-sinha.app.n8n.cloud';
 
 async function getWebhooks(): Promise<Webhooks> {
   const { data } = await db()
@@ -151,11 +157,78 @@ async function getWebhooks(): Promise<Webhooks> {
     .select('value').eq('organization_id', ORG_ID).eq('key', 'n8n_webhooks').maybeSingle();
   const v = (data?.value as Record<string, string>) || {};
   return {
-    send_email: v.send_email || '',
-    sync_sheets: v.sync_sheets || '',
-    process_replies: v.process_replies || '',
-    enrich_website: v.enrich_website || '',
+    send_email: v.send_email || `${N8N_BASE_DEFAULT}/webhook/ps2-send-email`,
+    sync_sheets: v.sync_sheets || `${N8N_BASE_DEFAULT}/webhook/ps2-sync-sheets`,
+    process_replies: v.process_replies || `${N8N_BASE_DEFAULT}/webhook/ps2-process-replies`,
+    enrich_website: v.enrich_website || `${N8N_BASE_DEFAULT}/webhook/ps2-website-enrichment`,
     extract_pdf: v.extract_pdf || '',
+    add_lead: v.add_lead || `${N8N_BASE_DEFAULT}/webhook/ps2-add-lead`,
+    update_lead: v.update_lead || `${N8N_BASE_DEFAULT}/webhook/ps2-update-lead`,
+  };
+}
+
+/** Minimal CSV parser (handles quoted fields). */
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cur = '';
+  let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { cur += '"'; i++; }
+        else inQ = false;
+      } else cur += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ',' || c === '\t') { row.push(cur); cur = ''; }
+      else if (c === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+      else if (c !== '\r') cur += c;
+    }
+  }
+  if (cur.length || row.length) { row.push(cur); rows.push(row); }
+  return rows.filter((r) => r.some((x) => String(x).trim()));
+}
+
+function headerKey(h: string): string {
+  return String(h || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
+}
+
+function mapSheetRow(headers: string[], cells: string[], rowNumber: number) {
+  const idx: Record<string, number> = {};
+  headers.forEach((h, i) => { idx[headerKey(h)] = i; });
+  const get = (...aliases: string[]) => {
+    for (const a of aliases) {
+      const i = idx[headerKey(a)];
+      if (i != null && cells[i] != null && String(cells[i]).trim()) return String(cells[i]).trim();
+    }
+    return '';
+  };
+  const email = get('Email', 'E-mail', 'Mail');
+  const name = get('Name', 'Full Name', 'FullName', 'Contact');
+  const statusRaw = get('Status', 'Pipeline Status') || 'new';
+  const status = statusRaw.toLowerCase().replace(/\s+/g, '_');
+  const fuRaw = get('Follow Up Count', 'Follow-Up Count', 'FollowUpCount', 'FU Count');
+  const follow_up_count = fuRaw === '' ? 0 : Number(fuRaw) || 0;
+  return {
+    id: email || `row-${rowNumber}`,
+    row_number: rowNumber,
+    full_name: name,
+    name,
+    email,
+    phone: get('Phone', 'Mobile', 'Tel'),
+    company: get('Company', 'Organisation', 'Organization'),
+    designation: get('Designation', 'Title', 'Job Title'),
+    website: get('Website', 'URL', 'Web'),
+    source: get('Source') || 'manual',
+    status,
+    follow_up_count,
+    website_summary: get('Website Summary', 'WebsiteSummary', 'Summary'),
+    last_email_sent: get('Last Email Sent', 'LastEmailSent', 'Last Email'),
+    created_at: get('Created At', 'CreatedAt', 'Created'),
+    notes: get('Notes', 'Note', 'Comments'),
+    last_activity_at: get('Last Email Sent', 'Created At') || null,
   };
 }
 
@@ -780,12 +853,14 @@ Deno.serve(async (req) => {
         sync_sheets: 'sync_sheets',
         enrich_website: 'enrich_website',
         extract_pdf: 'extract_pdf',
+        add_lead: 'add_lead',
+        update_lead: 'update_lead',
       };
       const key = allowed[which];
       if (!key) {
         return jsonResponse(400, {
           ok: false,
-          error: 'workflow must be one of: send_email, process_replies, sync_sheets, enrich_website, extract_pdf',
+          error: 'workflow must be one of: send_email, process_replies, sync_sheets, enrich_website, extract_pdf, add_lead, update_lead',
         });
       }
       const [wh, apiKey] = await Promise.all([getWebhooks(), getN8nApiKey()]);
@@ -1194,6 +1269,13 @@ Deno.serve(async (req) => {
             process_replies: webhooks?.process_replies || '',
             enrich_website: webhooks?.enrich_website || '',
             extract_pdf: webhooks?.extract_pdf || '',
+            add_lead: webhooks?.add_lead || '',
+            update_lead: webhooks?.update_lead || '',
+          },
+          master_sheet: {
+            id: MASTER_SHEET_ID,
+            url: `https://docs.google.com/spreadsheets/d/${MASTER_SHEET_ID}`,
+            gid: MASTER_SHEET_GID,
           },
           n8n_workflows: {
             send_email: '4LukaFFhxKQMceTf',
@@ -1229,7 +1311,92 @@ Deno.serve(async (req) => {
         await upsert('n8n_webhooks', { ...current, ...incoming });
       }
       if (body.n8n_api_key) await upsert('n8n_api_key', { key: String(body.n8n_api_key) });
+      if (body.booking_link !== undefined) await upsert('booking_link', { url: String(body.booking_link || '') });
       return jsonResponse(200, { ok: true });
+    }
+
+    // ── HEALTH (v6) ───────────────────────────────────────────────────────────
+    if (op === 'health' && method === 'GET') {
+      return jsonResponse(200, {
+        ok: true,
+        data: {
+          service: 'ps2-lead-api',
+          master: 'google_sheet',
+          sheet_id: MASTER_SHEET_ID,
+          ts: new Date().toISOString(),
+        },
+      });
+    }
+
+    // ── PORTAL SETTINGS (booking link + master sheet — sahasra roles) ─────────
+    if (op === 'portal-settings' && method === 'GET') {
+      const { data } = await db()
+        .from('ps2_system_settings').select('*').eq('organization_id', ORG_ID);
+      const rows = data || [];
+      const get = (key: string) => rows.find((r) => r.key === key)?.value ?? {};
+      const booking = get('booking_link') as Record<string, string>;
+      return jsonResponse(200, {
+        ok: true,
+        data: {
+          booking_link: booking?.url || '',
+          master_sheet: {
+            id: MASTER_SHEET_ID,
+            url: `https://docs.google.com/spreadsheets/d/${MASTER_SHEET_ID}`,
+            embed_url: `https://docs.google.com/spreadsheets/d/${MASTER_SHEET_ID}/htmlview?gid=${MASTER_SHEET_GID}&widget=true&headers=false`,
+            tab: 'Sheet1',
+            gid: MASTER_SHEET_GID,
+          },
+        },
+      });
+    }
+
+    if (op === 'portal-settings' && method === 'PATCH') {
+      if (user.role === 'sahasra_employee') return forbidden('Admin only');
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      if (body.booking_link !== undefined) {
+        await db().from('ps2_system_settings').upsert(
+          {
+            organization_id: ORG_ID,
+            key: 'booking_link',
+            value: { url: String(body.booking_link || '') },
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'organization_id,key' },
+        );
+      }
+      return jsonResponse(200, { ok: true });
+    }
+
+    // ── SHEET LEADS (v6 master DB read via public CSV export) ─────────────────
+    if (op === 'sheet-leads' && method === 'GET') {
+      const csvUrl =
+        `https://docs.google.com/spreadsheets/d/${MASTER_SHEET_ID}/export?format=csv&gid=${MASTER_SHEET_GID}`;
+      const sheetRes = await fetch(csvUrl, { redirect: 'follow' });
+      if (!sheetRes.ok) {
+        return jsonResponse(502, {
+          ok: false,
+          error: `Could not fetch master sheet (HTTP ${sheetRes.status}). Confirm the sheet is shared Anyone with the link can view.`,
+        });
+      }
+      const text = await sheetRes.text();
+      if (/<!DOCTYPE html>|Sign in/i.test(text.slice(0, 200))) {
+        return jsonResponse(502, {
+          ok: false,
+          error: 'Master sheet export returned HTML — check sharing (Anyone with the link → Viewer).',
+        });
+      }
+      const grid = parseCsv(text);
+      if (grid.length < 2) {
+        return jsonResponse(200, { ok: true, data: { leads: [], total: 0, sheet_id: MASTER_SHEET_ID } });
+      }
+      const headers = grid[0];
+      const leads = grid.slice(1).map((cells, i) => mapSheetRow(headers, cells, i + 2))
+        .filter((l) => l.full_name || l.email || l.company);
+      return jsonResponse(200, {
+        ok: true,
+        data: { leads, total: leads.length, sheet_id: MASTER_SHEET_ID, fetched_at: new Date().toISOString() },
+      });
     }
 
     return jsonResponse(404, { ok: false, error: `Unknown op: ${op}` });
