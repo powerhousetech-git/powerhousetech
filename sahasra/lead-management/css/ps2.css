@@ -144,6 +144,44 @@ body {
 }
 .meeting-outcome h4 { font-size: 14px; }
 
+.pipeline-history { margin-top: 20px; }
+.pipeline-history h3 {
+  font-size: 13px; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .06em; margin: 0 0 12px;
+}
+.pipe-list { list-style: none; margin: 0; padding: 0; }
+.pipe-item {
+  display: flex; gap: 12px; padding: 0 0 14px; position: relative;
+}
+.pipe-item:not(:last-child)::before {
+  content: ''; position: absolute; left: 5px; top: 14px; bottom: 0;
+  width: 2px; background: var(--border);
+}
+.pipe-dot {
+  width: 12px; height: 12px; border-radius: 50%; background: var(--gold);
+  flex-shrink: 0; margin-top: 3px; z-index: 1;
+}
+.pipe-item.pipe-reply .pipe-dot { background: var(--green); }
+.pipe-item.pipe-discarded .pipe-dot { background: var(--red); }
+.pipe-item.pipe-converted .pipe-dot { background: #10b981; }
+.pipe-item.pipe-created .pipe-dot { background: var(--muted); }
+.pipe-title { font-size: 13px; font-weight: 600; }
+.pipe-detail { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.pipe-time { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+.attach-row {
+  display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+}
+.attach-meta { color: var(--muted); font-size: 12px; }
+
+.lead-actions {
+  margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border);
+}
+.lead-actions-hint {
+  font-size: 12px; color: var(--muted); margin: 0 0 10px; line-height: 1.45;
+}
+
 /* ── Tables ───────────────────────────────────────────── */
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 20px; }
 .panel-head { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }

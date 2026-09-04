@@ -484,7 +484,7 @@ Deno.serve(async (req) => {
       try { body = await req.json(); } catch { /* */ }
       const allowed = ['first_name','last_name','full_name','company','designation','email','phone',
         'website','website_summary','status','assigned_to','tags','custom_intro','notes',
-        'meeting_scheduled_at','last_activity_at'];
+        'meeting_scheduled_at','last_activity_at','attachments'];
       const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
       for (const k of allowed) if (Object.hasOwn(body, k)) patch[k] = body[k];
       if (Object.hasOwn(body, 'status')) patch.last_activity_at = new Date().toISOString();
@@ -679,6 +679,68 @@ Deno.serve(async (req) => {
         data: { batch, forwarded, message: forwarded
           ? 'Queued for n8n extraction'
           : 'Saved. Set extract_pdf webhook (or add leads manually) — card OCR workflow is not deployed yet.' },
+      });
+    }
+
+    // ── LEAD ATTACHMENT (photo / PDF on a specific lead) ─────────────────────
+    if (op === 'lead-attachment' && method === 'POST') {
+      if (user.role === 'pt_admin') return forbidden();
+      let body: Record<string, unknown> = {};
+      try { body = await req.json(); } catch { /* */ }
+      const leadId = String(body.lead_id || id || '');
+      const filename = String(body.filename || 'attachment.bin');
+      const contentType = String(body.content_type || 'application/octet-stream');
+      const contentBase64 = String(body.content_base64 || '');
+      const runOcr = body.run_ocr === true;
+      if (!leadId) return jsonResponse(400, { ok: false, error: 'lead_id required' });
+      if (!contentBase64) return jsonResponse(400, { ok: false, error: 'content_base64 required' });
+      if (contentBase64.length > 5_000_000) return jsonResponse(413, { ok: false, error: 'File too large (max ~3.5MB)' });
+
+      const { data: lead } = await db()
+        .from('ps2_leads').select('id, attachments, full_name').eq('id', leadId).eq('organization_id', ORG_ID).maybeSingle();
+      if (!lead) return jsonResponse(404, { ok: false, error: 'Lead not found' });
+
+      const attachment = {
+        id: crypto.randomUUID(),
+        filename,
+        content_type: contentType,
+        uploaded_at: new Date().toISOString(),
+        uploaded_by: user.id,
+        size_approx: Math.round(contentBase64.length * 0.75),
+        ocr_requested: runOcr,
+      };
+      const next = [...((lead.attachments as unknown[]) || []), attachment];
+      const { data: updated, error } = await db().from('ps2_leads').update({
+        attachments: next,
+        updated_at: new Date().toISOString(),
+        last_activity_at: new Date().toISOString(),
+      }).eq('id', leadId).select('*').single();
+      if (error) throw error;
+
+      const [wh, key] = await Promise.all([getWebhooks(), getN8nApiKey()]);
+      let forwarded = false;
+      if (runOcr && wh.extract_pdf) {
+        forwarded = true;
+        fireN8n(wh.extract_pdf, {
+          event: 'lead.attachment',
+          lead_id: leadId,
+          attachment_id: attachment.id,
+          filename,
+          content_type: contentType,
+          content_base64: contentBase64,
+        }, key);
+      }
+      await logActivity(user.id, 'lead', leadId, 'attachment_added', `Attached ${filename} to ${lead.full_name || leadId}`);
+      return jsonResponse(200, {
+        ok: true,
+        data: {
+          lead: updated,
+          attachment,
+          forwarded,
+          message: forwarded
+            ? 'Attached and queued for OCR'
+            : (runOcr ? 'Attached. OCR webhook (extract_pdf / WF-E) not configured yet.' : 'Attached to lead'),
+        },
       });
     }
 

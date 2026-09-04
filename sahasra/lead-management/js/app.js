@@ -531,7 +531,10 @@
     state.leadsTotal = total;
 
     var addBtn = state.user && state.user.role !== 'pt_admin'
-      ? '<button class="btn btn-primary btn-sm" onclick="window.PS2App.openAddLead()">+ Add Lead</button>' : '';
+      ? '<div style="display:flex;gap:8px">' +
+          '<button class="btn btn-sm" onclick="window.PS2App.openLeadUpload()">Upload card / PDF</button>' +
+          '<button class="btn btn-primary btn-sm" onclick="window.PS2App.openAddLead()">+ Add Lead</button>' +
+        '</div>' : '';
 
     main.innerHTML =
       '<div class="page-head"><div><h1 class="page-title">Leads</h1><p class="page-sub">Master database · ' + total + ' total</p></div>' + addBtn + '</div>' +
@@ -571,26 +574,34 @@
   }
 
   async function openLeadDetail(id) {
-    var lead = state.leads.find(function(l){ return l.id === id; });
-    if (!lead) { var r = await PS2Api.getLead(id); if (!r.ok) return; lead = r.data.data.lead; }
+    var r = await PS2Api.getLead(id);
+    if (!r.ok) { toast('Could not load lead', true); return; }
+    var lead = r.data.data.lead;
     var emailsRes = await PS2Api.listEmails(id);
     var emails = (emailsRes.ok && emailsRes.data.data) || [];
     state.selectedLead = lead;
     showLeadPanel(lead, emails);
   }
 
+  function closeDetail() {
+    document.querySelectorAll('.detail-backdrop, .detail-panel').forEach(function(el){ el.remove(); });
+  }
+
   function showLeadPanel(lead, emails) {
-    var existing = document.querySelector('.detail-backdrop');
-    if (existing) existing.remove();
+    closeDetail();
     var locked = state.user && state.user.role === 'pt_admin';
     var pendingDraft = emails.find(function(e){ return e.is_ai_draft && e.status === 'pending_review' && e.direction === 'outbound'; });
+    var websiteHtml = lead.website
+      ? '<a href="' + esc(lead.website) + '" target="_blank" rel="noopener" style="color:var(--gold)">' + esc(lead.website) + '</a>'
+      : '—';
+    var attachments = lead.attachments || [];
 
     var html =
       '<div class="detail-backdrop" id="detail-backdrop"></div>' +
       '<div class="detail-panel" id="detail-panel">' +
         '<div class="detail-header">' +
           '<div><h2>' + esc(lead.full_name || '—') + '</h2><p style="margin:0;color:var(--muted);font-size:13px">' + esc(lead.company || '') + ' · ' + statusBadge(lead.status) + '</p></div>' +
-          '<button class="btn btn-sm btn-ghost" onclick="document.getElementById(\'detail-backdrop\').click()">✕ Close</button>' +
+          '<button type="button" class="btn btn-sm btn-ghost" id="btn-close-detail">✕ Close</button>' +
         '</div>' +
         (pendingDraft ? draftCard(pendingDraft, lead) : '') +
         (lead.status === 'meeting_scheduled' ? meetingOutcomeCard(lead) : '') +
@@ -599,31 +610,54 @@
           detailField('Phone', lead.phone) +
           detailField('Designation', lead.designation) +
           detailField('Source', lead.source) +
-          detailField('Tags', (lead.tags||[]).join(', ')) +
-          detailField('Meeting', fmtDate(lead.meeting_scheduled_at)) +
+          '<div class="detail-field"><label>Website</label><span>' + websiteHtml + '</span></div>' +
+          detailField('Meeting', lead.meeting_scheduled_at ? fmtDateTime(lead.meeting_scheduled_at) : '—') +
+          detailField('Tags', (lead.tags||[]).join(', ') || '—') +
+          detailField('Last activity', relTime(lead.last_activity_at)) +
         '</div>' +
         (lead.notes ? '<div style="margin-top:14px"><label style="font-size:11px;color:var(--muted);text-transform:uppercase">Notes</label><p style="font-size:13px;margin:4px 0">' + esc(lead.notes) + '</p></div>' : '') +
-        (lead.website_summary ? '<div style="margin-top:10px"><label style="font-size:11px;color:var(--muted);text-transform:uppercase">Website Summary</label><p style="font-size:13px;margin:4px 0;color:var(--muted)">' + esc(lead.website_summary) + '</p></div>' : '') +
-        (!locked ? '<div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap">' +
-          (lead.status !== 'meeting_scheduled' && lead.status !== 'converted' && lead.status !== 'discarded'
-            ? '<button class="btn btn-sm" onclick="window.PS2App.scheduleMeeting(\'' + lead.id + '\')">Schedule Meeting</button>' : '') +
-          (lead.status !== 'converted' && lead.status !== 'meeting_scheduled'
-            ? '<button class="btn btn-sm btn-primary" onclick="window.PS2App.convertLead(\'' + lead.id + '\')">Mark Converted</button>' : '') +
-          (lead.status !== 'discarded' && lead.status !== 'meeting_scheduled'
-            ? '<button class="btn btn-sm btn-danger" onclick="window.PS2App.discardLead(\'' + lead.id + '\')">Discard</button>' : '') +
-        '</div>' : '') +
+        (lead.website_summary ? '<div style="margin-top:10px"><label style="font-size:11px;color:var(--muted);text-transform:uppercase">Website summary (AI)</label><p style="font-size:13px;margin:4px 0;color:var(--muted)">' + esc(lead.website_summary) + '</p></div>' : '') +
+
+        '<div class="pipeline-history">' +
+          '<h3>Outreach pipeline</h3>' +
+          pipelineHistoryHtml(lead, emails) +
+        '</div>' +
+
+        '<div style="margin-top:18px">' +
+          '<h3 style="font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px">Attachments</h3>' +
+          (attachments.length === 0 ? '<p style="color:var(--muted);font-size:13px;margin:0 0 10px">No photos or PDFs on this lead yet.</p>' : '') +
+          attachments.map(function(a){
+            return '<div class="attach-row"><span>' + esc(a.filename || 'file') + '</span>' +
+              '<span class="attach-meta">' + esc(a.content_type || '') + ' · ' + relTime(a.uploaded_at) +
+              (a.ocr_requested ? ' · OCR requested' : '') + '</span></div>';
+          }).join('') +
+          (!locked ? '<div style="margin-top:10px"><button type="button" class="btn btn-sm" onclick="window.PS2App.openLeadUpload(\'' + lead.id + '\')">Upload photo / PDF</button></div>' : '') +
+        '</div>' +
+
+        (!locked ? '<div class="lead-actions">' +
+          '<p class="lead-actions-hint"><strong>Schedule meeting</strong> — use after a positive reply or when the prospect agrees to talk. Sets status to Meeting; after the call, convert or discard.</p>' +
+          '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+            (lead.status !== 'meeting_scheduled' && lead.status !== 'converted' && lead.status !== 'discarded'
+              ? '<button type="button" class="btn btn-sm" onclick="window.PS2App.scheduleMeeting(\'' + lead.id + '\')">Schedule meeting</button>' : '') +
+            (lead.status !== 'converted' && lead.status !== 'meeting_scheduled'
+              ? '<button type="button" class="btn btn-sm btn-primary" onclick="window.PS2App.convertLead(\'' + lead.id + '\')">Mark converted</button>' : '') +
+            (lead.status !== 'discarded' && lead.status !== 'meeting_scheduled'
+              ? '<button type="button" class="btn btn-sm btn-danger" onclick="window.PS2App.discardLead(\'' + lead.id + '\')">Discard</button>' : '') +
+            '<button type="button" class="btn btn-sm btn-ghost" onclick="window.PS2App.editLeadWebsite(\'' + lead.id + '\')">Edit website</button>' +
+          '</div></div>' : '') +
+
         '<div class="email-timeline" style="margin-top:22px">' +
-          '<h3 style="font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Email Timeline</h3>' +
-          (emails.length === 0 ? '<p style="color:var(--muted);font-size:13px">No emails yet.</p>' : '') +
+          '<h3 style="font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Email detail</h3>' +
+          (emails.length === 0 ? '<p style="color:var(--muted);font-size:13px">No emails recorded yet.</p>' : '') +
           emails.map(function(e){
-            var dir = e.direction === 'inbound' ? '← Inbound' : '→ Outbound';
+            var dir = e.direction === 'inbound' ? '← Reply' : '→ Outbound';
             var dirColor = e.direction === 'inbound' ? 'var(--green)' : 'var(--gold)';
             return '<div class="email-item"><div class="email-meta">' +
               '<span style="color:' + dirColor + ';font-weight:600">' + dir + '</span>' +
-              (e.sequence_step ? '<span>Step ' + e.sequence_step + '</span>' : '') +
+              (e.sequence_step ? '<span>' + esc(sequenceLabel(e.sequence_step)) + '</span>' : '') +
               sentimentBadge(e.sentiment) +
               '<span class="badge ' + (e.status==='sent'?'badge-green':e.status==='pending_review'?'badge-gold':'badge-gray') + '">' + e.status + '</span>' +
-              '<span>' + relTime(e.sent_at || e.received_at || e.created_at) + '</span></div>' +
+              '<span>' + fmtDateTime(e.sent_at || e.received_at || e.created_at) + '</span></div>' +
               '<div class="email-subject">' + esc(e.subject || '(no subject)') + '</div>' +
               '<div class="email-body">' + esc((e.body||'').slice(0,240)) + ((e.body||'').length>240?'…':'') + '</div></div>';
           }).join('') +
@@ -631,10 +665,86 @@
       '</div>';
 
     document.body.insertAdjacentHTML('beforeend', html);
-    $('detail-backdrop').addEventListener('click', function(){
-      document.getElementById('detail-backdrop').remove();
-      document.getElementById('detail-panel').remove();
+    $('btn-close-detail').addEventListener('click', function(e){ e.preventDefault(); closeDetail(); });
+    $('detail-backdrop').addEventListener('click', closeDetail);
+  }
+
+  function sequenceLabel(step) {
+    var n = Number(step);
+    if (n === 1) return 'Mail 1';
+    if (n > 1) return 'Follow-up ' + (n - 1);
+    return 'Step ' + step;
+  }
+
+  function fmtDateTime(ts) {
+    if (!ts) return '—';
+    try {
+      return new Date(ts).toLocaleString(undefined, {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      });
+    } catch (_) { return String(ts); }
+  }
+
+  function pipelineHistoryHtml(lead, emails) {
+    var events = [];
+    events.push({
+      t: lead.created_at,
+      title: 'Lead created',
+      detail: 'Source: ' + (lead.source || '—'),
+      kind: 'created',
     });
+
+    (emails || []).filter(function(e){ return e.direction === 'outbound' && e.status === 'sent'; })
+      .forEach(function(e){
+        events.push({
+          t: e.sent_at || e.created_at,
+          title: sequenceLabel(e.sequence_step || 1) + ' sent',
+          detail: e.subject || '',
+          kind: 'sent',
+        });
+      });
+
+    (emails || []).filter(function(e){ return e.direction === 'inbound'; })
+      .forEach(function(e){
+        events.push({
+          t: e.received_at || e.created_at,
+          title: 'Reply received',
+          detail: (e.sentiment ? 'Sentiment: ' + e.sentiment + '. ' : '') + (e.subject || ''),
+          kind: 'reply',
+        });
+      });
+
+    if (lead.meeting_scheduled_at) {
+      events.push({
+        t: lead.meeting_scheduled_at,
+        title: 'Meeting scheduled',
+        detail: fmtDateTime(lead.meeting_scheduled_at),
+        kind: 'meeting',
+      });
+    }
+    if (lead.status === 'converted') {
+      events.push({ t: lead.updated_at || lead.last_activity_at, title: 'Converted', detail: 'Moved to client tracker', kind: 'converted' });
+    }
+    if (lead.status === 'discarded') {
+      events.push({ t: lead.updated_at || lead.last_activity_at, title: 'Discarded', detail: '', kind: 'discarded' });
+    }
+
+    events.sort(function(a, b){ return new Date(a.t) - new Date(b.t); });
+
+    if (events.length === 1 && emails.length === 0) {
+      return '<p style="color:var(--muted);font-size:13px;margin:0">No outreach yet — waiting for Mail 1.</p>' +
+        '<ul class="pipe-list">' + pipeItem(events[0]) + '</ul>';
+    }
+    return '<ul class="pipe-list">' + events.map(pipeItem).join('') + '</ul>';
+  }
+
+  function pipeItem(ev) {
+    return '<li class="pipe-item pipe-' + esc(ev.kind) + '">' +
+      '<div class="pipe-dot"></div>' +
+      '<div><div class="pipe-title">' + esc(ev.title) + '</div>' +
+      (ev.detail ? '<div class="pipe-detail">' + esc(ev.detail) + '</div>' : '') +
+      '<div class="pipe-time">' + fmtDateTime(ev.t) + '</div></div></li>';
   }
 
   function meetingOutcomeCard(lead) {
@@ -1153,25 +1263,95 @@
   }
 
   async function scheduleMeeting(leadId) {
-    var existing = new Date();
+    var lead = state.selectedLead || {};
+    var existing = lead.meeting_scheduled_at ? new Date(lead.meeting_scheduled_at) : new Date();
+    if (!lead.meeting_scheduled_at) existing.setHours(existing.getHours() + 24, 0, 0, 0);
     existing.setMinutes(existing.getMinutes() - existing.getTimezoneOffset());
     var val = existing.toISOString().slice(0, 16);
     openModal('<div class="modal-card"><h2>Schedule meeting</h2><div class="form-panel">' +
-      '<label class="field-label">When<input id="mt-when" type="datetime-local" value="' + val + '" /></label>' +
-      '<div class="form-actions"><button class="btn btn-primary" onclick="window.PS2App.submitScheduleMeeting(\'' + leadId + '\')">Save</button>' +
+      '<p style="font-size:13px;color:var(--muted);margin:0 0 12px">Use when the prospect agreed to a call or meeting. After it happens, open the lead and choose Convert or Discard.</p>' +
+      '<label class="field-label">Date &amp; time' +
+        '<input id="mt-when" type="datetime-local" value="' + val + '" required />' +
+      '</label>' +
+      '<p style="font-size:12px;color:var(--muted);margin:0">Format: YYYY-MM-DD and 24h time (browser picker).</p>' +
+      '<div class="form-actions"><button class="btn btn-primary" onclick="window.PS2App.submitScheduleMeeting(\'' + leadId + '\')">Save meeting</button>' +
       '<button class="btn btn-ghost" onclick="window.PS2App.closeModal()">Cancel</button></div></div></div>');
   }
 
   async function submitScheduleMeeting(leadId) {
     var raw = $('mt-when') && $('mt-when').value;
-    if (!raw) { toast('Pick a date', true); return; }
+    if (!raw) { toast('Pick a date and time', true); return; }
     var res = await PS2Api.patchLead(leadId, { status: 'meeting_scheduled', meeting_scheduled_at: new Date(raw).toISOString() });
     if (!res.ok) { toast('Failed', true); return; }
     toast('Meeting scheduled');
     closeModal();
-    document.getElementById('detail-backdrop') && document.getElementById('detail-backdrop').click();
-    if (state.view === 'leads') renderLeads();
-    else openLeadDetail(leadId);
+    closeDetail();
+    openLeadDetail(leadId);
+  }
+
+  function editLeadWebsite(leadId) {
+    var lead = state.selectedLead || {};
+    openModal('<div class="modal-card"><h2>Website</h2><div class="form-panel">' +
+      '<label class="field-label">URL<input id="lw-url" type="url" placeholder="https://…" value="' + esc(lead.website || '') + '" /></label>' +
+      '<div class="form-actions"><button class="btn btn-primary" onclick="window.PS2App.saveLeadWebsite(\'' + leadId + '\')">Save</button>' +
+      '<button class="btn btn-ghost" onclick="window.PS2App.closeModal()">Cancel</button></div></div></div>');
+  }
+
+  async function saveLeadWebsite(leadId) {
+    var website = ($('lw-url') || { value: '' }).value.trim();
+    var res = await PS2Api.patchLead(leadId, { website: website || null });
+    if (!res.ok) { toast(res.data.error || 'Failed', true); return; }
+    toast('Website saved');
+    closeModal();
+    if (website) {
+      await PS2Api.triggerN8n({ workflow: 'enrich_website', payload: { event: 'lead.created', lead_id: leadId, website: website } });
+    }
+    openLeadDetail(leadId);
+  }
+
+  function openLeadUpload(preselectedLeadId) {
+    var leads = state.leads || [];
+    var leadOpts = leads.map(function(l){
+      return '<option value="' + l.id + '"' + (preselectedLeadId === l.id ? ' selected' : '') + '>' +
+        esc(l.full_name || l.email || l.id) + (l.company ? ' · ' + esc(l.company) : '') + '</option>';
+    }).join('');
+    if (preselectedLeadId && !leads.some(function(l){ return l.id === preselectedLeadId; })) {
+      leadOpts = '<option value="' + preselectedLeadId + '" selected>Current lead</option>' + leadOpts;
+    }
+    openModal('<div class="modal-card"><h2>Upload photo / PDF</h2><div class="form-panel">' +
+      '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">Attach a business card image or PDF to a lead. OCR via n8n (WF-E) is optional and only runs if configured.</p>' +
+      '<label class="field-label">Lead<select id="lu-lead">' + leadOpts + '</select></label>' +
+      '<label class="field-label">File<input id="lu-file" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/*" /></label>' +
+      '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)">' +
+        '<input type="checkbox" id="lu-ocr" /> Request OCR extraction (needs WF-E)</label>' +
+      '<div class="form-actions"><button class="btn btn-primary" onclick="window.PS2App.submitLeadUpload()">Upload</button>' +
+      '<button class="btn btn-ghost" onclick="window.PS2App.closeModal()">Cancel</button></div></div></div>');
+  }
+
+  async function submitLeadUpload() {
+    var leadId = ($('lu-lead') || {}).value;
+    var fileInput = $('lu-file');
+    var file = fileInput && fileInput.files && fileInput.files[0];
+    var runOcr = ($('lu-ocr') || {}).checked;
+    if (!leadId) { toast('Pick a lead', true); return; }
+    if (!file) { toast('Pick a file', true); return; }
+    try {
+      var b64 = await fileToBase64(file);
+      var res = await PS2Api.attachLeadFile({
+        lead_id: leadId,
+        filename: file.name,
+        content_type: file.type || 'application/octet-stream',
+        content_base64: b64,
+        run_ocr: !!runOcr,
+      });
+      if (!res.ok) { toast(res.data.error || 'Upload failed', true); return; }
+      toast((res.data.data && res.data.data.message) || 'Uploaded');
+      closeModal();
+      if (document.getElementById('detail-panel')) openLeadDetail(leadId);
+      else renderLeads();
+    } catch (err) {
+      toast('Could not read file', true);
+    }
   }
 
   async function convertLead(leadId) {
@@ -1195,7 +1375,7 @@
     if (!res.ok) { toast(res.data.error || 'Failed', true); return; }
     toast('Converted → project created');
     closeModal();
-    document.getElementById('detail-backdrop') && document.getElementById('detail-backdrop').click();
+    closeDetail();
     renderLeads();
   }
 
@@ -1204,7 +1384,7 @@
     var res = await PS2Api.patchLead(leadId, { status: 'discarded' });
     if (!res.ok) { toast('Failed', true); return; }
     toast('Lead discarded');
-    document.getElementById('detail-backdrop') && document.getElementById('detail-backdrop').click();
+    closeDetail();
     renderLeads();
   }
 
@@ -1222,8 +1402,7 @@
   }
 
   function showProjectDetail(p, transitions) {
-    var existing = document.querySelector('.detail-backdrop');
-    if (existing) existing.remove();
+    closeDetail();
     var stages = STAGE_ORDER.slice(0,7);
     var currentIdx = stages.indexOf(p.stage);
 
@@ -1242,7 +1421,7 @@
         '<div class="detail-header">' +
           '<div><h2>' + esc(p.project_name) + '</h2>' +
             '<p style="margin:2px 0;color:var(--muted);font-size:13px">' + esc(p.client_name) + ' · ' + stageBadge(p.stage) + (p.order_value ? ' · ' + fmtMoney(p.order_value) : '') + '</p></div>' +
-          '<button class="btn btn-sm btn-ghost" onclick="document.getElementById(\'detail-backdrop\').click()">✕ Close</button>' +
+          '<button type="button" class="btn btn-sm btn-ghost" id="btn-close-detail">✕ Close</button>' +
         '</div>' +
         stepperHtml +
         (nextStages.length ? '<div style="margin-bottom:16px"><select id="next-stage" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font:inherit;margin-right:8px">' +
@@ -1261,10 +1440,8 @@
       '</div>';
 
     document.body.insertAdjacentHTML('beforeend', html);
-    $('detail-backdrop').addEventListener('click', function(){
-      document.getElementById('detail-backdrop').remove();
-      document.getElementById('detail-panel').remove();
-    });
+    $('btn-close-detail').addEventListener('click', function(e){ e.preventDefault(); closeDetail(); });
+    $('detail-backdrop').addEventListener('click', closeDetail);
   }
 
   async function advanceStage(projectId) {
@@ -1274,8 +1451,7 @@
     var res = await PS2Api.advanceProject(projectId, { to_stage: toStage, notes: notes || null });
     if (!res.ok) { toast(res.data.error || 'Failed', true); return; }
     toast('Stage advanced');
-    var p = res.data.data.project;
-    document.getElementById('detail-backdrop') && document.getElementById('detail-backdrop').click();
+    closeDetail();
     openProject(projectId);
   }
 
@@ -1336,6 +1512,9 @@
     scheduleMeeting: scheduleMeeting, submitScheduleMeeting: submitScheduleMeeting,
     convertLead: convertLead, submitConvert: submitConvert, discardLead: discardLead,
     triggerN8n: triggerN8n,
+    closeDetail: closeDetail,
+    openLeadUpload: openLeadUpload, submitLeadUpload: submitLeadUpload,
+    editLeadWebsite: editLeadWebsite, saveLeadWebsite: saveLeadWebsite,
     openLead: openLead, openProject: openProject, advanceStage: advanceStage,
     deactivateUser: deactivateUser, toggleSheet: toggleSheet,
   };
