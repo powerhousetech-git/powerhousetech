@@ -1,0 +1,315 @@
+{
+  "name": "02 Email Resolver",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "n1",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://msratyvmnuvozuthgkmi.supabase.co/functions/v1/outreach-api/api/contacts?status=Queue&limit=30",
+        "authentication": "none",
+        "sendHeaders": true,
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 2e5559ab3d6c6c520534ad11841227924392e7a6d97f9bfb"
+            }
+          ]
+        }
+      },
+      "id": "n2",
+      "name": "Fetch Queue Contacts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const resp = $input.first().json;\nconst contacts = resp.contacts || [];\nif (!contacts.length) return [{ json: { _empty: true } }];\nreturn contacts.map((c) => ({\n  json: {\n    id: c.id,\n    firstName: c.firstName || '',\n    lastName: c.lastName || '',\n    domain: c.domain || '',\n    name: c.name || '',\n  },\n}));"
+      },
+      "id": "n3",
+      "name": "Flatten Contacts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json._empty === true }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n4",
+      "name": "Filter Empty",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        940,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const clean = (s) => String(s || '').toLowerCase().trim().replace(/[^a-z]/g, '');\nconst first = clean($json.firstName);\nconst last = clean($json.lastName);\nconst domain = String($json.domain || '').toLowerCase().trim();\nconst fi = first.charAt(0);\nconst li = last.charAt(0);\n\nconst perms = [];\nconst add = (p) => { if (p && !perms.includes(p)) perms.push(p); };\n\nif (first && domain) add(`${first}@${domain}`);\nif (fi && last && domain) add(`${fi}.${last}@${domain}`);\nif (first && last && domain) add(`${first}.${last}@${domain}`);\nif (first && last && domain) add(`${first}${last}@${domain}`);\nif (last && domain) add(`${last}@${domain}`);\nif (first && last && domain) add(`${first}_${last}@${domain}`);\nif (fi && last && domain) add(`${fi}_${last}@${domain}`);\nif (first && li && domain) add(`${first}.${li}@${domain}`);\n\nreturn [{\n  json: {\n    ...$json,\n    permutations: perms,\n  },\n}];"
+      },
+      "id": "n5",
+      "name": "Generate Permutations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1180,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://cloudflare-dns.com/dns-query?name={{ $json.domain }}&type=MX",
+        "authentication": "none",
+        "sendHeaders": true,
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/dns-json"
+            }
+          ]
+        }
+      },
+      "id": "n6",
+      "name": "MX Verify via Cloudflare DoH",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const source = $('Generate Permutations').item.json;\nconst dns = $json;\nconst hasMx = Array.isArray(dns.Answer) && dns.Answer.length > 0;\nconst resolvedEmail = hasMx && source.permutations.length ? source.permutations[0] : '';\n\nreturn [{\n  json: {\n    id: source.id,\n    firstName: source.firstName,\n    lastName: source.lastName,\n    domain: source.domain,\n    name: source.name,\n    resolvedEmail,\n    allPermutations: source.permutations.join(', '),\n    mxFound: hasMx,\n  },\n}];"
+      },
+      "id": "n7",
+      "name": "Resolve Email from MX",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.resolvedEmail }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n8",
+      "name": "Has Email Candidate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://msratyvmnuvozuthgkmi.supabase.co/functions/v1/outreach-api/api/contacts/{{ $json.id }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 2e5559ab3d6c6c520534ad11841227924392e7a6d97f9bfb"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"email\": $json.resolvedEmail,\n    \"status\": \"Email Found\",\n    \"allPermutations\": $json.allPermutations\n  }\n}}"
+      },
+      "id": "n9",
+      "name": "Update Portal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2140,
+        220
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Queue Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Queue Contacts": {
+      "main": [
+        [
+          {
+            "node": "Flatten Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Contacts": {
+      "main": [
+        [
+          {
+            "node": "Filter Empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Empty": {
+      "main": [
+        [
+          {
+            "node": "Generate Permutations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Permutations": {
+      "main": [
+        [
+          {
+            "node": "MX Verify via Cloudflare DoH",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MX Verify via Cloudflare DoH": {
+      "main": [
+        [
+          {
+            "node": "Resolve Email from MX",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Email from MX": {
+      "main": [
+        [
+          {
+            "node": "Has Email Candidate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Email Candidate?": {
+      "main": [
+        [
+          {
+            "node": "Update Portal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "powerhousetech-outreach-9d8174ad9132"
+  },
+  "pinData": {},
+  "versionId": "43cd3d2b-b675-4fce-92fe-e8eb43efe570",
+  "id": "5a9de775-b4b1-4d2d-8b7c-796c614052e3",
+  "tags": []
+}

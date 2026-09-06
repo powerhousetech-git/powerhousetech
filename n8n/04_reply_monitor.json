@@ -1,0 +1,258 @@
+{
+  "name": "04 Reply Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 2
+            }
+          ]
+        }
+      },
+      "id": "n1",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 20,
+        "simple": true,
+        "filters": {
+          "q": "is:unread newer_than:1d"
+        }
+      },
+      "id": "n2",
+      "name": "Fetch Unread Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const msg = $json;\nconst fromRaw = String(msg.from || '');\nconst match = fromRaw.match(/<([^>]+)>/);\nconst senderEmail = (match ? match[1] : fromRaw).trim().toLowerCase();\nconst senderName = fromRaw.replace(/<[^>]+>/, '').replace(/\"/g, '').trim() || senderEmail;\n\nreturn [{\n  json: {\n    messageId: msg.id,\n    threadId: msg.threadId,\n    subject: msg.subject || '',\n    snippet: msg.snippet || '',\n    senderEmail,\n    senderName,\n  },\n}];"
+      },
+      "id": "n3",
+      "name": "Extract Sender Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://msratyvmnuvozuthgkmi.supabase.co/functions/v1/outreach-api/api/contacts?email={{ $json.senderEmail }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 2e5559ab3d6c6c520534ad11841227924392e7a6d97f9bfb"
+            }
+          ]
+        }
+      },
+      "id": "n4",
+      "name": "Match Sender to Portal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        940,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ ($json.contacts || []).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n5",
+      "name": "Has Match?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1180,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://msratyvmnuvozuthgkmi.supabase.co/functions/v1/outreach-api/api/contacts/{{ $json.contacts[0].id }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 2e5559ab3d6c6c520534ad11841227924392e7a6d97f9bfb"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"status\": \"Replied\",\n    \"repliedAt\": $now.toISO()\n  }\n}}"
+      },
+      "id": "n6",
+      "name": "Update Portal - Replied",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1420,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "shreyas09here@gmail.com",
+        "subject": "=Reply from {{ $json.contact.name }} ({{ $json.contact.track }})",
+        "message": "=New reply detected from {{ $json.contact.name }} ({{ $json.contact.email }}).\\nTrack: {{ $json.contact.track }}\\n\\nView in portal: https://powerhousetech.in/outreach/",
+        "options": {}
+      },
+      "id": "n7",
+      "name": "Notify via Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1660,
+        220
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Unread Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Unread Gmail": {
+      "main": [
+        [
+          {
+            "node": "Extract Sender Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Sender Email": {
+      "main": [
+        [
+          {
+            "node": "Match Sender to Portal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match Sender to Portal": {
+      "main": [
+        [
+          {
+            "node": "Has Match?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Match?": {
+      "main": [
+        [
+          {
+            "node": "Update Portal - Replied",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Update Portal - Replied": {
+      "main": [
+        [
+          {
+            "node": "Notify via Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "powerhousetech-outreach-ae2c8a4d6f51"
+  },
+  "pinData": {},
+  "versionId": "2b451b23-5645-4b02-801f-9a5f4cae8dd7",
+  "id": "d747938e-7273-4183-9889-cc98b2635c73",
+  "tags": []
+}

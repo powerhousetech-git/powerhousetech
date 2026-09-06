@@ -6,6 +6,8 @@ const {
   FOLLOW_STATUSES,
   DEFAULT_CADENCE,
   normalizeCadence,
+  normalizeStatus,
+  statusesCompletedFollowUp,
 } = require('../lib/outreach');
 
 const router = express.Router();
@@ -135,10 +137,31 @@ async function resolveCadence(industryId) {
   };
 }
 
+/** POST /api/contacts/apollo-search — gated by global kill switch */
+router.post(
+  '/apollo-search',
+  asyncHandler(async (_req, res) => {
+    const config = await prisma.outreachConfig.findFirst();
+    if (!config?.systemEnabled) {
+      return res.status(503).json({ error: 'System paused' });
+    }
+    return jsonError(
+      res,
+      400,
+      'Apollo search requires an industry. Use POST /api/industries/:id/contacts/apollo-search',
+    );
+  }),
+);
+
 /** GET /api/contacts/sequence-ready — n8n batching for workflow 03 */
 router.get(
   '/sequence-ready',
   asyncHandler(async (req, res) => {
+    const config = await prisma.outreachConfig.findFirst();
+    if (!config?.systemEnabled) {
+      return res.json({ groups: [], totalContacts: 0, paused: true });
+    }
+
     const track = req.query.track ? String(req.query.track) : null;
     const industryId = req.query.industryId
       ? String(req.query.industryId)
@@ -190,11 +213,12 @@ router.get(
           take: 60,
         });
       } else {
-        const prevStatus = `Follow${i} Sent`;
+        // Completed previous step: Follow{i} Sent (+ legacy Day1/Day4/Day9)
+        const prevStatuses = statusesCompletedFollowUp(i);
         const gapDays = activeDays[i] - activeDays[i - 1];
         const cutoffDate = new Date(now.getTime() - gapDays * 24 * 60 * 60 * 1000);
         const candidates = await prisma.contact.findMany({
-          where: { status: prevStatus, ...baseWhere },
+          where: { status: { in: prevStatuses }, ...baseWhere },
           take: 60,
         });
         contacts = candidates.filter((c) => {
@@ -369,7 +393,7 @@ router.patch(
       if (followUpNum === 3) data.day9SentAt = sentAt;
 
       if (body.status != null) {
-        const st = String(body.status);
+        const st = normalizeStatus(body.status);
         if (!STATUSES.includes(st)) {
           return jsonError(res, 400, 'Invalid status. Use: ' + STATUSES.join(', '));
         }
@@ -413,10 +437,11 @@ router.patch(
         continue;
       }
       if (key === 'status') {
-        if (!STATUSES.includes(String(value))) {
+        const st = normalizeStatus(value);
+        if (!STATUSES.includes(st)) {
           return jsonError(res, 400, 'Invalid status. Use: ' + STATUSES.join(', '));
         }
-        data.status = String(value);
+        data.status = st;
         continue;
       }
       if (key === 'email') {
