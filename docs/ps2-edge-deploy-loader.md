@@ -10,4 +10,4 @@ await import(
 );
 ```
 
-Current live pin: `1b0ac646c7b4f5109a406865f572d8aeea97e9ca` (update after each source change + redeploy).
+Current live pin: `d0d6278e942587922c0a2f252c3b28da3691377e` (update after each source change + redeploy).
