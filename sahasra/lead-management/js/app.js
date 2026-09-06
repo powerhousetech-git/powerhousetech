@@ -513,49 +513,47 @@
       if (status) status.textContent = 'Uploading + extracting ' + f.name + '…';
       try {
         var isPdf = /pdf$/i.test(f.type || '') || /\.pdf$/i.test(f.name || '');
-        var payloads = [];
+        var payload;
         if (isPdf) {
+          // One batch for the whole PDF: keep original filename, attach page images
           if (status) status.textContent = 'Reading pages in ' + f.name + '…';
           var pages = await pdfFileToPngPages(f);
           if (!pages.length) throw new Error('No pages');
-          for (var pi = 0; pi < pages.length; pi++) {
-            payloads.push({
-              filename: f.name.replace(/\.pdf$/i, '') + '-p' + (pi + 1) + '.png',
-              content_type: 'image/png',
-              content_base64: pages[pi],
-            });
-          }
+          payload = {
+            filename: f.name,
+            content_type: 'application/pdf',
+            content_base64: await fileToBase64(f),
+            pages: pages.map(function(b64, idx) {
+              return { page: idx + 1, content_type: 'image/png', content_base64: b64 };
+            }),
+          };
+          if (status) status.textContent = 'Extracting ' + pages.length + ' card(s) from ' + f.name + '…';
         } else {
-          payloads.push({
+          payload = {
             filename: f.name,
             content_type: f.type || 'image/png',
             content_base64: await fileToBase64(f),
-          });
+          };
         }
-        var totalImported = 0;
-        var lastMsg = '';
-        var anyForwarded = false;
-        for (var j = 0; j < payloads.length; j++) {
-          if (status) status.textContent = 'Extracting card ' + (j + 1) + '/' + payloads.length + ' from ' + f.name + '…';
-          var res = await PS2Api.ingestFile(payloads[j]);
-          if (!res.ok) {
-            toast((res.data && res.data.error) || ('Failed on page ' + (j + 1)), true);
-            continue;
-          }
-          var d = (res.data && res.data.data) || {};
-          lastMsg = d.message || lastMsg;
-          if (d.imported) totalImported += Number(d.imported) || 0;
-          if (d.forwarded) anyForwarded = true;
+        var res = await PS2Api.ingestFile(payload);
+        if (!res.ok) {
+          toast((res.data && res.data.error) || 'Upload failed', true);
+          if (status) status.textContent = 'Failed: ' + ((res.data && res.data.error) || 'upload error');
+          continue;
         }
-        if (totalImported > 0) {
-          toast('Extracted ' + totalImported + ' lead(s) from ' + f.name + ' → master sheet');
-          if (status) status.textContent = 'Extracted ' + totalImported + ' lead(s) → master sheet';
-        } else if (anyForwarded) {
-          toast(lastMsg || 'Queued for n8n OCR');
+        var d = (res.data && res.data.data) || {};
+        var imported = Number(d.imported) || 0;
+        var extracted = Number(d.extracted) || imported;
+        var msg = d.message || ('Uploaded ' + f.name);
+        if (imported > 0) {
+          toast(msg);
+          if (status) status.textContent = 'Imported ' + imported + '/' + extracted + ' from ' + f.name + ' → master sheet';
+        } else if (d.forwarded) {
+          toast(msg);
           if (status) status.textContent = 'Queued for n8n OCR';
         } else {
-          toast(lastMsg || ('No leads extracted from ' + f.name), true);
-          if (status) status.textContent = lastMsg || 'No leads extracted';
+          toast(msg, true);
+          if (status) status.textContent = msg;
         }
       } catch (err) {
         console.error(err);
