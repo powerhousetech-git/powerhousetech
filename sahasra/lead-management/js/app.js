@@ -167,6 +167,7 @@
     if (v === 'dashboard') renderDashboard();
     else if (v === 'capture') renderCapture();
     else if (v === 'leads') renderLeads();
+    else if (v === 'lead-tracker') renderLeadTracker();
     else if (v === 'pipeline') renderPipeline();
     else if (v === 'review-drafts') renderReviewDrafts();
     else if (v === 'tracker') renderTracker();
@@ -242,7 +243,11 @@
         '<button class="btn btn-sm" id="n8n-btn-sync_sheets" onclick="window.PS2App.triggerN8n(\'sync_sheets\')">Sync Google Sheets</button>' +
         '<span id="n8n-run-status" style="font-size:12px;color:var(--muted)"></span>' +
       '</div>' +
-      '<p style="padding:0 18px 14px;margin:0;font-size:12px;color:var(--muted)">Website enrichment fires when a lead with a website is saved. Workflows must be Active in n8n.</p></div>';
+      '<div style="padding:0 18px 14px;font-size:12px;color:var(--muted);line-height:1.55">' +
+        '<p style="margin:0 0 6px"><strong style="color:var(--text)">Adding a lead does not send mail by itself.</strong> Outbound runs on the n8n schedule (Workflow A) or when you click <em>Run email sequence</em>.</p>' +
+        '<p style="margin:0 0 6px"><strong style="color:var(--text)">Run email sequence</strong> fires immediately. n8n asks who is due (<code>leads-ready-to-send</code>) — only those contacts get mail (skips responded / meeting / converted / discarded and anyone not yet due for the next step).</p>' +
+        '<p style="margin:0"><strong style="color:var(--text)">Re-run reply ingest</strong> also fires immediately — pulls Outlook replies now and updates matching leads. Website enrichment still runs when a lead with a website is saved.</p>' +
+      '</div></div>';
   }
 
   async function triggerN8n(workflow) {
@@ -352,9 +357,9 @@
         '<div style="padding:18px">' +
           '<div class="drop-zone" id="pdf-drop">' +
             '<div class="drop-zone-icon">📇</div>' +
-            '<p><strong>Drop exhibition cards here</strong></p>' +
-            '<p>PDF, PNG, or JPG — queued for n8n extraction, or add the contact manually</p>' +
-            '<input type="file" id="pdf-file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/*" multiple hidden />' +
+            '<p><strong>Drop any card photo or PDF here</strong></p>' +
+            '<p>Any photo or PDF — we always try to scan contact details (blurry cards OK)</p>' +
+            '<input type="file" id="pdf-file" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.heic,.heif,application/pdf,image/*" multiple hidden />' +
           '</div>' +
           '<p id="pdf-status" style="font-size:13px;color:var(--muted);margin:12px 0 0"></p>' +
         '</div></div>';
@@ -423,7 +428,7 @@
             '<td>' + c.sync_interval_hours + 'h</td>' +
             '<td>' + relTime(c.last_synced_at) + '</td>' +
             '<td><label><input type="checkbox" ' + (c.is_active?'checked':'') + ' onchange="window.PS2App.toggleSheet(\'' + c.id + '\',this.checked)" /></label></td>' +
-            '<td><button class="btn-icon btn-danger" onclick="window.PS2App.toggleSheet(\'' + c.id + '\',false)">✕</button></td></tr>';
+            '<td><button class="btn-icon btn-danger" onclick="window.PS2App.deleteSheet(\'' + c.id + '\')">✕</button></td></tr>';
         }).join('') +
       (conns.length===0?'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">No connections yet — website queries land here once a sheet is connected</td></tr>':'') +
       '</tbody></table></div>';
@@ -663,9 +668,19 @@
     var invalid = leads.filter(function(o){ return leadContactValid(o.full_name, o.email, o.company); });
     if (invalid.length) { toast(invalid.length + ' row(s) missing name + (email or company)', true); return; }
     if (status) status.textContent = 'Writing ' + leads.length + ' to master sheet…';
-    var ok = 0, fail = 0;
+    var ok = 0, fail = 0, dup = 0;
+    var existingLeads = await loadSheetLeads(true);
+    var seenEmails = {};
     for (var i = 0; i < leads.length; i++) {
       var row = leads[i];
+      var emailKey = String(row.email || '').trim().toLowerCase();
+      if (emailKey) {
+        if (seenEmails[emailKey] || PS2Sheet.findLeadByEmail(existingLeads, emailKey)) {
+          dup++;
+          continue;
+        }
+        seenEmails[emailKey] = true;
+      }
       row.source = 'csv';
       var res = await PS2Api.addLeadToSheet(row);
       if (res.ok) {
@@ -675,7 +690,7 @@
         }
       } else fail++;
     }
-    if (ok) toast('Added ' + ok + ' lead(s) to sheet' + (fail ? ' · ' + fail + ' failed' : ''));
+    if (ok) toast('Added ' + ok + ' lead(s) to sheet' + (dup ? ' · ' + dup + ' duplicate email(s) skipped' : '') + (fail ? ' · ' + fail + ' failed' : ''));
     else toast('Import failed — is /webhook/ps2-add-lead Active in n8n?', true);
     state.excel = { headers: [], rows: [], mapping: {}, filename: '' };
     state.sheetFetchedAt = null;
@@ -707,22 +722,13 @@
         '<p class="page-sub">Master Google Sheet (read-only embed) · edits via Capture / Pipeline</p></div>' + addBtn + '</div>' +
       '<div class="filter-bar">' +
         '<input id="leads-search" placeholder="Search tip: use Ctrl/Cmd+F inside the sheet" value="' + esc(state.leadsSearch) + '" disabled title="Search inside the embedded sheet" />' +
-        '<select id="leads-status"><option value="">All statuses (view in sheet)</option>' +
-          Object.entries(STATUS_LABELS).map(function(e){ return '<option value="' + e[0] + '"' + (state.leadsStatus===e[0]?' selected':'') + '>' + e[1] + '</option>'; }).join('') +
-        '</select>' +
+        '<span class="filter-note" style="font-size:13px;color:var(--muted)">All statuses shown</span>' +
         '<a class="btn btn-sm" href="' + esc(sheetUrl) + '" target="_blank" rel="noopener">Open in Google Sheets</a>' +
       '</div>' +
-      (state.leadsStatus
-        ? '<p class="sheet-filter-hint">Status filter is applied on the <a href="#pipeline">Pipeline</a> page. The sheet embed always shows the full master tab.</p>'
-        : '') +
       '<div class="sheet-embed-wrap">' +
         '<iframe id="sheet-embed" class="sheet-embed" title="Master leads Google Sheet" src="' + esc(src) + '"></iframe>' +
       '</div>';
 
-    $('leads-status').addEventListener('change', function(){
-      state.leadsStatus = this.value;
-      if (this.value) { location.hash = 'pipeline'; setView('pipeline'); }
-    });
   }
 
   function refreshSheetEmbed() {
@@ -1091,6 +1097,107 @@
   /* ─────────────────────────────────────────────────────────────────────────
      CLIENT TRACKER
   ──────────────────────────────────────────────────────────────────────────── */
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     LEAD TRACKER — pre-conversion CRM list (click → full history panel)
+  ──────────────────────────────────────────────────────────────────────────── */
+  async function renderLeadTracker() {
+    var main = $('main-content');
+    main.innerHTML = '<p style="color:var(--muted);padding:20px">Loading leads…</p>';
+    var leads = await loadSheetLeads(true);
+    var pre = (leads || []).filter(function(l){
+      return PS2Sheet.normStatus(l.status) !== 'converted';
+    });
+    state.leadTrackerFilter = state.leadTrackerFilter || '';
+    state.leadTrackerStatus = state.leadTrackerStatus || '';
+    state.leadTrackerList = pre;
+    paintLeadTracker();
+  }
+
+  function paintLeadTracker() {
+    var main = $('main-content');
+    var all = state.leadTrackerList || [];
+    var q = String(state.leadTrackerFilter || '').trim().toLowerCase();
+    var stFilter = state.leadTrackerStatus || '';
+    var rows = all.filter(function(l){
+      var st = PS2Sheet.normStatus(l.status);
+      if (stFilter === 'follow_up') {
+        if (PS2Sheet.pipelineBucket(l.status) !== 'follow_up') return false;
+      } else if (stFilter && st !== stFilter) {
+        return false;
+      }
+      if (!q) return true;
+      var blob = [l.full_name, l.email, l.company, l.phone, l.designation, l.source].join(' ').toLowerCase();
+      return blob.indexOf(q) >= 0;
+    });
+    rows = rows.slice().sort(function(a, b){
+      var ta = new Date(a.last_email_sent || a.updated_at || a.created_at || 0).getTime();
+      var tb = new Date(b.last_email_sent || b.updated_at || b.created_at || 0).getTime();
+      return tb - ta;
+    });
+
+    var statusOpts = [
+      { key: '', label: 'All pre-conversion' },
+      { key: 'new', label: 'New' },
+      { key: 'mail_1_sent', label: 'Mail 1' },
+      { key: 'follow_up', label: 'Follow-up' },
+      { key: 'responded', label: 'Responded' },
+      { key: 'meeting_scheduled', label: 'Meeting' },
+      { key: 'discarded', label: 'Discarded' },
+    ];
+
+    main.innerHTML =
+      '<div class="page-head"><div><h1 class="page-title">Lead Tracker</h1>' +
+        '<p class="page-sub">Pre-conversion clients · click a row for full history, replies, and actions</p></div>' +
+        '<button class="btn btn-sm" type="button" onclick="window.PS2App.renderLeadTracker()">Refresh</button></div>' +
+      '<div class="filter-bar">' +
+        '<input id="lt-search" placeholder="Search name, email, company…" value="' + esc(state.leadTrackerFilter || '') + '" />' +
+        '<select id="lt-status">' +
+          statusOpts.map(function(o){
+            return '<option value="' + o.key + '"' + (stFilter === o.key ? ' selected' : '') + '>' + o.label + '</option>';
+          }).join('') +
+        '</select>' +
+        '<span class="filter-note" style="font-size:13px;color:var(--muted)">' + rows.length + ' of ' + all.length + ' leads</span>' +
+      '</div>' +
+      '<div class="panel lead-tracker-panel"><table class="data-table"><thead><tr>' +
+        '<th>Name</th><th>Company</th><th>Email</th><th>Status</th><th>Follow-ups</th><th>Last email</th><th>Source</th>' +
+      '</tr></thead><tbody>' +
+      (rows.length ? rows.map(function(l){
+        var st = PS2Sheet.normStatus(l.status);
+        var key = encodeURIComponent(l.email || l.id || '');
+        var fu = l.follow_up_count != null ? l.follow_up_count : (PS2Sheet.followUpLabel(l) || '—');
+        return '<tr class="clickable" onclick="window.PS2App.openLead(decodeURIComponent(\'' + key + '\'))">' +
+          '<td><strong>' + esc(l.full_name || '—') + '</strong>' +
+            (l.designation ? '<div style="font-size:11px;color:var(--muted)">' + esc(l.designation) + '</div>' : '') + '</td>' +
+          '<td>' + esc(l.company || '—') + '</td>' +
+          '<td style="font-size:12px">' + esc(l.email || '—') + '</td>' +
+          '<td>' + statusBadge(st) + '</td>' +
+          '<td>' + esc(String(fu)) + '</td>' +
+          '<td style="font-size:12px;color:var(--muted)">' + esc(l.last_email_sent ? fmtDateTime(l.last_email_sent) : '—') + '</td>' +
+          '<td style="font-size:12px">' + esc(l.source || '—') + '</td>' +
+        '</tr>';
+      }).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:28px">No pre-conversion leads match this filter</td></tr>') +
+      '</tbody></table></div>' +
+      '<p style="font-size:12px;color:var(--muted);margin-top:10px">Converted clients move to <a href="#tracker">Client Tracker</a> (projects). The Google Sheet embed stays under Leads Database.</p>';
+
+    var search = $('lt-search');
+    var sel = $('lt-status');
+    if (search) {
+      search.addEventListener('input', function(){
+        state.leadTrackerFilter = this.value;
+        paintLeadTracker();
+        var el = $('lt-search');
+        if (el) { el.focus(); var n = el.value.length; el.setSelectionRange(n, n); }
+      });
+    }
+    if (sel) {
+      sel.addEventListener('change', function(){
+        state.leadTrackerStatus = this.value;
+        paintLeadTracker();
+      });
+    }
+  }
+
   async function renderTracker() {
     var main = $('main-content');
     var res = await PS2Api.listProjects();
@@ -1305,7 +1412,7 @@
             '<td>' + c.sync_interval_hours + 'h</td>' +
             '<td>' + relTime(c.last_synced_at) + '</td>' +
             '<td><label><input type="checkbox" ' + (c.is_active?'checked':'') + ' onchange="window.PS2App.toggleSheet(\'' + c.id + '\',this.checked)" /></label></td>' +
-            '<td><button class="btn-icon btn-danger" onclick="window.PS2App.toggleSheet(\'' + c.id + '\',false)">✕</button></td></tr>';
+            '<td><button class="btn-icon btn-danger" onclick="window.PS2App.deleteSheet(\'' + c.id + '\')">✕</button></td></tr>';
         }).join('') +
       (conns.length===0?'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">No field-team connections yet</td></tr>':'') +
       '</tbody></table></div>';
@@ -1380,6 +1487,13 @@
     var body = readLeadForm('nl');
     var err = leadContactValid(body.full_name, body.email, body.company);
     if (err) { toast(err, true); return; }
+    if (body.email) {
+      var existingLeads = await loadSheetLeads(false);
+      if (PS2Sheet.findLeadByEmail(existingLeads, body.email)) {
+        toast('Duplicate lead — email already exists in master sheet', true);
+        return;
+      }
+    }
     body.source = body.source === 'business_card' ? 'pdf' : (body.source === 'excel' ? 'csv' : (body.source || 'manual'));
     var res = await PS2Api.addLeadToSheet(body);
     if (!res.ok) { toast((res.data && res.data.error) || 'Failed — is /webhook/ps2-add-lead Active?', true); return; }
@@ -1479,6 +1593,10 @@
   function openAddSheet() {
     openModal('<div class="modal-card"><h2>Connect Google Sheet</h2><div class="form-panel">' +
       '<label class="field-label">Sheet URL<input id="ns-url" placeholder="https://docs.google.com/spreadsheets/d/…" /></label>' +
+      '<p style="font-size:12px;color:var(--muted);margin:-4px 0 10px">Try a sample: ' +
+        '<button type="button" class="btn btn-sm btn-ghost" onclick="document.getElementById(\'ns-url\').value=\'https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit\'">Google sample sheet</button> ' +
+        '<button type="button" class="btn btn-sm btn-ghost" onclick="document.getElementById(\'ns-url\').value=\'https://docs.google.com/spreadsheets/d/1UxKqqC5unE3CwTMqgpB3SMARfxIIw2sVSZQUuz3SclU/edit\'">Field-team demo link</button>' +
+      '</p>' +
       '<label class="field-label">Tab Name<input id="ns-tab" value="Sheet1" /></label>' +
       '<label class="field-label">Sync Interval<select id="ns-interval"><option value="1">Every 1 hour</option><option value="3">Every 3 hours</option><option value="6">Every 6 hours</option><option value="12">Every 12 hours</option><option value="24" selected>Every 24 hours</option></select></label>' +
       '<div class="form-actions"><button class="btn btn-primary" onclick="window.PS2App.submitAddSheet()">Connect</button><button class="btn btn-ghost" onclick="window.PS2App.closeModal()">Cancel</button></div>' +
@@ -1493,7 +1611,12 @@
     };
     if (!body.sheet_url) { toast('URL required', true); return; }
     var res = await PS2Api.createSheetConnection(body);
-    if (!res.ok) { toast(res.data.error || 'Failed', true); return; }
+    if (!res.ok) {
+      var err = (res.data && res.data.error) || 'Failed';
+      if (res.status === 409 || /duplicate/i.test(err)) toast('Duplicate sheet — this Google Sheet + tab is already connected', true);
+      else toast(err, true);
+      return;
+    }
     toast('Connection added');
     closeModal();
     if (state.view === 'sheets') renderSheets();
@@ -1665,7 +1788,7 @@
     openModal('<div class="modal-card"><h2>Upload photo / PDF</h2><div class="form-panel">' +
       '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">Attach a business card image or PDF to a lead. OCR via n8n (WF-E) is optional and only runs if configured.</p>' +
       '<label class="field-label">Lead<select id="lu-lead">' + leadOpts + '</select></label>' +
-      '<label class="field-label">File<input id="lu-file" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/*" /></label>' +
+      '<label class="field-label">File<input id="lu-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.heic,.heif,application/pdf,image/*" /></label>' +
       '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)">' +
         '<input type="checkbox" id="lu-ocr" /> Request OCR extraction (needs WF-E)</label>' +
       '<div class="form-actions"><button class="btn btn-primary" onclick="window.PS2App.submitLeadUpload()">Upload</button>' +
@@ -1846,10 +1969,24 @@
   }
 
   async function toggleSheet(id, active) {
-    await PS2Api.patchSheetConnection(id, { is_active: active });
+    var res = await PS2Api.patchSheetConnection(id, { is_active: active });
+    if (!res.ok) { toast((res.data && res.data.error) || 'Could not update sheet', true); return; }
     toast(active ? 'Connection enabled' : 'Connection disabled');
-    state.captureTab = 'sheets';
-    renderCapture();
+    refreshSheetLists();
+  }
+
+  async function deleteSheet(id) {
+    if (!confirm('Remove this field-team sheet connection?')) return;
+    var res = await PS2Api.deleteSheetConnection(id);
+    if (!res.ok) { toast((res.data && res.data.error) || 'Could not delete sheet', true); return; }
+    toast('Sheet connection removed');
+    refreshSheetLists();
+  }
+
+  function refreshSheetLists() {
+    if (state.view === 'sheets') renderSheets();
+    else if (state.view === 'capture') { state.captureTab = 'sheets'; renderCapture(); }
+    else if (state.captureTab === 'sheets') renderCapture();
   }
 
   /* ─ Boot ─────────────────────────────────────────────────────────────────── */
@@ -1902,8 +2039,8 @@
     renderPipeline: renderPipeline, renderLeads: renderLeads,
     openLeadUpload: openLeadUpload, submitLeadUpload: submitLeadUpload,
     editLeadWebsite: editLeadWebsite, saveLeadWebsite: saveLeadWebsite,
-    openLead: openLead, openProject: openProject, advanceStage: advanceStage,
-    deactivateUser: deactivateUser, toggleSheet: toggleSheet,
+    openLead: openLead, renderLeadTracker: renderLeadTracker, openProject: openProject, advanceStage: advanceStage,
+    deactivateUser: deactivateUser, toggleSheet: toggleSheet, deleteSheet: deleteSheet,
     togglePassword: togglePassword,
   };
 

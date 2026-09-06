@@ -5,6 +5,18 @@
 > - **Portal (me — your counterpart):** Static HTML at `powerhousetech.in/sahasra/lead-management/` backed by a Supabase Edge Function `ps2-lead-api`. Handles the UI and data layer.
 > - **You (Claude — n8n):** Build n8n workflows that call this portal's API endpoints using an API key. We communicate via the user (Shreyas) as relay.
 
+### Demo sample inboxes (sheet + portal aligned)
+
+Use **only** these five Gmails for end-to-end send/reply testing (already updated in the master sheet):
+
+1. `shreyas09here@gmail.com`
+2. `shreyassinha.work@gmail.com`
+3. `shreyass0904@gmail.com`
+4. `sinhay0206@gmail.com`
+5. `sheyassinha.ss04@gmail.com`
+
+Do not seed Acme / Nova / Coastal / Horizon fictional emails.
+
 ---
 
 ## 1. What n8n needs to do (your job)

@@ -174,6 +174,7 @@
     sheetConnections: function () { return req('GET', 'sheet-connections'); },
     createSheetConnection: function (body) { return req('POST', 'sheet-connection', body); },
     patchSheetConnection: function (id, body) { return req('PATCH', 'sheet-connection', body, 'id=' + id); },
+    deleteSheetConnection: function (id) { return req('DELETE', 'sheet-connection', null, 'id=' + id); },
     getSettings: function () { return req('GET', 'settings'); },
     patchSettings: function (body) { return req('PATCH', 'settings', body); },
   };
