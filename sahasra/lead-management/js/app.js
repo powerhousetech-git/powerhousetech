@@ -454,6 +454,56 @@
     });
   }
 
+
+  function loadPdfJs(cb) {
+    if (window.pdfjsLib) { cb(); return; }
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = function() {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      cb();
+    };
+    s.onerror = function(){ toast('Could not load PDF renderer', true); };
+    document.head.appendChild(s);
+  }
+
+  /** Render each PDF page to PNG base64 (more reliable for OCR than raw PDF). */
+  function pdfFileToPngPages(file) {
+    return new Promise(function(resolve, reject) {
+      loadPdfJs(function() {
+        var reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = function() {
+          var data = new Uint8Array(reader.result);
+          window.pdfjsLib.getDocument({ data: data }).promise.then(function(pdf) {
+            var pages = [];
+            var chain = Promise.resolve();
+            for (var p = 1; p <= pdf.numPages; p++) {
+              (function(pageNum) {
+                chain = chain.then(function() {
+                  return pdf.getPage(pageNum).then(function(page) {
+                    var scale = 1.5;
+                    var viewport = page.getViewport({ scale: scale });
+                    var canvas = document.createElement('canvas');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    var ctx = canvas.getContext('2d');
+                    return page.render({ canvasContext: ctx, viewport: viewport }).promise.then(function() {
+                      var dataUrl = canvas.toDataURL('image/png');
+                      pages.push(dataUrl.split(',')[1] || '');
+                    });
+                  });
+                });
+              })(p);
+            }
+            chain.then(function(){ resolve(pages); }).catch(reject);
+          }).catch(reject);
+        };
+        reader.readAsArrayBuffer(file);
+      });
+    });
+  }
+
   async function handlePdfFiles(fileList) {
     var files = Array.prototype.slice.call(fileList || []);
     var status = $('pdf-status');
@@ -462,26 +512,53 @@
       var f = files[i];
       if (status) status.textContent = 'Uploading + extracting ' + f.name + '…';
       try {
-        var b64 = await fileToBase64(f);
-        var res = await PS2Api.ingestFile({ filename: f.name, content_type: f.type || 'application/pdf', content_base64: b64 });
-        if (!res.ok) {
-          toast((res.data && res.data.error) || 'Upload failed', true);
-          if (status) status.textContent = 'Failed: ' + ((res.data && res.data.error) || 'upload error');
-          continue;
+        var isPdf = /pdf$/i.test(f.type || '') || /\.pdf$/i.test(f.name || '');
+        var payloads = [];
+        if (isPdf) {
+          if (status) status.textContent = 'Reading pages in ' + f.name + '…';
+          var pages = await pdfFileToPngPages(f);
+          if (!pages.length) throw new Error('No pages');
+          for (var pi = 0; pi < pages.length; pi++) {
+            payloads.push({
+              filename: f.name.replace(/\.pdf$/i, '') + '-p' + (pi + 1) + '.png',
+              content_type: 'image/png',
+              content_base64: pages[pi],
+            });
+          }
+        } else {
+          payloads.push({
+            filename: f.name,
+            content_type: f.type || 'image/png',
+            content_base64: await fileToBase64(f),
+          });
         }
-        var d = (res.data && res.data.data) || {};
-        var msg = d.message || ('Uploaded ' + f.name);
-        if (d.imported > 0) {
-          toast(msg);
-          if (status) status.textContent = 'Extracted ' + d.imported + ' lead(s) → master sheet';
-        } else if (d.forwarded) {
-          toast(msg);
+        var totalImported = 0;
+        var lastMsg = '';
+        var anyForwarded = false;
+        for (var j = 0; j < payloads.length; j++) {
+          if (status) status.textContent = 'Extracting card ' + (j + 1) + '/' + payloads.length + ' from ' + f.name + '…';
+          var res = await PS2Api.ingestFile(payloads[j]);
+          if (!res.ok) {
+            toast((res.data && res.data.error) || ('Failed on page ' + (j + 1)), true);
+            continue;
+          }
+          var d = (res.data && res.data.data) || {};
+          lastMsg = d.message || lastMsg;
+          if (d.imported) totalImported += Number(d.imported) || 0;
+          if (d.forwarded) anyForwarded = true;
+        }
+        if (totalImported > 0) {
+          toast('Extracted ' + totalImported + ' lead(s) from ' + f.name + ' → master sheet');
+          if (status) status.textContent = 'Extracted ' + totalImported + ' lead(s) → master sheet';
+        } else if (anyForwarded) {
+          toast(lastMsg || 'Queued for n8n OCR');
           if (status) status.textContent = 'Queued for n8n OCR';
         } else {
-          toast(msg, true);
-          if (status) status.textContent = msg;
+          toast(lastMsg || ('No leads extracted from ' + f.name), true);
+          if (status) status.textContent = lastMsg || 'No leads extracted';
         }
       } catch (err) {
+        console.error(err);
         toast('Could not read ' + f.name, true);
         if (status) status.textContent = 'Could not read file';
       }

@@ -314,7 +314,8 @@ async function extractContactsFromCard(contentBase64: string, contentType: strin
     });
   }
 
-  const model = Deno.env.get('ANTHROPIC_MODEL')?.trim() || 'claude-sonnet-4-20250514';
+  // Match other PowerhouseTech edge functions (override via ANTHROPIC_MODEL)
+  const model = Deno.env.get('ANTHROPIC_MODEL')?.trim() || 'claude-opus-4-8';
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'x-api-key': apiKey,
@@ -322,15 +323,28 @@ async function extractContactsFromCard(contentBase64: string, contentType: strin
   };
   if (isPdf) headers['anthropic-beta'] = 'pdfs-2024-09-25';
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model,
-      max_tokens: 2500,
-      messages: [{ role: 'user', content: userContent }],
-    }),
-  });
+  async function callAnthropic(activeModel: string) {
+    return await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: activeModel,
+        max_tokens: 2500,
+        messages: [{ role: 'user', content: userContent }],
+      }),
+    });
+  }
+
+  let res = await callAnthropic(model);
+  // Fallback chain if pinned model slug 404s on this account
+  if (res.status === 404) {
+    for (const fallback of ['claude-sonnet-4-5', 'claude-sonnet-4-20250514', 'claude-3-5-sonnet-latest']) {
+      if (fallback === model) continue;
+      console.error('card OCR retry with model', fallback);
+      res = await callAnthropic(fallback);
+      if (res.ok || res.status !== 404) break;
+    }
+  }
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
     console.error('card OCR anthropic error', res.status, errText.slice(0, 400));
