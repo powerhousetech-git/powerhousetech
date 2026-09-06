@@ -460,14 +460,30 @@
     if (!files.length) return;
     for (var i = 0; i < files.length; i++) {
       var f = files[i];
-      if (status) status.textContent = 'Uploading ' + f.name + '…';
+      if (status) status.textContent = 'Uploading + extracting ' + f.name + '…';
       try {
         var b64 = await fileToBase64(f);
         var res = await PS2Api.ingestFile({ filename: f.name, content_type: f.type || 'application/pdf', content_base64: b64 });
-        if (!res.ok) { toast(res.data.error || 'Upload failed', true); continue; }
-        toast(res.data.data && res.data.data.message ? res.data.data.message : 'Uploaded ' + f.name);
+        if (!res.ok) {
+          toast((res.data && res.data.error) || 'Upload failed', true);
+          if (status) status.textContent = 'Failed: ' + ((res.data && res.data.error) || 'upload error');
+          continue;
+        }
+        var d = (res.data && res.data.data) || {};
+        var msg = d.message || ('Uploaded ' + f.name);
+        if (d.imported > 0) {
+          toast(msg);
+          if (status) status.textContent = 'Extracted ' + d.imported + ' lead(s) → master sheet';
+        } else if (d.forwarded) {
+          toast(msg);
+          if (status) status.textContent = 'Queued for n8n OCR';
+        } else {
+          toast(msg, true);
+          if (status) status.textContent = msg;
+        }
       } catch (err) {
         toast('Could not read ' + f.name, true);
+        if (status) status.textContent = 'Could not read file';
       }
     }
     renderCapture();

@@ -248,8 +248,7 @@ async function getN8nApiKey(): Promise<string> {
   return v.key || '';
 }
 
-function fireN8n(url: string, body: unknown, apiKey: string) {
-  if (!url) return;
+function n8nHeaders(apiKey: string): Record<string, string> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (apiKey) {
     // Handshake standard is x-api-key. Also send Shreyas09 until n8n webhook
@@ -257,7 +256,108 @@ function fireN8n(url: string, body: unknown, apiKey: string) {
     headers['x-api-key'] = apiKey;
     headers['Shreyas09'] = apiKey;
   }
-  fetch(url, { method: 'POST', headers, body: JSON.stringify(body) }).catch(() => { /* fire and forget */ });
+  return headers;
+}
+
+function fireN8n(url: string, body: unknown, apiKey: string) {
+  if (!url) return;
+  fetch(url, { method: 'POST', headers: n8nHeaders(apiKey), body: JSON.stringify(body) }).catch(() => { /* fire and forget */ });
+}
+
+async function postN8n(url: string, body: unknown, apiKey: string): Promise<boolean> {
+  if (!url) return false;
+  try {
+    const res = await fetch(url, { method: 'POST', headers: n8nHeaders(apiKey), body: JSON.stringify(body) });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+type CardContact = {
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  designation: string;
+  website: string;
+  notes: string;
+};
+
+/** Claude vision OCR for business-card PDFs/images when n8n WF-E is not configured. */
+async function extractContactsFromCard(contentBase64: string, contentType: string): Promise<CardContact[]> {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!apiKey) return [];
+
+  const mime = (contentType || 'application/pdf').split(';')[0].trim().toLowerCase();
+  const isPdf = mime.includes('pdf');
+  const isImage = mime.startsWith('image/');
+  if (!isPdf && !isImage) return [];
+
+  const prompt =
+    'Extract every business card / contact visible in this file. ' +
+    'Return ONLY a JSON array (no markdown) of objects with keys: ' +
+    'name, email, phone, company, designation, website, notes. ' +
+    'Use empty string for missing fields. One object per distinct person/card. ' +
+    'Prefer the printed personal email on the card. Normalize website to https:// when possible.';
+
+  const userContent: Array<Record<string, unknown>> = [{ type: 'text', text: prompt }];
+  if (isPdf) {
+    userContent.push({
+      type: 'document',
+      source: { type: 'base64', media_type: 'application/pdf', data: contentBase64 },
+    });
+  } else {
+    userContent.push({
+      type: 'image',
+      source: { type: 'base64', media_type: mime, data: contentBase64 },
+    });
+  }
+
+  const model = Deno.env.get('ANTHROPIC_MODEL')?.trim() || 'claude-sonnet-4-20250514';
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-api-key': apiKey,
+    'anthropic-version': '2023-06-01',
+  };
+  if (isPdf) headers['anthropic-beta'] = 'pdfs-2024-09-25';
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model,
+      max_tokens: 2500,
+      messages: [{ role: 'user', content: userContent }],
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    console.error('card OCR anthropic error', res.status, errText.slice(0, 400));
+    throw new Error(`Card OCR failed (Anthropic HTTP ${res.status})`);
+  }
+  const data = await res.json() as { content?: Array<{ type?: string; text?: string }> };
+  const text = (data.content || []).filter((c) => c.type === 'text').map((c) => c.text || '').join('\n').trim();
+  const match = text.match(/\[[\s\S]*\]/);
+  if (!match) return [];
+  let parsed: unknown;
+  try { parsed = JSON.parse(match[0]); } catch { return []; }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.map((raw) => {
+    const o = (raw || {}) as Record<string, unknown>;
+    const str = (k: string) => String(o[k] ?? '').trim();
+    let website = str('website');
+    if (website && !/^https?:\/\//i.test(website)) website = 'https://' + website.replace(/^\/\//, '');
+    return {
+      name: str('name') || str('full_name'),
+      email: str('email').toLowerCase(),
+      phone: str('phone'),
+      company: str('company'),
+      designation: str('designation') || str('title'),
+      website,
+      notes: str('notes'),
+    };
+  }).filter((c) => c.name || c.email || c.company);
 }
 
 function leadRowFromBody(
@@ -730,7 +830,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── INGEST FILE (PDF business cards → n8n Workflow extract) ──────────────
+    // ── INGEST FILE (PDF business cards → n8n WF-E OR Claude vision OCR) ─────
     if (op === 'ingest-file' && method === 'POST') {
       if (user.role === 'pt_admin') return forbidden();
       let body: Record<string, unknown> = {};
@@ -756,6 +856,8 @@ Deno.serve(async (req) => {
 
       const [wh, key] = await Promise.all([getWebhooks(), getN8nApiKey()]);
       const forwarded = Boolean(wh.extract_pdf);
+
+      // Preferred path: n8n WF-E when configured
       if (forwarded) {
         fireN8n(wh.extract_pdf, {
           event: 'pdf.uploaded',
@@ -764,13 +866,100 @@ Deno.serve(async (req) => {
           content_type: contentType,
           content_base64: contentBase64,
         }, key);
+        await logActivity(user.id, 'lead', batch.id, 'file_ingested', `Uploaded ${filename} → n8n extract_pdf`);
+        return jsonResponse(200, {
+          ok: true,
+          data: { batch, forwarded: true, extracted: 0, imported: 0, message: 'Queued for n8n extraction' },
+        });
       }
-      await logActivity(user.id, 'lead', batch.id, 'file_ingested', `Uploaded ${filename} (business card)`);
+
+      // Fallback: Claude vision OCR on Edge → write each contact to master sheet via add_lead
+      if (!Deno.env.get('ANTHROPIC_API_KEY')) {
+        await logActivity(user.id, 'lead', batch.id, 'file_ingested', `Uploaded ${filename} (no OCR path)`);
+        return jsonResponse(200, {
+          ok: true,
+          data: {
+            batch,
+            forwarded: false,
+            extracted: 0,
+            imported: 0,
+            message: 'Saved but not extracted — set extract_pdf webhook or ANTHROPIC_API_KEY for card OCR.',
+          },
+        });
+      }
+
+      let contacts: CardContact[] = [];
+      try {
+        contacts = await extractContactsFromCard(contentBase64, contentType);
+      } catch (ocrErr) {
+        // Table has no notes column — only bump failed_count
+        await db().from('ps2_upload_batches').update({
+          failed_count: 1,
+        }).eq('id', batch.id);
+        return jsonResponse(502, {
+          ok: false,
+          error: ocrErr instanceof Error ? ocrErr.message : 'Card OCR failed',
+          data: { batch_id: batch.id },
+        });
+      }
+
+      let imported = 0;
+      let failed = 0;
+      const leads: CardContact[] = [];
+      for (const c of contacts) {
+        if (!c.name && !c.email && !c.company) continue;
+        const ok = await postN8n(wh.add_lead, {
+          action: 'create',
+          event: 'lead.create',
+          name: c.name,
+          full_name: c.name,
+          email: c.email,
+          phone: c.phone,
+          company: c.company,
+          designation: c.designation,
+          website: c.website,
+          source: 'pdf',
+          status: 'new',
+          notes: c.notes || `Extracted from ${filename}`,
+          batch_id: batch.id,
+        }, key);
+        if (ok) { imported++; leads.push(c); }
+        else failed++;
+        if (c.website && c.email && wh.enrich_website) {
+          fireN8n(wh.enrich_website, { event: 'lead.created', email: c.email, website: c.website }, key);
+        }
+      }
+
+      const { data: updatedBatch } = await db().from('ps2_upload_batches').update({
+        total_records: contacts.length,
+        imported_count: imported,
+        failed_count: failed,
+      }).eq('id', batch.id).select('*').single();
+
+      await logActivity(
+        user.id,
+        'lead',
+        batch.id,
+        'file_ingested',
+        `OCR ${filename}: extracted ${contacts.length}, imported ${imported}`,
+      );
+
       return jsonResponse(200, {
         ok: true,
-        data: { batch, forwarded, message: forwarded
-          ? 'Queued for n8n extraction'
-          : 'Saved. Set extract_pdf webhook (or add leads manually) — card OCR workflow is not deployed yet.' },
+        data: {
+          batch: updatedBatch || batch,
+          forwarded: false,
+          ocr: 'anthropic',
+          extracted: contacts.length,
+          imported,
+          failed,
+          leads,
+          message: imported
+            ? `Extracted ${imported} lead(s) from card → master sheet`
+            : (contacts.length
+              ? 'Contacts found but sheet write failed — is ps2-add-lead Active?'
+              : 'No contacts found on card — try a clearer scan or add manually'),
+        },
       });
     }
 
