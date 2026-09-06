@@ -844,7 +844,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── INGEST FILE (PDF business cards → n8n WF-E OR Claude vision OCR) ─────
+    // ── INGEST FILE (PDF/image cards → n8n WF-E OR Claude vision OCR) ────────
+    // One upload = one batch row. Multi-page PDFs may include pages[] (PNG
+    // renders) so filename stays the original PDF and counts aggregate.
     if (op === 'ingest-file' && method === 'POST') {
       if (user.role === 'pt_admin') return forbidden();
       let body: Record<string, unknown> = {};
@@ -852,8 +854,20 @@ Deno.serve(async (req) => {
       const filename = String(body.filename || 'upload.bin');
       const contentType = String(body.content_type || 'application/pdf');
       const contentBase64 = String(body.content_base64 || '');
-      if (!contentBase64) return jsonResponse(400, { ok: false, error: 'content_base64 required' });
-      if (contentBase64.length > 5_000_000) return jsonResponse(413, { ok: false, error: 'File too large (max ~3.5MB)' });
+      const rawPages = Array.isArray(body.pages) ? body.pages as Array<Record<string, unknown>> : [];
+      const pageParts = rawPages
+        .map((p, i) => ({
+          page: Number(p.page) || i + 1,
+          content_type: String(p.content_type || 'image/png'),
+          content_base64: String(p.content_base64 || ''),
+        }))
+        .filter((p) => p.content_base64.length > 0);
+
+      if (!contentBase64 && pageParts.length === 0) {
+        return jsonResponse(400, { ok: false, error: 'content_base64 or pages[] required' });
+      }
+      const payloadChars = contentBase64.length + pageParts.reduce((n, p) => n + p.content_base64.length, 0);
+      if (payloadChars > 12_000_000) return jsonResponse(413, { ok: false, error: 'File too large' });
 
       const { data: batch, error } = await db().from('ps2_upload_batches').insert({
         organization_id: ORG_ID,
@@ -871,14 +885,14 @@ Deno.serve(async (req) => {
       const [wh, key] = await Promise.all([getWebhooks(), getN8nApiKey()]);
       const forwarded = Boolean(wh.extract_pdf);
 
-      // Preferred path: n8n WF-E when configured
       if (forwarded) {
         fireN8n(wh.extract_pdf, {
           event: 'pdf.uploaded',
           batch_id: batch.id,
           filename,
           content_type: contentType,
-          content_base64: contentBase64,
+          content_base64: contentBase64 || undefined,
+          pages: pageParts.length ? pageParts : undefined,
         }, key);
         await logActivity(user.id, 'lead', batch.id, 'file_ingested', `Uploaded ${filename} → n8n extract_pdf`);
         return jsonResponse(200, {
@@ -887,7 +901,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Fallback: Claude vision OCR on Edge → write each contact to master sheet via add_lead
       if (!Deno.env.get('ANTHROPIC_API_KEY')) {
         await logActivity(user.id, 'lead', batch.id, 'file_ingested', `Uploaded ${filename} (no OCR path)`);
         return jsonResponse(200, {
@@ -902,17 +915,39 @@ Deno.serve(async (req) => {
         });
       }
 
+      const ocrTargets = pageParts.length
+        ? pageParts.map((p) => ({ label: `page ${p.page}`, content_type: p.content_type, content_base64: p.content_base64 }))
+        : [{ label: 'file', content_type: contentType, content_base64: contentBase64 }];
+
       let contacts: CardContact[] = [];
-      try {
-        contacts = await extractContactsFromCard(contentBase64, contentType);
-      } catch (ocrErr) {
-        // Table has no notes column — only bump failed_count
+      let pageFailures = 0;
+      for (const target of ocrTargets) {
+        try {
+          const found = await extractContactsFromCard(target.content_base64, target.content_type);
+          for (const c of found) {
+            const emailKey = (c.email || '').toLowerCase();
+            const already = contacts.some((x) =>
+              (emailKey && (x.email || '').toLowerCase() === emailKey) ||
+              (!emailKey && x.name === c.name && x.company === c.company),
+            );
+            if (!already) contacts.push(c);
+          }
+          if (!found.length) pageFailures++;
+        } catch (pageErr) {
+          console.error('card OCR page failed', target.label, pageErr);
+          pageFailures++;
+        }
+      }
+
+      if (!contacts.length && pageFailures === ocrTargets.length) {
         await db().from('ps2_upload_batches').update({
-          failed_count: 1,
+          total_records: ocrTargets.length,
+          imported_count: 0,
+          failed_count: pageFailures,
         }).eq('id', batch.id);
         return jsonResponse(502, {
           ok: false,
-          error: ocrErr instanceof Error ? ocrErr.message : 'Card OCR failed',
+          error: 'Card OCR failed on all pages',
           data: { batch_id: batch.id },
         });
       }
@@ -944,10 +979,11 @@ Deno.serve(async (req) => {
         }
       }
 
+      const totalRecords = Math.max(ocrTargets.length, contacts.length);
       const { data: updatedBatch } = await db().from('ps2_upload_batches').update({
-        total_records: contacts.length,
+        total_records: totalRecords,
         imported_count: imported,
-        failed_count: failed,
+        failed_count: failed + pageFailures,
       }).eq('id', batch.id).select('*').single();
 
       await logActivity(
@@ -955,7 +991,7 @@ Deno.serve(async (req) => {
         'lead',
         batch.id,
         'file_ingested',
-        `OCR ${filename}: extracted ${contacts.length}, imported ${imported}`,
+        `OCR ${filename}: ${imported}/${totalRecords} imported (${ocrTargets.length} page(s))`,
       );
 
       return jsonResponse(200, {
@@ -964,15 +1000,16 @@ Deno.serve(async (req) => {
           batch: updatedBatch || batch,
           forwarded: false,
           ocr: 'anthropic',
-          extracted: contacts.length,
+          pages: ocrTargets.length,
+          extracted: totalRecords,
           imported,
-          failed,
+          failed: failed + pageFailures,
           leads,
           message: imported
-            ? `Extracted ${imported} lead(s) from card → master sheet`
+            ? `Imported ${imported}/${totalRecords} from ${filename} → master sheet`
             : (contacts.length
               ? 'Contacts found but sheet write failed — is ps2-add-lead Active?'
-              : 'No contacts found on card — try a clearer scan or add manually'),
+              : 'No contacts found — try a clearer scan or add manually'),
         },
       });
     }
