@@ -193,11 +193,32 @@ export async function handleAdminOps(
       if (user.role === 'pt_admin') return forbidden();
       let body: Record<string, unknown> = {};
       try { body = await req.json(); } catch { /* */ }
+      const sheetUrl = String(body.sheet_url || '').trim();
+      if (!sheetUrl) return jsonResponse(400, { ok: false, error: 'sheet_url required' });
+      const tabName = String(body.tab_name || 'Sheet1').trim() || 'Sheet1';
+      const parsedFromUrl = String(sheetUrl).match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      const parsedId = String(body.sheet_id || '').trim() || (parsedFromUrl ? parsedFromUrl[1] : null);
+      if (parsedId) {
+        const { data: existing } = await db()
+          .from('ps2_google_sheet_connections')
+          .select('id, sheet_url, tab_name, sheet_id')
+          .eq('organization_id', ORG_ID)
+          .eq('sheet_id', parsedId)
+          .eq('tab_name', tabName)
+          .maybeSingle();
+        if (existing) {
+          return jsonResponse(409, {
+            ok: false,
+            error: 'Duplicate sheet — this Google Sheet + tab is already connected',
+            data: { existing_id: existing.id },
+          });
+        }
+      }
       const { data, error } = await db().from('ps2_google_sheet_connections').insert({
         organization_id: ORG_ID,
-        sheet_url: body.sheet_url,
-        sheet_id: body.sheet_id || null,
-        tab_name: body.tab_name || 'Sheet1',
+        sheet_url: sheetUrl,
+        sheet_id: parsedId || null,
+        tab_name: tabName,
         column_mapping: body.column_mapping || {},
         sync_interval_hours: body.sync_interval_hours || 24,
         is_active: true,
@@ -210,13 +231,25 @@ export async function handleAdminOps(
     if (op === 'sheet-connection' && id && method === 'PATCH') {
       let body: Record<string, unknown> = {};
       try { body = await req.json(); } catch { /* */ }
-      const allowed = ['sheet_id','tab_name','column_mapping','sync_interval_hours','is_active','last_synced_at'];
+      const allowed = ['sheet_id','tab_name','column_mapping','sync_interval_hours','is_active','last_synced_at','sheet_url'];
       const patch: Record<string, unknown> = {};
       for (const k of allowed) if (Object.prototype.hasOwnProperty.call(body, k)) patch[k] = body[k];
       const { data, error } = await db()
         .from('ps2_google_sheet_connections').update(patch).eq('id', id).eq('organization_id', ORG_ID).select('*').single();
       if (error) throw error;
       return jsonResponse(200, { ok: true, data });
+    }
+
+    if (op === 'sheet-connection' && id && method === 'DELETE') {
+      if (user.role === 'pt_admin') return forbidden();
+      const { error } = await db()
+        .from('ps2_google_sheet_connections')
+        .delete()
+        .eq('id', id)
+        .eq('organization_id', ORG_ID);
+      if (error) throw error;
+      await logActivity(user.id, 'system', id, 'sheet_connection_deleted', `Removed field-team sheet connection ${id}`);
+      return jsonResponse(200, { ok: true, data: { id } });
     }
 
     // ── OUTLOOK ACCOUNTS ──────────────────────────────────────────────────────

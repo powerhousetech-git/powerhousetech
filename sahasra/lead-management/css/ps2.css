@@ -431,3 +431,10 @@ body {
 @media (max-width: 900px) {
   .sheet-embed { min-height: 420px; height: 60vh; }
 }
+
+/* Lead Tracker (pre-conversion) */
+.lead-tracker-panel { overflow: auto; }
+.lead-tracker-panel .data-table td { vertical-align: top; }
+.filter-note { align-self: center; }
+.data-table tr.clickable { cursor: pointer; }
+.data-table tr.clickable:hover { background: rgba(212,175,55,.06); }

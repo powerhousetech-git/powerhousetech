@@ -149,6 +149,41 @@ type Webhooks = {
 
 const MASTER_SHEET_ID = '1UxKqqC5unE3CwTMqgpB3SMARfxIIw2sVSZQUuz3SclU';
 const MASTER_SHEET_GID = '0';
+
+/** Extract spreadsheet id from a Google Sheets URL. */
+function parseGoogleSheetId(url: string): string | null {
+  const m = String(url || '').match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return m ? m[1] : null;
+}
+
+/** Email addresses already in the master sheet (duplicate key = email only). */
+async function fetchMasterSheetEmails(): Promise<Set<string>> {
+  const emails = new Set<string>();
+  try {
+    const csvUrl =
+      `https://docs.google.com/spreadsheets/d/${MASTER_SHEET_ID}/export?format=csv&gid=${MASTER_SHEET_GID}`;
+    const sheetRes = await fetch(csvUrl, { redirect: 'follow' });
+    if (!sheetRes.ok) return emails;
+    const text = await sheetRes.text();
+    if (/<!DOCTYPE html>|Sign in/i.test(text.slice(0, 200))) return emails;
+    const rows = parseCsv(text);
+    if (rows.length < 2) return emails;
+    const headers = rows[0].map((h) => String(h || '').trim().toLowerCase());
+    const emailIdx = headers.findIndex((h) =>
+      h === 'email' || h === 'e-mail' || h === 'mail' || h === 'email id' || h === 'email address'
+    );
+    if (emailIdx < 0) return emails;
+    for (const row of rows.slice(1)) {
+      const e = String(row[emailIdx] || '').trim().toLowerCase();
+      if (e.includes('@')) emails.add(e);
+    }
+  } catch (err) {
+    console.error('fetchMasterSheetEmails failed', err);
+  }
+  return emails;
+}
+
+
 const N8N_BASE_DEFAULT = 'https://shreyas-sinha.app.n8n.cloud';
 
 async function getWebhooks(): Promise<Webhooks> {
@@ -289,17 +324,27 @@ async function extractContactsFromCard(contentBase64: string, contentType: strin
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) return [];
 
-  const mime = (contentType || 'application/pdf').split(';')[0].trim().toLowerCase();
+  let mime = (contentType || 'application/pdf').split(';')[0].trim().toLowerCase();
+  // Accept any photo/PDF — coerce unknown binary uploads to image/jpeg so OCR still runs
+  if (!mime || mime === 'application/octet-stream' || mime === 'binary/octet-stream') {
+    mime = 'image/jpeg';
+  }
   const isPdf = mime.includes('pdf');
-  const isImage = mime.startsWith('image/');
-  if (!isPdf && !isImage) return [];
+  const isImage = mime.startsWith('image/') ||
+    ['image/heic', 'image/heif', 'image/webp', 'image/tiff', 'image/bmp', 'image/gif'].includes(mime);
+  if (!isPdf && !isImage) {
+    // Last resort: still try as JPEG (blurry phone photos often arrive with odd MIME)
+    mime = 'image/jpeg';
+  }
 
   const prompt =
-    'Extract every business card / contact visible in this file. ' +
+    'Extract every business card / contact visible in this file, even if the image is blurry, ' +
+    'tilted, low-light, partially cropped, or not a perfect scan. Do your best to read printed text. ' +
     'Return ONLY a JSON array (no markdown) of objects with keys: ' +
     'name, email, phone, company, designation, website, notes. ' +
     'Use empty string for missing fields. One object per distinct person/card. ' +
-    'Prefer the printed personal email on the card. Normalize website to https:// when possible.';
+    'Prefer the printed personal email on the card. Normalize website to https:// when possible. ' +
+    'If you can only read some fields, still return the object with whatever you found.';
 
   const userContent: Array<Record<string, unknown>> = [{ type: 'text', text: prompt }];
   if (isPdf) {
@@ -925,11 +970,11 @@ Deno.serve(async (req) => {
         try {
           const found = await extractContactsFromCard(target.content_base64, target.content_type);
           for (const c of found) {
+            // Duplicates are email-only — same name/company without email is allowed
             const emailKey = (c.email || '').toLowerCase();
-            const already = contacts.some((x) =>
-              (emailKey && (x.email || '').toLowerCase() === emailKey) ||
-              (!emailKey && x.name === c.name && x.company === c.company),
-            );
+            const already = emailKey
+              ? contacts.some((x) => (x.email || '').toLowerCase() === emailKey)
+              : false;
             if (!already) contacts.push(c);
           }
           if (!found.length) pageFailures++;
@@ -939,24 +984,51 @@ Deno.serve(async (req) => {
         }
       }
 
-      if (!contacts.length && pageFailures === ocrTargets.length) {
+      // Always keep the capture batch — even when OCR finds nothing (non-OCR-friendly photos/PDFs)
+      if (!contacts.length) {
         await db().from('ps2_upload_batches').update({
           total_records: ocrTargets.length,
           imported_count: 0,
           failed_count: pageFailures,
+          duplicate_count: 0,
         }).eq('id', batch.id);
-        return jsonResponse(502, {
-          ok: false,
-          error: 'Card OCR failed on all pages',
-          data: { batch_id: batch.id },
+        await logActivity(
+          user.id,
+          'lead',
+          batch.id,
+          'file_ingested',
+          `Captured ${filename} — no contacts readable (saved for manual entry)`,
+        );
+        return jsonResponse(200, {
+          ok: true,
+          data: {
+            batch,
+            forwarded: false,
+            ocr: 'anthropic',
+            pages: ocrTargets.length,
+            extracted: 0,
+            imported: 0,
+            failed: pageFailures,
+            duplicates: 0,
+            leads: [],
+            message: 'File captured but no contact details could be read — add the lead manually or re-scan a clearer photo',
+          },
         });
       }
 
+      const existingEmails = await fetchMasterSheetEmails();
       let imported = 0;
       let failed = 0;
+      let duplicates = 0;
       const leads: CardContact[] = [];
       for (const c of contacts) {
         if (!c.name && !c.email && !c.company) continue;
+        const emailKey = (c.email || '').toLowerCase();
+        // Duplicate check = email id only (never name)
+        if (emailKey && existingEmails.has(emailKey)) {
+          duplicates++;
+          continue;
+        }
         const ok = await postN8n(wh.add_lead, {
           action: 'create',
           event: 'lead.create',
@@ -972,8 +1044,11 @@ Deno.serve(async (req) => {
           notes: c.notes || `Extracted from ${filename}`,
           batch_id: batch.id,
         }, key);
-        if (ok) { imported++; leads.push(c); }
-        else failed++;
+        if (ok) {
+          imported++;
+          leads.push(c);
+          if (emailKey) existingEmails.add(emailKey);
+        } else failed++;
         if (c.website && c.email && wh.enrich_website) {
           fireN8n(wh.enrich_website, { event: 'lead.created', email: c.email, website: c.website }, key);
         }
@@ -984,6 +1059,7 @@ Deno.serve(async (req) => {
         total_records: totalRecords,
         imported_count: imported,
         failed_count: failed + pageFailures,
+        duplicate_count: duplicates,
       }).eq('id', batch.id).select('*').single();
 
       await logActivity(
@@ -1005,11 +1081,14 @@ Deno.serve(async (req) => {
           imported,
           failed: failed + pageFailures,
           leads,
+          duplicates,
           message: imported
-            ? `Imported ${imported}/${totalRecords} from ${filename} → master sheet`
-            : (contacts.length
-              ? 'Contacts found but sheet write failed — is ps2-add-lead Active?'
-              : 'No contacts found — try a clearer scan or add manually'),
+            ? `Imported ${imported}/${totalRecords} from ${filename} → master sheet` + (duplicates ? ` (${duplicates} duplicate email(s) skipped)` : '')
+            : (duplicates
+              ? `All ${duplicates} contact(s) already in master sheet (matched by email)`
+              : (contacts.length
+                ? 'Contacts found but sheet write failed — is ps2-add-lead Active?'
+                : 'No contacts found — try a clearer scan or add manually')),
         },
       });
     }
@@ -1446,11 +1525,31 @@ Deno.serve(async (req) => {
       if (user.role === 'pt_admin') return forbidden();
       let body: Record<string, unknown> = {};
       try { body = await req.json(); } catch { /* */ }
+      const sheetUrl = String(body.sheet_url || '').trim();
+      if (!sheetUrl) return jsonResponse(400, { ok: false, error: 'sheet_url required' });
+      const tabName = String(body.tab_name || 'Sheet1').trim() || 'Sheet1';
+      const parsedId = String(body.sheet_id || '').trim() || parseGoogleSheetId(sheetUrl);
+      if (parsedId) {
+        const { data: existing } = await db()
+          .from('ps2_google_sheet_connections')
+          .select('id, sheet_url, tab_name, sheet_id')
+          .eq('organization_id', ORG_ID)
+          .eq('sheet_id', parsedId)
+          .eq('tab_name', tabName)
+          .maybeSingle();
+        if (existing) {
+          return jsonResponse(409, {
+            ok: false,
+            error: 'Duplicate sheet — this Google Sheet + tab is already connected',
+            data: { existing_id: existing.id },
+          });
+        }
+      }
       const { data, error } = await db().from('ps2_google_sheet_connections').insert({
         organization_id: ORG_ID,
-        sheet_url: body.sheet_url,
-        sheet_id: body.sheet_id || null,
-        tab_name: body.tab_name || 'Sheet1',
+        sheet_url: sheetUrl,
+        sheet_id: parsedId || null,
+        tab_name: tabName,
         column_mapping: body.column_mapping || {},
         sync_interval_hours: body.sync_interval_hours || 24,
         is_active: true,
@@ -1463,13 +1562,25 @@ Deno.serve(async (req) => {
     if (op === 'sheet-connection' && id && method === 'PATCH') {
       let body: Record<string, unknown> = {};
       try { body = await req.json(); } catch { /* */ }
-      const allowed = ['sheet_id','tab_name','column_mapping','sync_interval_hours','is_active','last_synced_at'];
+      const allowed = ['sheet_id','tab_name','column_mapping','sync_interval_hours','is_active','last_synced_at','sheet_url'];
       const patch: Record<string, unknown> = {};
       for (const k of allowed) if (Object.prototype.hasOwnProperty.call(body, k)) patch[k] = body[k];
       const { data, error } = await db()
         .from('ps2_google_sheet_connections').update(patch).eq('id', id).eq('organization_id', ORG_ID).select('*').single();
       if (error) throw error;
       return jsonResponse(200, { ok: true, data });
+    }
+
+    if (op === 'sheet-connection' && id && method === 'DELETE') {
+      if (user.role === 'pt_admin') return forbidden();
+      const { error } = await db()
+        .from('ps2_google_sheet_connections')
+        .delete()
+        .eq('id', id)
+        .eq('organization_id', ORG_ID);
+      if (error) throw error;
+      await logActivity(user.id, 'system', id, 'sheet_connection_deleted', `Removed field-team sheet connection ${id}`);
+      return jsonResponse(200, { ok: true, data: { id } });
     }
 
     // ── OUTLOOK ACCOUNTS ──────────────────────────────────────────────────────
