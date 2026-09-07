@@ -77,12 +77,13 @@
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function show(id) { ['gate-view','app-shell'].forEach(function(v){ var el = $(v); if(el) el.classList.toggle('hidden', v !== id); }); }
-  function toast(msg, err) {
+  function toast(msg, err, ms) {
     var el = $('toast');
     if (!el) return;
     el.textContent = msg;
     el.className = 'toast show' + (err ? ' err' : '');
-    setTimeout(function(){ el.className = 'toast'; }, 3200);
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function(){ el.className = 'toast'; }, ms || (err ? 4500 : 3200));
   }
 
   /* ─ Status / badge helpers ───────────────────────────────────────────────── */
@@ -424,9 +425,9 @@
             }).join('') + '</select>';
         }).join('') +
         '</div>' +
-        '<div style="padding:0 18px 12px;display:flex;gap:8px;align-items:center">' +
+        '<div style="padding:0 18px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
           '<button class="btn btn-primary" id="btn-import-excel">Import ' + ex.rows.length + ' rows</button>' +
-          '<span id="excel-import-status" style="font-size:13px;color:var(--muted)"></span>' +
+          '<span id="excel-import-status" style="font-size:13px;color:var(--muted)">' + esc(state.excelImportStatus || '') + '</span>' +
         '</div>' +
         '<div class="panel" style="margin:0 18px 18px"><table class="data-table"><thead><tr>' +
           ex.headers.slice(0,8).map(function(h){ return '<th>' + esc(h) + '</th>'; }).join('') +
@@ -879,6 +880,12 @@
   async function submitExcelImport() {
     var ex = state.excel;
     var status = $('excel-import-status');
+    var btn = $('btn-import-excel');
+    if (!ex || !ex.rows || !ex.rows.length) {
+      toast('Drop a spreadsheet first, then click Import', true);
+      return;
+    }
+    if (btn) btn.disabled = true;
     var leads = ex.rows.map(function(r){
       var o = {};
       EXCEL_FIELDS.forEach(function(f){
@@ -888,7 +895,11 @@
       });
       return o;
     }).filter(function(o){ return o.full_name || o.first_name || o.email || o.company || o.phone; });
-    if (!leads.length) { toast('Map at least name, email, company, or phone', true); return; }
+    if (!leads.length) {
+      toast('Map at least name, email, company, or phone', true);
+      if (btn) btn.disabled = false;
+      return;
+    }
     // Skip invalid rows instead of blocking entire import
     var valid = [];
     var skippedValidation = 0;
@@ -907,8 +918,13 @@
       valid.push(o);
     });
     leads = valid;
-    if (!leads.length) { toast('No valid rows to import (need at least name or email)', true); return; }
-    if (status) status.textContent = 'Writing ' + leads.length + ' to master sheet…';
+    if (!leads.length) {
+      toast('No valid rows to import (need at least name or email)', true);
+      if (btn) btn.disabled = false;
+      return;
+    }
+    if (status) status.textContent = 'Checking ' + leads.length + ' row(s) against master sheet…';
+    state.excelImportStatus = status ? status.textContent : '';
     var ok = 0, fail = 0, dup = 0, noEmail = 0;
     var lastErr = '';
     var existingLeads = await loadSheetLeads(true);
@@ -938,23 +954,45 @@
         lastErr = (res.data && res.data.error) || lastErr;
       }
     }
-    var skipMsg = (dup ? ' · ' + dup + ' duplicate(s) skipped' : '') +
-      (noEmail ? ' · ' + noEmail + ' skipped (no email)' : '') +
-      (skippedValidation ? ' · ' + skippedValidation + ' skipped (invalid)' : '') +
-      (fail ? ' · ' + fail + ' failed' : '');
+
+    var summaryParts = [];
+    if (ok) summaryParts.push(ok + ' added');
+    if (dup) summaryParts.push(dup + ' duplicate' + (dup === 1 ? '' : 's') + ' skipped');
+    if (noEmail) summaryParts.push(noEmail + ' skipped (no email)');
+    if (skippedValidation) summaryParts.push(skippedValidation + ' skipped (invalid)');
+    if (fail) summaryParts.push(fail + ' failed');
+    var summary = summaryParts.join(' · ');
+
     if (ok) {
-      toast('Added ' + ok + ' lead(s) to sheet' + skipMsg);
+      toast('Added ' + ok + ' lead(s) to sheet' + (dup ? ' · ' + dup + ' duplicate(s) skipped' : '') + (fail ? ' · ' + fail + ' failed' : ''));
+      state.excelImportStatus = summary;
+      state.excel = { headers: [], rows: [], mapping: {}, filename: '' };
+      state.sheetFetchedAt = null;
+      renderCapture();
     } else if (fail) {
-      toast(lastErr || ('Import failed — is /webhook/ps2-add-lead Active in n8n?' + skipMsg), true);
-    } else if (dup || noEmail || skippedValidation) {
-      // Nothing new to write — not an n8n failure
-      toast('No new leads added' + skipMsg);
+      toast(lastErr || ('Import failed — is /webhook/ps2-add-lead Active in n8n?' + (summary ? ' · ' + summary : '')), true);
+      state.excelImportStatus = summary || lastErr || 'Import failed';
+      if (status) status.textContent = state.excelImportStatus;
+      if (btn) btn.disabled = false;
+    } else if (dup) {
+      // Explicit duplicates notification on Import (keep mapping UI so user sees it)
+      var dupMsg = dup + ' duplicate email' + (dup === 1 ? '' : 's') + ' already in the master sheet — skipped';
+      toast(dupMsg + (noEmail || skippedValidation ? ' · ' + summary : ''), true, 5500);
+      state.excelImportStatus = dupMsg;
+      if (status) {
+        status.textContent = dupMsg;
+        status.style.color = 'var(--danger, #f87171)';
+      }
+      if (btn) btn.disabled = false;
+    } else if (noEmail || skippedValidation) {
+      toast('No new leads added · ' + summary, true);
+      state.excelImportStatus = summary;
+      if (status) status.textContent = summary;
+      if (btn) btn.disabled = false;
     } else {
       toast('No rows to import', true);
+      if (btn) btn.disabled = false;
     }
-    state.excel = { headers: [], rows: [], mapping: {}, filename: '' };
-    state.sheetFetchedAt = null;
-    renderCapture();
   }
 
   /* ─────────────────────────────────────────────────────────────────────────
