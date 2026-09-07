@@ -665,9 +665,11 @@
           continue;
         }
 
-        if (isAck) {
+        var emptyBody = !data || (typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length === 0);
+        if (isAck || emptyBody) {
           toast('Queued for n8n OCR — refresh Leads in a moment');
-          if (status) status.textContent = 'Queued · n8n is extracting ' + f.name + ' (Respond Immediately mode)';
+          if (status) status.textContent = 'Queued · n8n is extracting ' + f.name +
+            (emptyBody ? ' (empty response — set Respond to Webhook with contacts[])' : ' (Respond Immediately mode)');
           continue;
         }
 
