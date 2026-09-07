@@ -583,21 +583,19 @@
     for (var i = 0; i < extractedLeads.length; i++) {
       var row = mapOcrContact(extractedLeads[i]);
       row.source = 'pdf';
-      if (!row.full_name && !row.email && !row.company && !row.phone) { skipped++; continue; }
-      if (leadContactValid(row.full_name, row.email, row.company)) { skipped++; continue; }
       var emailKey = String(row.email || '').trim().toLowerCase();
-      if (emailKey) {
-        if (seenEmails[emailKey] || PS2Sheet.findLeadByEmail(existingLeads, emailKey)) {
-          dup++;
-          continue;
-        }
-        seenEmails[emailKey] = true;
+      if (!emailKey) { skipped++; continue; }
+      if (leadContactValid(row.full_name, row.email, row.company)) { skipped++; continue; }
+      if (seenEmails[emailKey] || PS2Sheet.findLeadByEmail(existingLeads, emailKey)) {
+        dup++;
+        continue;
       }
+      seenEmails[emailKey] = true;
       var res = await PS2Api.addLeadToSheet(row);
-      if (res.ok) {
+      if (res.ok || (res.data && (res.data.ok || res.data.success))) {
         ok++;
         imported.push(row);
-        if (emailKey) existingLeads.push(row);
+        existingLeads.push(row);
         if (row.website && row.email) PS2Api.enrichWebsite(row.email, row.website);
       } else fail++;
     }
@@ -863,14 +861,18 @@
     state.excel = { headers: headers, rows: data, mapping: mapping, filename: filename };
 
     var mapped = Object.keys(mapping).filter(function(k){ return mapping[k] !== '' && mapping[k] != null; });
-    var hasNameOrEmail = mapped.indexOf('full_name') >= 0 || mapped.indexOf('first_name') >= 0 || mapped.indexOf('email') >= 0;
+    var hasEmail = mapped.indexOf('email') >= 0;
+    var hasName = mapped.indexOf('full_name') >= 0 || mapped.indexOf('first_name') >= 0;
 
-    if (hasNameOrEmail && mapped.length >= 2) {
+    // Email is the sheet primary key — only auto-import when email column is detected
+    if (hasEmail && (hasName || mapped.length >= 2)) {
       renderCapture();
       setTimeout(function(){ submitExcelImport(); }, 300);
     } else {
       renderCapture();
-      toast('Could not auto-detect all columns — please map them manually', true);
+      toast(hasEmail
+        ? 'Could not auto-detect enough columns — please map them manually'
+        : 'Could not detect an email column — map Email manually, then Import', true);
     }
   }
 
@@ -907,20 +909,23 @@
     leads = valid;
     if (!leads.length) { toast('No valid rows to import (need at least name or email)', true); return; }
     if (status) status.textContent = 'Writing ' + leads.length + ' to master sheet…';
-    var ok = 0, fail = 0, dup = 0;
+    var ok = 0, fail = 0, dup = 0, noEmail = 0;
     var lastErr = '';
     var existingLeads = await loadSheetLeads(true);
     var seenEmails = {};
     for (var i = 0; i < leads.length; i++) {
       var row = leads[i];
       var emailKey = String(row.email || '').trim().toLowerCase();
-      if (emailKey) {
-        if (seenEmails[emailKey] || PS2Sheet.findLeadByEmail(existingLeads, emailKey)) {
-          dup++;
-          continue;
-        }
-        seenEmails[emailKey] = true;
+      // Email is required — primary key in the master sheet
+      if (!emailKey) {
+        noEmail++;
+        continue;
       }
+      if (seenEmails[emailKey] || PS2Sheet.findLeadByEmail(existingLeads, emailKey)) {
+        dup++;
+        continue;
+      }
+      seenEmails[emailKey] = true;
       row.source = 'csv';
       var res = await PS2Api.addLeadToSheet(row);
       if (res.ok || (res.data && (res.data.ok || res.data.success))) {
@@ -933,7 +938,8 @@
         lastErr = (res.data && res.data.error) || lastErr;
       }
     }
-    var skipMsg = (dup ? ' · ' + dup + ' duplicate email(s) skipped' : '') +
+    var skipMsg = (dup ? ' · ' + dup + ' duplicate(s) skipped' : '') +
+      (noEmail ? ' · ' + noEmail + ' skipped (no email)' : '') +
       (skippedValidation ? ' · ' + skippedValidation + ' skipped (invalid)' : '') +
       (fail ? ' · ' + fail + ' failed' : '');
     if (ok) toast('Added ' + ok + ' lead(s) to sheet' + skipMsg);
