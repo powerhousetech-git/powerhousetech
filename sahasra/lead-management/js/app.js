@@ -705,9 +705,15 @@
         (result.fail ? ' · ' + result.fail + ' failed' : ''));
       if (status) status.textContent = result.ok + ' lead(s) saved to master sheet.';
       renderOcrSummary(result, result.imported.length ? result.imported : extractedLeads);
-      // Refresh sheet-backed views / embed
-      try { await refreshAfterSheetWrite(); } catch (_) {}
-      if (state.view === 'leads') refreshSheetEmbed();
+      // Bust cache so Dashboard / Pipeline / Lead Tracker / sheet embed pick up new rows
+      state.sheetFetchedAt = null;
+      if (state.view === 'leads') {
+        try { await renderLeads(); } catch (_) {}
+      } else if (state.view === 'pipeline') {
+        try { await renderPipeline(); } catch (_) {}
+      } else if (state.view === 'lead-tracker') {
+        try { await renderLeadTracker(); } catch (_) {}
+      }
     } else {
       toast('No new leads saved' +
         (result.dup ? ' (duplicates)' : '') +
