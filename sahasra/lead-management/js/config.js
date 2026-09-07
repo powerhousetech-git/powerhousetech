@@ -19,5 +19,6 @@ window.PS2 = {
     enrich_website: '/webhook/ps2-website-enrichment',
     add_lead: '/webhook/ps2-add-lead',
     update_lead: '/webhook/ps2-update-lead',
+    card_ocr: '/webhook/ps2-card-ocr',
   },
 };

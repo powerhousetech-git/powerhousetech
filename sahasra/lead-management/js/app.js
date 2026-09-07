@@ -398,8 +398,8 @@
         '<div style="padding:18px">' +
           '<div class="drop-zone" id="pdf-drop">' +
             '<div class="drop-zone-icon">📇</div>' +
-            '<p><strong>Use Excel/CSV import or + Add Lead</strong></p>' +
-            '<p>Any photo or PDF — we always try to scan contact details (blurry cards OK)</p>' +
+            '<p><strong>Drop a card photo or PDF</strong></p>' +
+            '<p>Pages are sent to n8n (Claude vision) for OCR · blurry cards OK</p>' +
             '<input type="file" id="pdf-file" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.heic,.heif,application/pdf,image/*" multiple hidden />' +
           '</div>' +
           '<p id="pdf-status" style="font-size:13px;color:var(--muted);margin:12px 0 0"></p>' +
@@ -539,10 +539,147 @@
     });
   }
 
+  function normalizeOcrContacts(data) {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.contacts)) return data.contacts;
+    if (Array.isArray(data.leads)) return data.leads;
+    if (data.contact && typeof data.contact === 'object') return [data.contact];
+    if (data.name || data.Name || data.email || data.Email) return [data];
+    return [];
+  }
+
+  function mapOcrContact(c) {
+    c = c || {};
+    return {
+      name: c.name || c.Name || c.full_name || '',
+      full_name: c.name || c.Name || c.full_name || '',
+      email: String(c.email || c.Email || '').toLowerCase().trim(),
+      phone: c.phone || c.Phone || '',
+      company: c.company || c.Company || '',
+      designation: c.designation || c.Designation || c.title || '',
+      website: c.website || c.Website || '',
+      source: 'pdf',
+      notes: c.notes || c.Notes || '',
+    };
+  }
+
+  async function importOcrContacts(contacts) {
+    var ok = 0, fail = 0, dup = 0, skipped = 0;
+    var existingLeads = await loadSheetLeads(true);
+    var seenEmails = {};
+    for (var i = 0; i < contacts.length; i++) {
+      var row = mapOcrContact(contacts[i]);
+      if (!row.full_name && !row.email && !row.company && !row.phone) { skipped++; continue; }
+      if (leadContactValid(row.full_name, row.email, row.company)) { skipped++; continue; }
+      var emailKey = String(row.email || '').trim().toLowerCase();
+      if (emailKey) {
+        if (seenEmails[emailKey] || PS2Sheet.findLeadByEmail(existingLeads, emailKey)) {
+          dup++;
+          continue;
+        }
+        seenEmails[emailKey] = true;
+      }
+      var res = await PS2Api.addLeadToSheet(row);
+      if (res.ok) {
+        ok++;
+        if (row.website && row.email) PS2Api.enrichWebsite(row.email, row.website);
+      } else fail++;
+    }
+    return { ok: ok, fail: fail, dup: dup, skipped: skipped };
+  }
+
   async function handlePdfFiles(fileList) {
-    toast('Card PDF OCR is handled by n8n now. Import via Excel/CSV or Add Lead.', true);
+    var files = Array.prototype.slice.call(fileList || []);
     var status = $('pdf-status');
-    if (status) status.textContent = 'Use Excel/CSV tab or + Add Lead — portal no longer uploads to Supabase OCR.';
+    if (!files.length) return;
+    if (!PS2Api.cardOcr) {
+      toast('Card OCR webhook not configured', true);
+      return;
+    }
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i];
+      if (status) status.textContent = 'Preparing ' + f.name + '…';
+      try {
+        var isPdf = /pdf$/i.test(f.type || '') || /\.pdf$/i.test(f.name || '');
+        var payload;
+        if (isPdf) {
+          if (status) status.textContent = 'Reading pages in ' + f.name + '…';
+          var pages = await pdfFileToPngPages(f);
+          if (!pages.length) throw new Error('No pages');
+          // Prefer page PNGs for Claude vision (skip bulky raw PDF bytes)
+          payload = {
+            filename: f.name,
+            content_type: 'application/pdf',
+            page_count: pages.length,
+            pages: pages.map(function(b64, idx) {
+              return { page: idx + 1, content_type: 'image/png', content_base64: b64 };
+            }),
+          };
+          if (status) status.textContent = 'OCR via n8n · ' + pages.length + ' page(s) from ' + f.name + '…';
+        } else {
+          var imgB64 = await fileToBase64(f);
+          payload = {
+            filename: f.name,
+            content_type: f.type || 'image/png',
+            content_base64: imgB64,
+            pages: [{ page: 1, content_type: f.type || 'image/png', content_base64: imgB64 }],
+          };
+          if (status) status.textContent = 'OCR via n8n · ' + f.name + '…';
+        }
+        var res = await PS2Api.cardOcr(payload);
+        var data = res.data || {};
+        var isAck = data.message && /workflow was started/i.test(String(data.message));
+        var contacts = normalizeOcrContacts(data);
+        var alreadyImported = Number(data.imported) || 0;
+
+        if (!res.ok) {
+          toast((data && data.error) || 'OCR upload failed — is /webhook/ps2-card-ocr Active?', true);
+          if (status) status.textContent = 'Failed: ' + ((data && data.error) || 'OCR error');
+          continue;
+        }
+
+        if (alreadyImported > 0 && !contacts.length) {
+          toast('Imported ' + alreadyImported + ' lead(s) from ' + f.name);
+          if (status) status.textContent = 'Imported ' + alreadyImported + ' from ' + f.name + ' → master sheet';
+          state.sheetFetchedAt = null;
+          continue;
+        }
+
+        if (contacts.length) {
+          if (status) status.textContent = 'Writing ' + contacts.length + ' contact(s) to master sheet…';
+          var result = await importOcrContacts(contacts);
+          if (result.ok) {
+            toast('Added ' + result.ok + ' lead(s) from ' + f.name +
+              (result.dup ? ' · ' + result.dup + ' duplicate email(s) skipped' : '') +
+              (result.fail ? ' · ' + result.fail + ' failed' : ''));
+            if (status) status.textContent = 'Imported ' + result.ok + '/' + contacts.length + ' from ' + f.name;
+            state.sheetFetchedAt = null;
+          } else {
+            toast('OCR found contacts but none were saved' +
+              (result.dup ? ' (duplicates)' : '') +
+              (result.skipped ? ' (incomplete)' : '') +
+              (result.fail ? ' (write failed)' : ''), true);
+            if (status) status.textContent = 'No new leads saved from ' + f.name;
+          }
+          continue;
+        }
+
+        if (isAck) {
+          toast('Queued for n8n OCR — refresh Leads in a moment');
+          if (status) status.textContent = 'Queued · n8n is extracting ' + f.name + ' (Respond Immediately mode)';
+          continue;
+        }
+
+        toast((data && data.message) || 'No contacts extracted from ' + f.name, true);
+        if (status) status.textContent = (data && data.message) || 'No contacts found';
+      } catch (err) {
+        console.error(err);
+        toast('Could not read ' + f.name, true);
+        if (status) status.textContent = 'Could not read file';
+      }
+    }
+    renderCapture();
   }
 
   function parseCsv(text) {
@@ -1302,6 +1439,7 @@
           '<div><strong>send_email</strong> · ' + esc(wh.send_email || '') + '</div>' +
           '<div><strong>process_replies</strong> · ' + esc(wh.process_replies || '') + '</div>' +
           '<div><strong>enrich_website</strong> · ' + esc(wh.enrich_website || '') + '</div>' +
+          '<div><strong>card_ocr</strong> · ' + esc(wh.card_ocr || '') + '</div>' +
         '</div>' +
       '</div>' +
       '<div class="settings-card">' +

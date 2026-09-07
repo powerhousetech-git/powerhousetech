@@ -113,6 +113,19 @@
     listEmails: function () { return portalData('email-log'); },
     portalSettings: function () { return portalData('settings'); },
 
+    // ─── CARD OCR (n8n Claude vision) ───
+    /** POST PNG/PDF page images to /webhook/ps2-card-ocr */
+    cardOcr: function (payload) {
+      return n8nWebhook(webhookPath('card_ocr'), Object.assign({
+        event: 'card.ocr',
+        triggered_at: new Date().toISOString(),
+      }, payload || {}));
+    },
+    /** Alias used by Capture upload flow */
+    ingestFile: function (payload) {
+      return this.cardOcr(payload);
+    },
+
     // ─── WRITES (n8n webhooks) ───
     addLeadToSheet: function (lead) {
       return n8nWebhook(webhookPath('add_lead'), toSheetPayload(lead, { action: 'create', event: 'lead.create' }));
