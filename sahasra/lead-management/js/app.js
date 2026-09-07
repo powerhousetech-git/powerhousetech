@@ -942,8 +942,16 @@
       (noEmail ? ' · ' + noEmail + ' skipped (no email)' : '') +
       (skippedValidation ? ' · ' + skippedValidation + ' skipped (invalid)' : '') +
       (fail ? ' · ' + fail + ' failed' : '');
-    if (ok) toast('Added ' + ok + ' lead(s) to sheet' + skipMsg);
-    else toast(lastErr || ('Import failed — is /webhook/ps2-add-lead Active in n8n?' + skipMsg), true);
+    if (ok) {
+      toast('Added ' + ok + ' lead(s) to sheet' + skipMsg);
+    } else if (fail) {
+      toast(lastErr || ('Import failed — is /webhook/ps2-add-lead Active in n8n?' + skipMsg), true);
+    } else if (dup || noEmail || skippedValidation) {
+      // Nothing new to write — not an n8n failure
+      toast('No new leads added' + skipMsg);
+    } else {
+      toast('No rows to import', true);
+    }
     state.excel = { headers: [], rows: [], mapping: {}, filename: '' };
     state.sheetFetchedAt = null;
     renderCapture();
