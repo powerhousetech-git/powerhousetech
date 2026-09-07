@@ -36,7 +36,23 @@
     try { data = await res.json(); } catch (_) {
       try { data = { raw: await res.text() }; } catch (_) { data = {}; }
     }
-    return { ok: res.ok, status: res.status, data: data };
+    var ackOnly = !!(data && data.message && /workflow was started/i.test(String(data.message)));
+    return { ok: res.ok, status: res.status, data: data, ackOnly: ackOnly };
+  }
+
+  function requireWriteConfirm(res, label) {
+    if (res && res.ackOnly) {
+      return {
+        ok: false,
+        status: res.status,
+        ackOnly: true,
+        data: {
+          error: (label || 'n8n write') + ' acknowledged but did not confirm sheet write — set Respond to Webhook after Sheets append',
+          message: res.data && res.data.message,
+        },
+      };
+    }
+    return res;
   }
 
   function webhookPath(key) {
