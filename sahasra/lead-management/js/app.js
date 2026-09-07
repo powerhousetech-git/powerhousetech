@@ -400,7 +400,7 @@
           '<div class="drop-zone" id="pdf-drop">' +
             '<div class="drop-zone-icon">📇</div>' +
             '<p><strong>Drop a business card photo or PDF</strong></p>' +
-            '<p>AI scans the card and extracts contact details (blurry cards OK)</p>' +
+            '<p>AI extracts contacts and saves them to the master sheet automatically</p>' +
             '<input type="file" id="pdf-file" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.heic,.heif,application/pdf,image/*" multiple hidden />' +
           '</div>' +
           '<p id="pdf-status" style="font-size:13px;color:var(--muted);margin:12px 0 0"></p>' +
@@ -575,67 +575,55 @@
     return mapOcrContact(data);
   }
 
-  function renderOcrResults(extractedLeads) {
+  async function autoImportOcrLeads(extractedLeads) {
+    var ok = 0, fail = 0, dup = 0, skipped = 0;
+    var existingLeads = await loadSheetLeads(true);
+    var seenEmails = {};
+    var imported = [];
+    for (var i = 0; i < extractedLeads.length; i++) {
+      var row = mapOcrContact(extractedLeads[i]);
+      row.source = 'pdf';
+      if (!row.full_name && !row.email && !row.company && !row.phone) { skipped++; continue; }
+      if (leadContactValid(row.full_name, row.email, row.company)) { skipped++; continue; }
+      var emailKey = String(row.email || '').trim().toLowerCase();
+      if (emailKey) {
+        if (seenEmails[emailKey] || PS2Sheet.findLeadByEmail(existingLeads, emailKey)) {
+          dup++;
+          continue;
+        }
+        seenEmails[emailKey] = true;
+      }
+      var res = await PS2Api.addLeadToSheet(row);
+      if (res.ok) {
+        ok++;
+        imported.push(row);
+        if (emailKey) existingLeads.push(row);
+        if (row.website && row.email) PS2Api.enrichWebsite(row.email, row.website);
+      } else fail++;
+    }
+    return { ok: ok, fail: fail, dup: dup, skipped: skipped, imported: imported };
+  }
+
+  function renderOcrSummary(result, extractedLeads) {
     var resultsEl = $('ocr-results');
     if (!resultsEl) return;
-    state.ocrExtractedLeads = extractedLeads || [];
-    if (!extractedLeads.length) {
-      resultsEl.innerHTML = '';
-      return;
-    }
-    resultsEl.innerHTML = extractedLeads.map(function(lead, i) {
-      return '<div class="panel" style="margin-bottom:12px;padding:14px">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px">' +
-          '<strong>' + esc(lead._source_label || ('Card ' + (i + 1))) + '</strong>' +
-          '<button type="button" class="btn btn-primary btn-sm" data-ocr-add="' + i + '">+ Add Lead</button>' +
-        '</div>' +
-        '<div style="display:grid;grid-template-columns:120px 1fr;gap:4px 12px;font-size:13px">' +
-          '<span style="color:var(--muted)">Name</span><span>' + esc(lead.name || lead.full_name) + '</span>' +
-          '<span style="color:var(--muted)">Email</span><span>' + esc(lead.email) + '</span>' +
-          '<span style="color:var(--muted)">Phone</span><span>' + esc(lead.phone) + '</span>' +
-          '<span style="color:var(--muted)">Company</span><span>' + esc(lead.company) + '</span>' +
-          '<span style="color:var(--muted)">Designation</span><span>' + esc(lead.designation) + '</span>' +
-          '<span style="color:var(--muted)">Website</span><span>' + esc(lead.website) + '</span>' +
-        '</div></div>';
+    var lines = (extractedLeads || []).map(function(l) {
+      return '<li style="margin:0 0 6px">' +
+        '<strong>' + esc(l.full_name || l.name || '—') + '</strong>' +
+        (l.email ? ' · ' + esc(l.email) : '') +
+        (l.company ? ' · ' + esc(l.company) : '') +
+        '</li>';
     }).join('');
-
-    resultsEl.querySelectorAll('[data-ocr-add]').forEach(function(btn) {
-      btn.addEventListener('click', async function() {
-        var li = parseInt(btn.dataset.ocrAdd, 10);
-        var lead = (state.ocrExtractedLeads || [])[li];
-        if (!lead) return;
-        var err = leadContactValid(lead.full_name || lead.name, lead.email, lead.company);
-        if (err) { toast(err, true); return; }
-        if (lead.email) {
-          var existing = await loadSheetLeads(false);
-          if (PS2Sheet.findLeadByEmail(existing, lead.email)) {
-            toast('Duplicate lead — email already exists in master sheet', true);
-            return;
-          }
-        }
-        btn.disabled = true;
-        btn.textContent = 'Adding…';
-        var payload = mapOcrContact(lead);
-        payload.source = 'pdf';
-        try {
-          var addRes = await PS2Api.addLeadToSheet(payload);
-          if (addRes.ok) {
-            btn.textContent = 'Added ✓';
-            toast((payload.full_name || payload.email || 'Lead') + ' added to master sheet');
-            state.sheetFetchedAt = null;
-            if (payload.website && payload.email) PS2Api.enrichWebsite(payload.email, payload.website);
-          } else {
-            btn.disabled = false;
-            btn.textContent = '+ Add Lead';
-            toast((addRes.data && addRes.data.error) || 'Failed to add lead', true);
-          }
-        } catch (e) {
-          btn.disabled = false;
-          btn.textContent = '+ Add Lead';
-          toast('Error adding lead: ' + (e && e.message ? e.message : e), true);
-        }
-      });
-    });
+    resultsEl.innerHTML =
+      '<div class="panel" style="padding:14px">' +
+        '<p style="margin:0 0 8px;font-size:13px">Saved to master sheet automatically. Edit rows there if anything needs fixing.</p>' +
+        '<ul style="margin:0;padding-left:18px;font-size:13px">' + lines + '</ul>' +
+        '<p style="margin:10px 0 0;font-size:12px;color:var(--muted)">' +
+          (result.ok || 0) + ' added' +
+          (result.dup ? ' · ' + result.dup + ' duplicate email(s) skipped' : '') +
+          (result.skipped ? ' · ' + result.skipped + ' incomplete skipped' : '') +
+          (result.fail ? ' · ' + result.fail + ' failed' : '') +
+        '</p></div>';
   }
 
   async function handlePdfFiles(fileList) {
@@ -681,7 +669,6 @@
       var img = allImages[idx];
       if (status) status.textContent = 'Scanning card ' + (idx + 1) + ' of ' + allImages.length + '…';
       try {
-        // Claude n8n WF expects { image_base64 } per page/image
         var res = await PS2Api.cardOcr({ image_base64: img.base64, filename: img.label });
         if (!res.ok) {
           toast('Card ' + (idx + 1) + ': ' + ((res.data && res.data.error) || 'OCR failed'), true);
@@ -708,8 +695,27 @@
       return;
     }
 
-    if (status) status.textContent = extractedLeads.length + ' contact(s) extracted. Review below and click Add to save.';
-    renderOcrResults(extractedLeads);
+    if (status) status.textContent = 'Saving ' + extractedLeads.length + ' contact(s) to master sheet…';
+    var result = await autoImportOcrLeads(extractedLeads);
+    state.sheetFetchedAt = null;
+
+    if (result.ok) {
+      toast('Added ' + result.ok + ' lead(s) from card scan' +
+        (result.dup ? ' · ' + result.dup + ' duplicate(s) skipped' : '') +
+        (result.fail ? ' · ' + result.fail + ' failed' : ''));
+      if (status) status.textContent = result.ok + ' lead(s) saved to master sheet.';
+      renderOcrSummary(result, result.imported.length ? result.imported : extractedLeads);
+      // Refresh sheet-backed views / embed
+      try { await refreshAfterSheetWrite(); } catch (_) {}
+      if (state.view === 'leads') refreshSheetEmbed();
+    } else {
+      toast('No new leads saved' +
+        (result.dup ? ' (duplicates)' : '') +
+        (result.skipped ? ' (incomplete)' : '') +
+        (result.fail ? ' (write failed)' : ''), true);
+      if (status) status.textContent = 'No new leads saved.';
+      renderOcrSummary(result, extractedLeads);
+    }
   }
 
   function parseCsv(text) {
