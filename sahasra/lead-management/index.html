@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/sahasra/lead-management/css/ps2.css?v=6h">
+  <link rel="stylesheet" href="/sahasra/lead-management/css/ps2.css?v=7a">
 </head>
 <body>
 
@@ -20,24 +20,10 @@
       <p class="gate-logo">Sahasra Group · PS2</p>
       <h1>Lead Management Portal</h1>
       <p class="gate-sub">Built by PowerhouseTech</p>
-      <form id="login-form" class="login-form">
-        <label>Username
-          <input name="username" id="login-username" autocomplete="username" required />
-        </label>
-        <label>Password
-          <div class="password-field">
-            <input name="password" id="login-password" type="password" autocomplete="current-password" required />
-            <button type="button" class="btn btn-ghost btn-sm password-toggle" onclick="window.PS2App && window.PS2App.togglePassword('login-password', this)">Show</button>
-          </div>
-        </label>
-        <button type="submit" class="btn btn-primary btn-block" id="btn-login">Sign In</button>
+      <p class="gate-sub" style="margin-top:12px">Opening portal…</p>
+      <form id="login-form" class="login-form" style="display:none">
+        <button type="submit" class="btn btn-primary btn-block" id="btn-login">Enter</button>
       </form>
-      <details class="demo-creds">
-        <summary>Demo credentials</summary>
-        <p><strong>Admin:</strong> sahasra_admin / sahasra_admin</p>
-        <p><strong>Employee:</strong> sahasra_employee / sahasra_employee</p>
-        <p><strong>PT Admin:</strong> pt_admin / pt_admin</p>
-      </details>
     </div>
   </div>
 
@@ -89,30 +75,15 @@
           </a>
         </div>
 
-        <div class="nav-section" data-role="sahasra_admin,sahasra_employee">
-          <div class="nav-label">Segment 2 — Projects</div>
-          <a href="#tracker" class="nav-link" data-view="tracker"
-             data-role="sahasra_admin,sahasra_employee">
-            <span class="icon">📦</span> Client Tracker <span style="opacity:.65;font-size:10px">(projects)</span>
-          </a>
-        </div>
 
         <div class="nav-section">
           <div class="nav-label">Settings</div>
-          <a href="#users" class="nav-link" data-view="users"
-             data-role="sahasra_admin">
-            <span class="icon">👤</span> Users
-          </a>
-          <a href="#outlook" class="nav-link" data-view="outlook"
-             data-role="sahasra_admin">
-            <span class="icon">📧</span> Outlook
-          </a>
           <a href="#sheets" class="nav-link" data-view="sheets"
              data-role="sahasra_admin">
             <span class="icon">📄</span> Google Sheets
           </a>
           <a href="#settings" class="nav-link" data-view="settings"
-             data-role="pt_admin">
+             data-role="sahasra_admin,pt_admin">
             <span class="icon">🔧</span> System Settings
           </a>
         </div>
@@ -135,9 +106,9 @@
 
   <div id="toast" class="toast"></div>
 
-  <script src="/sahasra/lead-management/js/config.js?v=6h"></script>
-  <script src="/sahasra/lead-management/js/api.js?v=6h"></script>
-  <script src="/sahasra/lead-management/js/sheet.js?v=6h"></script>
-  <script src="/sahasra/lead-management/js/app.js?v=6h"></script>
+  <script src="/sahasra/lead-management/js/config.js?v=7a"></script>
+  <script src="/sahasra/lead-management/js/api.js?v=7a"></script>
+  <script src="/sahasra/lead-management/js/sheet.js?v=7a"></script>
+  <script src="/sahasra/lead-management/js/app.js?v=7a"></script>
 </body>
 </html>

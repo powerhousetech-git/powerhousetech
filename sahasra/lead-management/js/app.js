@@ -12,10 +12,33 @@
     selectedLead: null,
     selectedProject: null,
     reviewDrafts: [],
-    captureTab: 'pdf',
+    captureTab: 'excel',
     excel: { headers: [], rows: [], mapping: {}, filename: '' },
     sheetFetchedAt: null,
   };
+
+  function normalizeSheetLead(row) {
+    row = row || {};
+    return {
+      id: (row.Email || row.Email || row.Email || '').toLowerCase().trim() || (row.Name || row.name || ''),
+      name: row.Name || row.name || '',
+      full_name: row.Name || row.name || row.full_name || '',
+      email: (row.Email || row.email || '').toLowerCase().trim(),
+      phone: row.Phone || row.phone || '',
+      company: row.Company || row.company || '',
+      designation: row.Designation || row.designation || '',
+      website: row.Website || row.website || '',
+      source: row.Source || row.source || 'manual',
+      status: String(row.Status || row.status || 'new').toLowerCase().trim().replace(/\s+/g, '_'),
+      follow_up_count: row['Follow Up Count'] || row.follow_up_count || '0',
+      website_summary: row['Website Summary'] || row.website_summary || '',
+      last_email_sent: row['Last Email Sent'] || row.last_email_sent || '',
+      created_at: row['Created At'] || row.created_at || '',
+      notes: row.Notes || row.notes || '',
+      updated_at: row['Updated At'] || row.updated_at || '',
+      last_activity_at: row['Last Activity'] || row.last_activity_at || '',
+    };
+  }
 
   async function loadSheetLeads(force) {
     if (!force && state.leads && state.leads.length && state.sheetFetchedAt && (Date.now() - state.sheetFetchedAt) < 15000) {
@@ -23,10 +46,18 @@
     }
     var res = await PS2Api.sheetLeads();
     if (!res.ok) {
-      toast((res.data && res.data.error) || 'Could not load master sheet', true);
+      toast((res.data && (res.data.error || res.data.message)) || 'Could not load master sheet', true);
       return state.leads || [];
     }
-    var leads = (res.data.data && res.data.data.leads) || [];
+    if (res.data && res.data.message && /workflow was started/i.test(String(res.data.message))) {
+      toast('n8n portal_data returned an ack only — set the webhook to Respond to Webhook with sheet rows', true);
+      return state.leads || [];
+    }
+    var raw = Array.isArray(res.data) ? res.data
+      : (res.data && Array.isArray(res.data.leads) ? res.data.leads
+        : (res.data && res.data.data && Array.isArray(res.data.data.leads) ? res.data.data.leads
+          : (res.data && Array.isArray(res.data.data) ? res.data.data : [])));
+    var leads = raw.map(normalizeSheetLead).filter(function(l){ return l.email || l.full_name || l.company; });
     state.leads = leads;
     state.leadsTotal = leads.length;
     state.sheetFetchedAt = Date.now();
@@ -113,19 +144,22 @@
     var btn = $('btn-login');
     if (btn) btn.disabled = true;
     try {
-      var res = await PS2Api.login(username, password);
-      if (!res.ok) { toast(res.data.error || 'Login failed', true); return; }
-      PS2Api.setToken(res.data.token);
-      await enterApp(res.data.user);
+      // Local gate only — Supabase auth retired
+      await enterApp({
+        role: 'sahasra_admin',
+        username: username || 'admin',
+        full_name: username || 'Admin',
+      });
     } finally { if (btn) btn.disabled = false; }
   }
 
   async function bootSession() {
-    var token = PS2Api.getToken();
-    if (!token) { show('gate-view'); return; }
-    var res = await PS2Api.me();
-    if (res.ok) { await enterApp(res.data.user); }
-    else { PS2Api.clearToken(); show('gate-view'); }
+    // Option A: no Supabase auth — enter as sahasra_admin (portal URL is private)
+    await enterApp({
+      role: 'sahasra_admin',
+      username: 'admin',
+      full_name: 'Admin',
+    });
   }
 
   async function enterApp(user) {
@@ -183,9 +217,20 @@
   ──────────────────────────────────────────────────────────────────────────── */
   async function renderDashboard() {
     var main = $('main-content');
-    var [leads, actRes] = await Promise.all([loadSheetLeads(true), PS2Api.activity(20)]);
+    var [leads, emailLogRes] = await Promise.all([loadSheetLeads(true), PS2Api.listEmails()]);
     var s = PS2Sheet.computeKpis(leads);
-    var activity = (actRes.ok && actRes.data.data) || [];
+    var emailLog = Array.isArray(emailLogRes.data) ? emailLogRes.data
+      : (emailLogRes.data && Array.isArray(emailLogRes.data.data) ? emailLogRes.data.data : []);
+    var activity = emailLog
+      .slice()
+      .sort(function(a, b) { return new Date(b.timestamp || b.sent_at || b.received_at || b.created_at || 0) - new Date(a.timestamp || a.sent_at || a.received_at || a.created_at || 0); })
+      .slice(0, 20)
+      .map(function(e) {
+        return {
+          summary: (e.direction === 'outbound' ? 'Sent' : 'Received') + ' email: ' + (e.subject || '(no subject)') + ' → ' + (e.lead_email || e.to_email || e.from_email || ''),
+          created_at: e.timestamp || e.sent_at || e.received_at || e.created_at,
+        };
+      });
     var funnel = s.funnel || [];
     var maxFunnel = Math.max(1, ...funnel.map(function(f){ return f.count; }));
 
@@ -240,13 +285,12 @@
       '<div style="padding:14px 18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">' +
         '<button class="btn btn-primary btn-sm" id="n8n-btn-send_email" onclick="window.PS2App.triggerN8n(\'send_email\')">Run email sequence</button>' +
         '<button class="btn btn-sm" id="n8n-btn-process_replies" onclick="window.PS2App.triggerN8n(\'process_replies\')">Re-run reply ingest</button>' +
-        '<button class="btn btn-sm" id="n8n-btn-sync_sheets" onclick="window.PS2App.triggerN8n(\'sync_sheets\')">Sync Google Sheets</button>' +
         '<span id="n8n-run-status" style="font-size:12px;color:var(--muted)"></span>' +
       '</div>' +
       '<div style="padding:0 18px 14px;font-size:12px;color:var(--muted);line-height:1.55">' +
         '<p style="margin:0 0 6px"><strong style="color:var(--text)">Adding a lead does not send mail by itself.</strong> Outbound runs on the n8n schedule (Workflow A) or when you click <em>Run email sequence</em>.</p>' +
         '<p style="margin:0 0 6px"><strong style="color:var(--text)">Run email sequence</strong> fires immediately. n8n asks who is due (<code>leads-ready-to-send</code>) — only those contacts get mail (skips responded / meeting / converted / discarded and anyone not yet due for the next step).</p>' +
-        '<p style="margin:0"><strong style="color:var(--text)">Re-run reply ingest</strong> also fires immediately — pulls Outlook replies now and updates matching leads. Website enrichment still runs when a lead with a website is saved.</p>' +
+        '<p style="margin:0"><strong style="color:var(--text)">Re-run reply ingest</strong> also fires immediately — pulls Outlook replies now and updates matching leads. Website enrichment still runs when a lead with a website is saved. Sync Sheets is managed in n8n (WF-C retired from portal).</p>' +
       '</div></div>';
   }
 
@@ -265,9 +309,6 @@
         triggered_by: state.user && state.user.username,
         triggered_at: new Date().toISOString(),
       });
-      if (!res.ok) {
-        res = await PS2Api.triggerN8n({ workflow: workflow });
-      }
       if (!res.ok) {
         toast((res.data && res.data.error) || 'Trigger failed — is the workflow Active?', true);
         if (status) status.textContent = 'Error';
@@ -310,13 +351,13 @@
 
   async function renderCapture() {
     var main = $('main-content');
-    var tab = state.captureTab || 'pdf';
-    var batchesRes = await PS2Api.uploadBatches();
-    var batches = (batchesRes.ok && batchesRes.data.data) || [];
+    var tab = state.captureTab || 'excel';
+    var batchesRes = { ok: true, data: [] };
+    var batches = Array.isArray(batchesRes.data) ? batchesRes.data : ((batchesRes.data && batchesRes.data.data) || []);
     var tabs = [
-      { id: 'pdf', label: 'Business cards (PDF)' },
+      { id: 'pdf', label: 'Business cards (info)' },
       { id: 'excel', label: 'Excel / CSV' },
-      { id: 'sheets', label: 'Field team sheets' },
+      { id: 'sheets', label: 'Master sheet' },
     ];
     main.innerHTML =
       '<div class="page-head"><div><h1 class="page-title">Capture</h1>' +
@@ -357,7 +398,7 @@
         '<div style="padding:18px">' +
           '<div class="drop-zone" id="pdf-drop">' +
             '<div class="drop-zone-icon">📇</div>' +
-            '<p><strong>Drop any card photo or PDF here</strong></p>' +
+            '<p><strong>Use Excel/CSV import or + Add Lead</strong></p>' +
             '<p>Any photo or PDF — we always try to scan contact details (blurry cards OK)</p>' +
             '<input type="file" id="pdf-file" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.heic,.heif,application/pdf,image/*" multiple hidden />' +
           '</div>' +
@@ -414,24 +455,13 @@
   }
 
   async function renderSheetsCapture(el) {
-    var res = await PS2Api.sheetConnections();
-    var conns = (res.ok && res.data.data) || [];
-    var addBtn = state.user && state.user.role !== 'pt_admin'
-      ? '<button class="btn btn-primary btn-sm" onclick="window.PS2App.openAddSheet()">+ Connect Sheet</button>' : '';
+    var sheetUrl = (window.PS2 && PS2.SHEET_URL) || '';
     el.innerHTML =
-      '<div class="page-head" style="margin-bottom:14px"><div>' +
-        '<p class="page-sub" style="margin:0">Website enquiry forms and other live sheets. n8n Workflow C pulls new rows every 6 hours (or the interval you set).</p></div>' + addBtn + '</div>' +
-      '<div class="panel"><table class="data-table"><thead><tr><th>Sheet URL</th><th>Tab</th><th>Sync Interval</th><th>Last Synced</th><th>Active</th><th></th></tr></thead><tbody>' +
-        conns.map(function(c){
-          return '<tr><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis"><a href="' + esc(c.sheet_url) + '" target="_blank" style="color:var(--gold)">' + esc((c.sheet_url||'').slice(0,56)) + '…</a></td>' +
-            '<td>' + esc(c.tab_name||'—') + '</td>' +
-            '<td>' + c.sync_interval_hours + 'h</td>' +
-            '<td>' + relTime(c.last_synced_at) + '</td>' +
-            '<td><label><input type="checkbox" ' + (c.is_active?'checked':'') + ' onchange="window.PS2App.toggleSheet(\'' + c.id + '\',this.checked)" /></label></td>' +
-            '<td><button class="btn-icon btn-danger" onclick="window.PS2App.deleteSheet(\'' + c.id + '\')">✕</button></td></tr>';
-        }).join('') +
-      (conns.length===0?'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">No connections yet — website queries land here once a sheet is connected</td></tr>':'') +
-      '</tbody></table></div>';
+      '<div class="panel" style="padding:18px">' +
+        '<h2 style="margin:0 0 8px;font-size:16px">Master Google Sheet</h2>' +
+        '<p style="font-size:13px;color:var(--muted);margin:0 0 12px">Field-team sheet connections are managed in n8n. The portal uses one master sheet.</p>' +
+        '<a class="btn btn-sm" href="' + esc(sheetUrl) + '" target="_blank" rel="noopener">Open master sheet</a>' +
+      '</div>';
   }
 
   function bindDropZone(zone, input, onFiles) {
@@ -510,63 +540,9 @@
   }
 
   async function handlePdfFiles(fileList) {
-    var files = Array.prototype.slice.call(fileList || []);
+    toast('Card PDF OCR is handled by n8n now. Import via Excel/CSV or Add Lead.', true);
     var status = $('pdf-status');
-    if (!files.length) return;
-    for (var i = 0; i < files.length; i++) {
-      var f = files[i];
-      if (status) status.textContent = 'Uploading + extracting ' + f.name + '…';
-      try {
-        var isPdf = /pdf$/i.test(f.type || '') || /\.pdf$/i.test(f.name || '');
-        var payload;
-        if (isPdf) {
-          // One batch for the whole PDF: keep original filename, attach page images
-          if (status) status.textContent = 'Reading pages in ' + f.name + '…';
-          var pages = await pdfFileToPngPages(f);
-          if (!pages.length) throw new Error('No pages');
-          payload = {
-            filename: f.name,
-            content_type: 'application/pdf',
-            content_base64: await fileToBase64(f),
-            pages: pages.map(function(b64, idx) {
-              return { page: idx + 1, content_type: 'image/png', content_base64: b64 };
-            }),
-          };
-          if (status) status.textContent = 'Extracting ' + pages.length + ' card(s) from ' + f.name + '…';
-        } else {
-          payload = {
-            filename: f.name,
-            content_type: f.type || 'image/png',
-            content_base64: await fileToBase64(f),
-          };
-        }
-        var res = await PS2Api.ingestFile(payload);
-        if (!res.ok) {
-          toast((res.data && res.data.error) || 'Upload failed', true);
-          if (status) status.textContent = 'Failed: ' + ((res.data && res.data.error) || 'upload error');
-          continue;
-        }
-        var d = (res.data && res.data.data) || {};
-        var imported = Number(d.imported) || 0;
-        var extracted = Number(d.extracted) || imported;
-        var msg = d.message || ('Uploaded ' + f.name);
-        if (imported > 0) {
-          toast(msg);
-          if (status) status.textContent = 'Imported ' + imported + '/' + extracted + ' from ' + f.name + ' → master sheet';
-        } else if (d.forwarded) {
-          toast(msg);
-          if (status) status.textContent = 'Queued for n8n OCR';
-        } else {
-          toast(msg, true);
-          if (status) status.textContent = msg;
-        }
-      } catch (err) {
-        console.error(err);
-        toast('Could not read ' + f.name, true);
-        if (status) status.textContent = 'Could not read file';
-      }
-    }
-    renderCapture();
+    if (status) status.textContent = 'Use Excel/CSV tab or + Add Lead — portal no longer uploads to Supabase OCR.';
   }
 
   function parseCsv(text) {
@@ -758,12 +734,13 @@
     // Emails may still live in Supabase keyed by legacy UUID — try by email filter if supported
     var emails = [];
     try {
-      var emailsRes = await PS2Api.listEmails(null);
+      var emailsRes = await PS2Api.listEmails();
       if (emailsRes.ok) {
-        var all = emailsRes.data.data || [];
+        var all = Array.isArray(emailsRes.data) ? emailsRes.data
+          : (emailsRes.data && Array.isArray(emailsRes.data.data) ? emailsRes.data.data : []);
         var em = String(lead.email || '').toLowerCase();
         emails = all.filter(function(e){
-          var to = String(e.to_email || e.from_email || e.lead_email || '').toLowerCase();
+          var to = String(e.lead_email || e.to_email || e.from_email || '').toLowerCase();
           return em && (to === em || (e.lead_id && e.lead_id === lead.id));
         });
       }
@@ -1067,8 +1044,12 @@
   ──────────────────────────────────────────────────────────────────────────── */
   async function renderReviewDrafts() {
     var main = $('main-content');
-    var res = await PS2Api.reviewDrafts();
-    var drafts = (res.ok && res.data.data) || [];
+    var res = await PS2Api.listEmails();
+    var allEmails = Array.isArray(res.data) ? res.data
+      : (res.data && Array.isArray(res.data.data) ? res.data.data : []);
+    var drafts = allEmails.filter(function(e) {
+      return e.status === 'pending_review' || e.is_ai_draft === true || e.is_ai_draft === 'TRUE';
+    });
     state.reviewDrafts = drafts;
 
     main.innerHTML =
@@ -1200,6 +1181,11 @@
 
   async function renderTracker() {
     var main = $('main-content');
+    main.innerHTML = '<div class="page-head"><div><h1 class="page-title">Client Tracker</h1>' +
+      '<p class="page-sub">Project tracker moved off Supabase. Rebuild on a Google Sheet tab if needed — currently managed in n8n.</p></div></div>';
+    return;
+
+    var main = $('main-content');
     var res = await PS2Api.listProjects();
     var projects = (res.ok && res.data.data) || [];
     state.projects = projects;
@@ -1246,7 +1232,19 @@
   async function renderMailConfig() {
     var main = $('main-content');
     var res = await PS2Api.mailConfig();
-    var steps = (res.ok && res.data.data) || [];
+    var rawSteps = Array.isArray(res.data) ? res.data
+      : (res.data && Array.isArray(res.data.data) ? res.data.data : []);
+    var steps = rawSteps.map(function(s) {
+      return {
+        step_number: parseInt(s.step_number, 10) || 0,
+        is_active: String(s.is_active).toUpperCase() === 'TRUE' || s.is_active === true,
+        label: s.label || '',
+        subject_template: s.subject_template || '',
+        day_offset: parseInt(s.day_offset, 10) || 0,
+        body_template: s.body_template || s.body_template_notes || '',
+        body_template_notes: s.body_template_notes || '',
+      };
+    });
     state.mailConfig = steps;
     var isAdmin = state.user && state.user.role === 'sahasra_admin';
 
@@ -1273,47 +1271,56 @@
   async function renderSettings() {
     var main = $('main-content');
     var res = await PS2Api.getSettings();
-    var s = (res.ok && res.data.data) || {};
-    var h = s.health || {};
+    var rawSettings = Array.isArray(res.data) ? res.data
+      : (res.data && Array.isArray(res.data.data) ? res.data.data : []);
+    var s = {};
+    if (rawSettings.length) {
+      rawSettings.forEach(function(row) {
+        if (row.key) s[row.key] = row.value != null ? row.value : '';
+      });
+    } else if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+      s = res.data.data || res.data || {};
+    }
+    var wh = (window.PS2 && PS2.N8N_WEBHOOKS) || {};
+    var rowsHtml = Object.keys(s).length
+      ? Object.keys(s).map(function(k){
+          return '<tr><td style="font-family:monospace;font-size:12px">' + esc(k) + '</td><td style="font-size:13px">' + esc(String(s[k])) + '</td></tr>';
+        }).join('')
+      : '<tr><td colspan="2" style="color:var(--muted);padding:16px;text-align:center">No rows from portal_data?op=settings yet</td></tr>';
 
     main.innerHTML =
-      '<div class="page-head"><div><h1 class="page-title">System Settings</h1><p class="page-sub">PowerhouseTech admin — n8n config, prompts, health</p></div></div>' +
-
+      '<div class="page-head"><div><h1 class="page-title">System Settings</h1>' +
+        '<p class="page-sub">Read from Google Sheet Settings tab via n8n · writes go through update-lead</p></div></div>' +
       '<div class="settings-card">' +
-        '<h3>System Health</h3>' +
-        healthRow('n8n API Key', h.n8n_api_key_configured) +
-        healthRow('Anthropic API Key', h.anthropic_key_configured) +
-        healthRow('Supabase Service Key', h.supabase_service_key_configured) +
+        '<h3>Portal ↔ n8n</h3>' +
+        '<p style="font-size:13px;color:var(--muted);margin:0 0 8px">Backend is n8n + Google Sheets. Supabase Edge Function is retired.</p>' +
+        '<div style="font-size:12px;line-height:1.7">' +
+          '<div><strong>N8N_BASE</strong> · ' + esc((window.PS2 && PS2.N8N_BASE) || '') + '</div>' +
+          '<div><strong>portal_data</strong> · ' + esc(wh.portal_data || '') + '</div>' +
+          '<div><strong>add_lead</strong> · ' + esc(wh.add_lead || '') + '</div>' +
+          '<div><strong>update_lead</strong> · ' + esc(wh.update_lead || '') + '</div>' +
+          '<div><strong>send_email</strong> · ' + esc(wh.send_email || '') + '</div>' +
+          '<div><strong>process_replies</strong> · ' + esc(wh.process_replies || '') + '</div>' +
+          '<div><strong>enrich_website</strong> · ' + esc(wh.enrich_website || '') + '</div>' +
+        '</div>' +
       '</div>' +
-
       '<div class="settings-card">' +
-        '<h3>n8n Webhook URLs</h3>' +
-        webhookField('Send Email Webhook (Workflow A)', 'wh-send-email', s.n8n_webhooks && s.n8n_webhooks.send_email) +
-        webhookField('Reply Processing Webhook (Workflow B)', 'wh-process-replies', s.n8n_webhooks && s.n8n_webhooks.process_replies) +
-        webhookField('Google Sheets Sync Webhook (Workflow C)', 'wh-sync-sheets', s.n8n_webhooks && s.n8n_webhooks.sync_sheets) +
-        webhookField('Website Enrichment Webhook (Workflow D)', 'wh-enrich-website', s.n8n_webhooks && s.n8n_webhooks.enrich_website) +
-        webhookField('Add Lead Webhook (portal → sheet)', 'wh-add-lead', s.n8n_webhooks && s.n8n_webhooks.add_lead) +
-        webhookField('Update Lead Webhook (portal → sheet)', 'wh-update-lead', s.n8n_webhooks && s.n8n_webhooks.update_lead) +
-        webhookField('PDF Card Extraction Webhook (optional)', 'wh-extract-pdf', s.n8n_webhooks && s.n8n_webhooks.extract_pdf) +
-        '<p style="font-size:12px;color:var(--muted);margin:8px 0 0">v6: lead master DB is the Google Sheet. Portal writes via add/update-lead webhooks. Reply ingest is polled by n8n (Gmail).</p>' +
+        '<h3>Sheet settings (key / value)</h3>' +
+        '<table class="data-table"><thead><tr><th>Key</th><th>Value</th></tr></thead><tbody>' + rowsHtml + '</tbody></table>' +
       '</div>' +
-
       '<div class="settings-card">' +
-        '<h3>n8n API key</h3>' +
-        healthRow('Shared key (n8n ↔ portal)', h.n8n_api_key_configured) +
-        '<label style="font-size:12px;color:var(--muted);display:block;margin:10px 0 4px">Set or rotate key (leave blank to keep current)</label>' +
-        '<input id="n8n-api-key" type="password" autocomplete="off" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font:inherit;font-size:13px" placeholder="Paste N8N_API_KEY" />' +
+        '<h3>Booking link</h3>' +
+        '<label class="field-label">URL<input id="booking-link" value="' + esc(s.booking_link || s.booking_url || '') + '" placeholder="https://calendly.com/…" /></label>' +
+        '<button class="btn btn-primary btn-sm" onclick="window.PS2App.saveBookingLink()">Save booking link</button>' +
       '</div>' +
-
       '<div class="settings-card">' +
-        '<h3>AI Prompt Templates</h3>' +
+        '<h3>AI prompts (optional)</h3>' +
         promptField('First Email Prompt', 'pt-first-email', s.ai_prompt_first_email) +
         promptField('Reply Draft Prompt', 'pt-reply', s.ai_prompt_reply) +
         promptField('Sentiment Classification Prompt', 'pt-sentiment', s.ai_prompt_sentiment) +
-      '</div>' +
-
-      '<div style="margin-top:4px"><button class="btn btn-primary" onclick="window.PS2App.saveSettings()">Save Settings</button></div>' +
-      '<div id="settings-msg" style="margin-top:10px;font-size:13px;color:var(--green)"></div>';
+        '<button class="btn btn-primary" onclick="window.PS2App.saveSettings()">Save prompts</button>' +
+        '<div id="settings-msg" style="margin-top:10px;font-size:13px;color:var(--green)"></div>' +
+      '</div>';
   }
 
   function healthRow(label, ok) {
@@ -1332,6 +1339,11 @@
      USERS / OUTLOOK / SHEETS (admin panels)
   ──────────────────────────────────────────────────────────────────────────── */
   async function renderUsers() {
+    var main = $('main-content');
+    main.innerHTML = '<div class="page-head"><div><h1 class="page-title">Users</h1>' +
+      '<p class="page-sub">User management retired with Supabase. Portal uses a local admin session.</p></div></div>';
+    return;
+
     if (!state.user || state.user.role !== 'sahasra_admin') return;
     var main = $('main-content');
     var res = await PS2Api.listUsers();
@@ -1351,6 +1363,11 @@
 
   async function renderOutlook() {
     var main = $('main-content');
+    main.innerHTML = '<div class="page-head"><div><h1 class="page-title">Outlook</h1>' +
+      '<p class="page-sub">Outlook OAuth is managed inside n8n credentials.</p></div></div>';
+    return;
+
+    var main = $('main-content');
     var res = await PS2Api.outlookAccounts();
     var accounts = (res.ok && res.data.data) || [];
     main.innerHTML =
@@ -1368,6 +1385,11 @@
   }
 
   async function renderSheets() {
+    var main = $('main-content');
+    main.innerHTML = '<div class="page-head"><div><h1 class="page-title">Google Sheets</h1>' +
+      '<p class="page-sub">One master sheet is configured in the portal. Field sync connections are managed in n8n.</p></div></div>';
+    return;
+
     var main = $('main-content');
     var [connRes, portalRes] = await Promise.all([PS2Api.sheetConnections(), PS2Api.portalSettings()]);
     var conns = (connRes.ok && connRes.data.data) || [];
@@ -1549,6 +1571,8 @@
   }
 
   async function submitAddProject() {
+    toast('Projects tracker retired', true); return;
+
     var body = {
       client_name: $('np-client').value.trim(),
       project_name: $('np-project').value.trim(),
@@ -1575,6 +1599,8 @@
   }
 
   async function submitAddUser() {
+    toast('User management retired', true); return;
+
     var body = {
       username: $('nu-uname').value.trim(),
       password: $('nu-pass').value,
@@ -1604,6 +1630,8 @@
   }
 
   async function submitAddSheet() {
+    toast('Sheet connections managed in n8n', true); return;
+
     var body = {
       sheet_url: $('ns-url').value.trim(),
       tab_name: $('ns-tab').value.trim() || 'Sheet1',
@@ -1671,27 +1699,18 @@
 
   async function saveSettings() {
     var body = {
-      n8n_webhooks: {
-        send_email: ($('wh-send-email') || {value:''}).value,
-        sync_sheets: ($('wh-sync-sheets') || {value:''}).value,
-        process_replies: ($('wh-process-replies') || {value:''}).value,
-        enrich_website: ($('wh-enrich-website') || {value:''}).value,
-        add_lead: ($('wh-add-lead') || {value:''}).value,
-        update_lead: ($('wh-update-lead') || {value:''}).value,
-        extract_pdf: ($('wh-extract-pdf') || {value:''}).value,
-      },
+      op: 'settings-update',
       ai_prompt_first_email: ($('pt-first-email') || {value:''}).value,
       ai_prompt_reply: ($('pt-reply') || {value:''}).value,
       ai_prompt_sentiment: ($('pt-sentiment') || {value:''}).value,
     };
-    var keyEl = $('n8n-api-key');
-    if (keyEl && keyEl.value.trim()) body.n8n_api_key = keyEl.value.trim();
     var res = await PS2Api.patchSettings(body);
-    if (!res.ok) { toast(res.data.error || 'Failed to save', true); return; }
+    if (!res.ok) { toast((res.data && res.data.error) || 'Failed to save', true); return; }
     toast('Settings saved');
     var msg = $('settings-msg');
     if (msg) { msg.textContent = 'Saved ✓ ' + new Date().toLocaleTimeString(); }
   }
+
 
   /* ─────────────────────────────────────────────────────────────────────────
      Lead / Project actions
@@ -1796,30 +1815,9 @@
   }
 
   async function submitLeadUpload() {
-    var leadId = ($('lu-lead') || {}).value;
-    var fileInput = $('lu-file');
-    var file = fileInput && fileInput.files && fileInput.files[0];
-    var runOcr = ($('lu-ocr') || {}).checked;
-    if (!leadId) { toast('Pick a lead', true); return; }
-    if (!file) { toast('Pick a file', true); return; }
-    try {
-      var b64 = await fileToBase64(file);
-      var res = await PS2Api.attachLeadFile({
-        lead_id: leadId,
-        filename: file.name,
-        content_type: file.type || 'application/octet-stream',
-        content_base64: b64,
-        run_ocr: !!runOcr,
-      });
-      if (!res.ok) { toast(res.data.error || 'Upload failed', true); return; }
-      toast((res.data.data && res.data.data.message) || 'Uploaded');
-      closeModal();
-      if (document.getElementById('detail-panel')) openLeadDetail(leadId);
-      else renderLeads();
-    } catch (err) {
-      toast('Could not read file', true);
-    }
+    toast('Lead attachments via Supabase are retired. Add notes on the lead or use Excel import.', true);
   }
+
 
   async function convertLead(emailKey) {
     var lead = state.selectedLead || PS2Sheet.findLeadByEmail(state.leads, emailKey) || {};
@@ -1858,8 +1856,8 @@
       order_value: ($('cv-value') || {value:''}).value || null,
       notes: 'Converted from lead ' + email,
     };
-    var projRes = await PS2Api.createProject(body);
-    toast(projRes.ok ? 'Converted → sheet updated + project created' : 'Converted in sheet (project create failed)');
+    var projRes = { ok: true, data: { id: null } }; // projects tracker retired with Supabase
+    toast('Converted — status updated in master sheet');
     closeModal();
     closeDetail();
     state.sheetFetchedAt = null;
@@ -1898,6 +1896,8 @@
   }
 
   async function openProject(id) {
+    toast('Projects tracker retired', true); return;
+
     var res = await PS2Api.getProject(id);
     if (!res.ok) return;
     var p = res.data.data.project;
@@ -1950,6 +1950,8 @@
   }
 
   async function advanceStage(projectId) {
+    toast('Projects tracker retired', true); return;
+
     var toStage = $('next-stage') && $('next-stage').value;
     var notes = $('advance-notes') && $('advance-notes').value;
     if (!toStage) return;
@@ -1961,6 +1963,8 @@
   }
 
   async function deactivateUser(userId) {
+    toast('User management retired', true); return;
+
     if (!confirm('Deactivate this user?')) return;
     var res = await PS2Api.patchUser(userId, { is_active: false });
     if (!res.ok) { toast('Failed', true); return; }
@@ -1969,6 +1973,8 @@
   }
 
   async function toggleSheet(id, active) {
+    toast('Sheet connections managed in n8n', true); return;
+
     var res = await PS2Api.patchSheetConnection(id, { is_active: active });
     if (!res.ok) { toast((res.data && res.data.error) || 'Could not update sheet', true); return; }
     toast(active ? 'Connection enabled' : 'Connection disabled');
@@ -1976,6 +1982,8 @@
   }
 
   async function deleteSheet(id) {
+    toast('Sheet connections managed in n8n', true); return;
+
     if (!confirm('Remove this field-team sheet connection?')) return;
     var res = await PS2Api.deleteSheetConnection(id);
     if (!res.ok) { toast((res.data && res.data.error) || 'Could not delete sheet', true); return; }

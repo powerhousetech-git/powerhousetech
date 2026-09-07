@@ -1,7 +1,6 @@
 (function (global) {
   'use strict';
 
-  var API = global.PS2.API;
   var TOKEN_KEY = global.PS2.TOKEN_KEY;
   var N8N_BASE = global.PS2.N8N_BASE;
   var N8N_API_KEY = global.PS2.N8N_API_KEY;
@@ -17,21 +16,7 @@
     try { sessionStorage.removeItem(TOKEN_KEY); localStorage.removeItem(TOKEN_KEY); } catch (_) {}
   }
 
-  async function req(method, op, body, params) {
-    var url = API + '?op=' + op;
-    if (params) url += '&' + params;
-    var headers = { 'Content-Type': 'application/json' };
-    var t = getToken();
-    if (t) headers['Authorization'] = 'Bearer ' + t;
-    var opts = { method: method, headers: headers };
-    if (body != null) opts.body = JSON.stringify(body);
-    var res = await fetch(url, opts);
-    var data = {};
-    try { data = await res.json(); } catch (_) {}
-    return { ok: res.ok, status: res.status, data: data };
-  }
-
-  /** Direct portal → n8n webhook (Option B sheet writes). Dual auth headers for handshake compat. */
+  /** Direct portal → n8n webhook. Dual auth headers for handshake compat. */
   async function n8nWebhook(pathOrUrl, body) {
     var url = pathOrUrl;
     if (url && url.indexOf('http') !== 0) url = N8N_BASE + url;
@@ -80,102 +65,91 @@
     return out;
   }
 
+  /** Read from n8n Portal Data API — replaces all Supabase reads */
+  async function portalData(op) {
+    var path = (N8N_WEBHOOKS.portal_data || '/webhook/ps2-portal-data');
+    var headers = {
+      'Content-Type': 'application/json',
+      'x-api-key': N8N_API_KEY,
+      'Shreyas09': N8N_API_KEY,
+    };
+    async function call(method) {
+      var url = N8N_BASE + path + (method === 'GET' ? ('?op=' + encodeURIComponent(op)) : '');
+      var opts = { method: method, headers: headers };
+      if (method === 'POST') opts.body = JSON.stringify({ op: op, event: 'portal.data' });
+      var res;
+      try { res = await fetch(url, opts); }
+      catch (err) { return { ok: false, status: 0, data: { error: 'Network error' } }; }
+      var data;
+      try { data = await res.json(); } catch (_) { data = []; }
+      return { ok: res.ok, status: res.status, data: data };
+    }
+    var result = await call('GET');
+    // Some n8n webhooks are POST-only or "respond immediately" on GET — retry POST
+    var d = result.data;
+    if (!result.ok || (d && d.message && /workflow was started/i.test(String(d.message))) || (d && d.error)) {
+      var post = await call('POST');
+      if (post.ok && !(post.data && post.data.message && /workflow was started/i.test(String(post.data.message)))) {
+        return post;
+      }
+      // Prefer POST body if GET only returned ack
+      if (Array.isArray(post.data) || (post.data && Array.isArray(post.data.leads))) return post;
+    }
+    return result;
+  }
+
   global.PS2Api = {
     getToken: getToken,
     setToken: setToken,
     clearToken: clearToken,
     n8nWebhook: n8nWebhook,
     toSheetPayload: toSheetPayload,
+    portalData: portalData,
 
-    login: function (u, p) { return req('POST', 'login', { username: u, password: p }); },
-    me: function () { return req('GET', 'me'); },
+    // ─── READS (n8n Portal Data API) ───
+    sheetLeads: function () { return portalData('leads'); },
+    mailConfig: function () { return portalData('mail-config'); },
+    getSettings: function () { return portalData('settings'); },
+    listEmails: function () { return portalData('email-log'); },
+    portalSettings: function () { return portalData('settings'); },
 
-    // Dashboard / activity (Supabase support DB)
-    stats: function () { return req('GET', 'stats'); },
-    activity: function (limit) { return req('GET', 'activity', null, 'limit=' + (limit || 20)); },
-
-    // v6 master sheet reads (Edge proxies public CSV — avoids browser CORS)
-    sheetLeads: function () { return req('GET', 'sheet-leads'); },
-    health: function () { return req('GET', 'health'); },
-
-    // Portal org settings (booking link etc.) — sahasra_admin allowed
-    portalSettings: function () { return req('GET', 'portal-settings'); },
-    patchPortalSettings: function (body) { return req('PATCH', 'portal-settings', body); },
-
-    // Sheet writes via n8n
+    // ─── WRITES (n8n webhooks) ───
     addLeadToSheet: function (lead) {
       return n8nWebhook(webhookPath('add_lead'), toSheetPayload(lead, { action: 'create', event: 'lead.create' }));
     },
     updateLeadInSheet: function (lead) {
       var payload = toSheetPayload(lead, { action: 'update', event: 'lead.update' });
-      if (!payload.email) return Promise.resolve({ ok: false, status: 400, data: { error: 'email required to update sheet row' } });
+      if (!payload.email) return Promise.resolve({ ok: false, status: 400, data: { error: 'email required' } });
       return n8nWebhook(webhookPath('update_lead'), payload);
     },
     enrichWebsite: function (email, website) {
-      return n8nWebhook(webhookPath('enrich_website'), {
-        event: 'lead.created',
-        email: email,
-        website: website,
-      });
+      return n8nWebhook(webhookPath('enrich_website'), { event: 'lead.created', email: email, website: website });
     },
     triggerN8nDirect: function (workflowKey, payload) {
-      var path = webhookPath(workflowKey);
-      return n8nWebhook(path, payload || {
+      return n8nWebhook(webhookPath(workflowKey), payload || {
         event: 'portal.trigger',
         workflow: workflowKey,
         triggered_at: new Date().toISOString(),
       });
     },
 
-    // Legacy Supabase lead ops (kept for transitional / attachment flows — prefer sheet methods)
-    listLeads: function (params) { return req('GET', 'leads', null, params || ''); },
-    getLead: function (id) { return req('GET', 'lead', null, 'id=' + id); },
-    createLead: function (body) { return req('POST', 'lead', body); },
-    patchLead: function (id, body) { return req('PATCH', 'lead', body, 'id=' + id); },
-    deleteLead: function (id) { return req('DELETE', 'lead', null, 'id=' + id); },
-    bulkLeads: function (body) { return req('POST', 'leads-bulk', body); },
-    importLeads: function (body) { return req('POST', 'leads-import', body); },
-    ingestFile: function (body) { return req('POST', 'ingest-file', body); },
-    uploadBatches: function () { return req('GET', 'upload-batches'); },
-    triggerN8n: function (body) { return req('POST', 'trigger-n8n', body); },
-    attachLeadFile: function (body) { return req('POST', 'lead-attachment', body); },
-    leadsReadyToSend: function () { return req('GET', 'leads-ready-to-send'); },
-    convertLead: function (id, body) { return req('POST', 'lead-convert', body, 'id=' + id); },
-
-    // Emails / drafts (Supabase)
-    listEmails: function (leadId, status) {
-      return req('GET', 'emails', null, [leadId ? 'lead_id=' + leadId : '', status ? 'status=' + status : ''].filter(Boolean).join('&'));
+    // ─── MAIL / SETTINGS WRITES ───
+    patchMailConfig: function (body) {
+      return n8nWebhook(webhookPath('update_lead'), Object.assign({ op: 'mail-config-update' }, body || {}));
     },
-    createEmail: function (body) { return req('POST', 'email', body); },
-    patchEmail: function (id, body) { return req('PATCH', 'email', body, 'id=' + id); },
-    reviewDrafts: function (assignedTo) {
-      return req('GET', 'review-drafts', null, assignedTo ? 'assigned_to=' + assignedTo : '');
+    patchSettings: function (body) {
+      return n8nWebhook(webhookPath('update_lead'), Object.assign({ op: 'settings-update' }, body || {}));
+    },
+    patchPortalSettings: function (body) {
+      return n8nWebhook(webhookPath('update_lead'), Object.assign({ op: 'settings-update' }, body || {}));
     },
 
-    // Mail config
-    mailConfig: function () { return req('GET', 'mail-config'); },
-    patchMailConfig: function (body) { return req('PATCH', 'mail-config', body); },
-
-    // Projects
-    listProjects: function () { return req('GET', 'projects'); },
-    getProject: function (id) { return req('GET', 'project', null, 'id=' + id); },
-    createProject: function (body) { return req('POST', 'project', body); },
-    patchProject: function (id, body) { return req('PATCH', 'project', body, 'id=' + id); },
-    advanceProject: function (id, body) { return req('POST', 'project-advance', body, 'id=' + id); },
-
-    // Users
-    listUsers: function () { return req('GET', 'users'); },
-    createUser: function (body) { return req('POST', 'user', body); },
-    patchUser: function (id, body) { return req('PATCH', 'user', body, 'id=' + id); },
-    deleteUser: function (id) { return req('DELETE', 'user', null, 'id=' + id); },
-
-    // Settings
-    outlookAccounts: function () { return req('GET', 'outlook-accounts'); },
-    sheetConnections: function () { return req('GET', 'sheet-connections'); },
-    createSheetConnection: function (body) { return req('POST', 'sheet-connection', body); },
-    patchSheetConnection: function (id, body) { return req('PATCH', 'sheet-connection', body, 'id=' + id); },
-    deleteSheetConnection: function (id) { return req('DELETE', 'sheet-connection', null, 'id=' + id); },
-    getSettings: function () { return req('GET', 'settings'); },
-    patchSettings: function (body) { return req('PATCH', 'settings', body); },
+    // Draft approve/reject → email log status via update webhook
+    patchEmail: function (id, body) {
+      return n8nWebhook(webhookPath('update_lead'), Object.assign({
+        op: 'email-status-update',
+        email_id: id,
+      }, body || {}));
+    },
   };
 })(window);
