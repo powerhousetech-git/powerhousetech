@@ -38,7 +38,9 @@
     if (status === 'mail_1_sent') return 'mail_1_sent';
     if (FOLLOW_UP_STATUSES.indexOf(status) >= 0) return 'follow_up';
     if (status === 'responded') return 'responded';
+    if (status === 'meeting_proposed') return 'meeting_proposed';
     if (status === 'meeting_scheduled') return 'meeting_scheduled';
+    if (status === 'human_takeover') return 'human_takeover';
     if (status === 'converted') return 'converted';
     if (status === 'discarded') return 'discarded';
     return 'new';
@@ -47,15 +49,17 @@
   function computeKpis(leads) {
     leads = leads || [];
     var total = leads.length;
-    var mail1 = 0, fus = 0, responded = 0, meetings = 0, converted = 0, discarded = 0, contacted = 0;
+    var mail1 = 0, fus = 0, responded = 0, meetings = 0, meetingProposed = 0, humanTakeover = 0, converted = 0, discarded = 0, contacted = 0;
     leads.forEach(function (l) {
       var st = normStatus(l.status);
       if (st === 'mail_1_sent' || FOLLOW_UP_STATUSES.indexOf(st) >= 0 || st === 'responded' ||
-          st === 'meeting_scheduled' || st === 'converted') contacted++;
+          st === 'meeting_proposed' || st === 'meeting_scheduled' || st === 'human_takeover' || st === 'converted') contacted++;
       if (st === 'mail_1_sent') mail1++;
       if (FOLLOW_UP_STATUSES.indexOf(st) >= 0) fus++;
       if (st === 'responded') responded++;
+      if (st === 'meeting_proposed') meetingProposed++;
       if (st === 'meeting_scheduled') meetings++;
+      if (st === 'human_takeover') humanTakeover++;
       if (st === 'converted') converted++;
       if (st === 'discarded') discarded++;
       var n = Number(l.follow_up_count);
@@ -69,7 +73,9 @@
       { key: 'mail_1_sent', label: 'Mail 1 Sent', count: leads.filter(function (l) { return pipelineBucket(l.status) === 'mail_1_sent'; }).length },
       { key: 'follow_up', label: 'Follow-up', count: leads.filter(function (l) { return pipelineBucket(l.status) === 'follow_up'; }).length },
       { key: 'responded', label: 'Responded', count: responded },
+      { key: 'meeting_proposed', label: 'Meeting Proposed', count: meetingProposed },
       { key: 'meeting_scheduled', label: 'Meeting', count: meetings },
+      { key: 'human_takeover', label: 'Human Takeover', count: humanTakeover },
       { key: 'converted', label: 'Converted', count: converted },
       { key: 'discarded', label: 'Discarded', count: discarded },
     ];
@@ -79,7 +85,9 @@
       follow_ups_sent: fus,
       responses: responded,
       responded_leads: responded,
+      meetings_proposed: meetingProposed,
       meetings_scheduled: meetings,
+      human_takeover: humanTakeover,
       converted_leads: converted,
       discarded_leads: discarded,
       contacted_leads: contacted,

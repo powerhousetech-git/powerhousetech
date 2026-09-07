@@ -92,15 +92,15 @@
     new: 'New', mail_1_sent: 'Mail 1 Sent',
     follow_up_1:'FU 1',follow_up_2:'FU 2',follow_up_3:'FU 3',follow_up_4:'FU 4',follow_up_5:'FU 5',
     follow_up_6:'FU 6',follow_up_7:'FU 7',follow_up_8:'FU 8',follow_up_9:'FU 9',follow_up_10:'FU 10',
-    responded:'Responded', meeting_scheduled:'Meeting', converted:'Converted', discarded:'Discarded',
+    responded:'Responded', meeting_proposed:'Meeting Proposed', meeting_scheduled:'Meeting', human_takeover:'Human Takeover', converted:'Converted', discarded:'Discarded',
   };
   var STATUS_BADGE = {
     new:'badge-gray', mail_1_sent:'badge-blue',
     follow_up_1:'badge-blue',follow_up_2:'badge-blue',follow_up_3:'badge-blue',
     follow_up_4:'badge-blue',follow_up_5:'badge-blue',follow_up_6:'badge-blue',
     follow_up_7:'badge-blue',follow_up_8:'badge-blue',follow_up_9:'badge-blue',follow_up_10:'badge-blue',
-    responded:'badge-green', meeting_scheduled:'badge-purple',
-    converted:'badge-emerald', discarded:'badge-red',
+    responded:'badge-green', meeting_proposed:'badge-purple', meeting_scheduled:'badge-purple',
+    human_takeover:'badge-orange', converted:'badge-emerald', discarded:'badge-red',
   };
   var STAGE_LABELS = {
     enquiry_received:'Enquiry', bid_submitted:'Bid Submitted', order_won:'Order Won',
@@ -260,7 +260,7 @@
           '<div style="padding:18px"><div class="funnel">' +
           funnel.map(function(f){
             var w = Math.round((f.count / maxFunnel) * 100);
-            var colors = { new:'#94a3b8', mail_1_sent:'#3b82f6', follow_up:'#0ea5e9', responded:'#22c55e', meeting_scheduled:'#a855f7', converted:'#eab308', discarded:'#ef4444' };
+            var colors = { new:'#94a3b8', mail_1_sent:'#3b82f6', follow_up:'#0ea5e9', responded:'#22c55e', meeting_proposed:'#c084fc', meeting_scheduled:'#a855f7', human_takeover:'#f97316', converted:'#eab308', discarded:'#ef4444' };
             var barColor = colors[f.key] || 'var(--primary)';
             return '<div class="funnel-row"><span class="funnel-label">' + esc(f.label) + '</span>' +
               '<div class="funnel-bar-wrap"><div class="funnel-bar" style="width:' + w + '%;background:' + barColor + '"></div></div>' +
@@ -292,7 +292,7 @@
       '</div>' +
       '<div style="padding:0 18px 14px;font-size:12px;color:var(--muted);line-height:1.55">' +
         '<p style="margin:0 0 6px"><strong style="color:var(--text)">Adding a lead does not send mail by itself.</strong> Outbound runs on the n8n schedule (Workflow A) or when you click <em>Run email sequence</em>.</p>' +
-        '<p style="margin:0 0 6px"><strong style="color:var(--text)">Run email sequence</strong> fires immediately. n8n asks who is due (<code>leads-ready-to-send</code>) — only those contacts get mail (skips responded / meeting / converted / discarded and anyone not yet due for the next step).</p>' +
+        '<p style="margin:0 0 6px"><strong style="color:var(--text)">Run email sequence</strong> fires immediately. n8n asks who is due — only those contacts get mail (skips responded / meeting proposed / meeting scheduled / human takeover / converted / discarded, and anyone emailed in the last 24h).</p>' +
         '<p style="margin:0"><strong style="color:var(--text)">Re-run reply ingest</strong> also fires immediately — pulls Outlook replies now and updates matching leads. Website enrichment still runs when a lead with a website is saved. Sync Sheets is managed in n8n (WF-C retired from portal).</p>' +
       '</div></div>';
   }
@@ -1127,7 +1127,7 @@
           '<p class="lead-actions-hint">Prospects book via the Settings booking link in follow-up emails. Use <strong>Mark as meeting booked</strong> for phone-call bookings (one click).</p>' +
           '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
             '<button type="button" class="btn btn-sm" onclick="window.PS2App.openEditLead(decodeURIComponent(\'' + key + '\'))">Edit lead</button>' +
-            (st !== 'meeting_scheduled' && st !== 'converted' && st !== 'discarded'
+            (st !== 'meeting_proposed' && st !== 'meeting_scheduled' && st !== 'human_takeover' && st !== 'converted' && st !== 'discarded'
               ? '<button type="button" class="btn btn-sm" onclick="window.PS2App.markMeetingBooked(decodeURIComponent(\'' + key + '\'))">Mark as meeting booked</button>' : '') +
             (st !== 'converted'
               ? '<button type="button" class="btn btn-sm btn-primary" onclick="window.PS2App.convertLead(decodeURIComponent(\'' + key + '\'))">Mark converted</button>' : '') +
@@ -1314,7 +1314,9 @@
       { key: 'mail_1_sent', label: 'MAIL 1 SENT' },
       { key: 'follow_up', label: 'FOLLOW-UP' },
       { key: 'responded', label: 'RESPONDED' },
+      { key: 'meeting_proposed', label: 'MEETING PROPOSED' },
       { key: 'meeting_scheduled', label: 'MEETING' },
+      { key: 'human_takeover', label: 'HUMAN TAKEOVER' },
       { key: 'converted', label: 'CONVERTED' },
       { key: 'discarded', label: 'DISCARDED' },
     ];
@@ -1326,7 +1328,8 @@
     var maxFunnel = Math.max(1, ...columns.map(function(c){ return leadsForCol(c).length; }));
     var barColors = {
       new:'#94a3b8', mail_1_sent:'#3b82f6', follow_up:'#0ea5e9',
-      responded:'#22c55e', meeting_scheduled:'#a855f7', converted:'#eab308', discarded:'#ef4444',
+      responded:'#22c55e', meeting_proposed:'#c084fc', meeting_scheduled:'#a855f7',
+      human_takeover:'#f97316', converted:'#eab308', discarded:'#ef4444',
     };
 
     main.innerHTML =
@@ -1446,7 +1449,9 @@
       { key: 'mail_1_sent', label: 'Mail 1' },
       { key: 'follow_up', label: 'Follow-up' },
       { key: 'responded', label: 'Responded' },
+      { key: 'meeting_proposed', label: 'Meeting proposed' },
       { key: 'meeting_scheduled', label: 'Meeting' },
+      { key: 'human_takeover', label: 'Human takeover' },
       { key: 'discarded', label: 'Discarded' },
     ];
 

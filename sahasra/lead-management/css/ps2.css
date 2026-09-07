@@ -219,6 +219,7 @@ body {
 .badge-green { background: rgba(46,168,106,.15); color: var(--green); }
 .badge-gold { background: var(--gold-soft); color: var(--gold); }
 .badge-purple { background: rgba(139,92,246,.15); color: var(--purple); }
+.badge-orange { background: rgba(249,115,22,.15); color: #fb923c; border: 1px solid rgba(249,115,22,.35); }
 .badge-emerald { background: rgba(16,185,129,.15); color: #10b981; }
 .badge-red { background: rgba(204,68,68,.15); color: #f87171; }
 
