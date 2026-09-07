@@ -141,12 +141,14 @@
 
     // ─── WRITES (n8n webhooks) ───
     addLeadToSheet: function (lead) {
-      return n8nWebhook(webhookPath('add_lead'), toSheetPayload(lead, { action: 'create', event: 'lead.create' }));
+      return n8nWebhook(webhookPath('add_lead'), toSheetPayload(lead, { action: 'create', event: 'lead.create' }))
+        .then(function (res) { return requireWriteConfirm(res, 'ps2-add-lead'); });
     },
     updateLeadInSheet: function (lead) {
       var payload = toSheetPayload(lead, { action: 'update', event: 'lead.update' });
       if (!payload.email) return Promise.resolve({ ok: false, status: 400, data: { error: 'email required' } });
-      return n8nWebhook(webhookPath('update_lead'), payload);
+      return n8nWebhook(webhookPath('update_lead'), payload)
+        .then(function (res) { return requireWriteConfirm(res, 'ps2-update-lead'); });
     },
     enrichWebsite: function (email, website) {
       return n8nWebhook(webhookPath('enrich_website'), { event: 'lead.created', email: email, website: website });
