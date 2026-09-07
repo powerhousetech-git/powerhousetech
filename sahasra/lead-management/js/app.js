@@ -14,6 +14,7 @@
     reviewDrafts: [],
     captureTab: 'excel',
     excel: { headers: [], rows: [], mapping: {}, filename: '' },
+    excelImportStatus: '',
     sheetFetchedAt: null,
     ocrExtractedLeads: [],
   };
