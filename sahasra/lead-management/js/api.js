@@ -114,12 +114,9 @@
     portalSettings: function () { return portalData('settings'); },
 
     // ─── CARD OCR (n8n Claude vision) ───
-    /** POST PNG/PDF page images to /webhook/ps2-card-ocr */
+    /** POST one page/image as { image_base64 } to /webhook/ps2-card-ocr */
     cardOcr: function (payload) {
-      return n8nWebhook(webhookPath('card_ocr'), Object.assign({
-        event: 'card.ocr',
-        triggered_at: new Date().toISOString(),
-      }, payload || {}));
+      return n8nWebhook(webhookPath('card_ocr'), payload || {});
     },
     /** Alias used by Capture upload flow */
     ingestFile: function (payload) {

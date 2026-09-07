@@ -15,6 +15,7 @@
     captureTab: 'excel',
     excel: { headers: [], rows: [], mapping: {}, filename: '' },
     sheetFetchedAt: null,
+    ocrExtractedLeads: [],
   };
 
   function normalizeSheetLead(row) {
@@ -355,7 +356,7 @@
     var batchesRes = { ok: true, data: [] };
     var batches = Array.isArray(batchesRes.data) ? batchesRes.data : ((batchesRes.data && batchesRes.data.data) || []);
     var tabs = [
-      { id: 'pdf', label: 'Business cards (info)' },
+      { id: 'pdf', label: 'Business cards' },
       { id: 'excel', label: 'Excel / CSV' },
       { id: 'sheets', label: 'Master sheet' },
     ];
@@ -398,11 +399,12 @@
         '<div style="padding:18px">' +
           '<div class="drop-zone" id="pdf-drop">' +
             '<div class="drop-zone-icon">📇</div>' +
-            '<p><strong>Drop a card photo or PDF</strong></p>' +
-            '<p>Pages are sent to n8n (Claude vision) for OCR · blurry cards OK</p>' +
+            '<p><strong>Drop a business card photo or PDF</strong></p>' +
+            '<p>AI scans the card and extracts contact details (blurry cards OK)</p>' +
             '<input type="file" id="pdf-file" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.heic,.heif,application/pdf,image/*" multiple hidden />' +
           '</div>' +
           '<p id="pdf-status" style="font-size:13px;color:var(--muted);margin:12px 0 0"></p>' +
+          '<div id="ocr-results" style="margin-top:16px"></div>' +
         '</div></div>';
     bindDropZone($('pdf-drop'), $('pdf-file'), handlePdfFiles);
   }
@@ -539,16 +541,6 @@
     });
   }
 
-  function normalizeOcrContacts(data) {
-    if (!data) return [];
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data.contacts)) return data.contacts;
-    if (Array.isArray(data.leads)) return data.leads;
-    if (data.contact && typeof data.contact === 'object') return [data.contact];
-    if (data.name || data.Name || data.email || data.Email) return [data];
-    return [];
-  }
-
   function mapOcrContact(c) {
     c = c || {};
     return {
@@ -564,124 +556,160 @@
     };
   }
 
-  async function importOcrContacts(contacts) {
-    var ok = 0, fail = 0, dup = 0, skipped = 0;
-    var existingLeads = await loadSheetLeads(true);
-    var seenEmails = {};
-    for (var i = 0; i < contacts.length; i++) {
-      var row = mapOcrContact(contacts[i]);
-      if (!row.full_name && !row.email && !row.company && !row.phone) { skipped++; continue; }
-      if (leadContactValid(row.full_name, row.email, row.company)) { skipped++; continue; }
-      var emailKey = String(row.email || '').trim().toLowerCase();
-      if (emailKey) {
-        if (seenEmails[emailKey] || PS2Sheet.findLeadByEmail(existingLeads, emailKey)) {
-          dup++;
-          continue;
-        }
-        seenEmails[emailKey] = true;
-      }
-      var res = await PS2Api.addLeadToSheet(row);
-      if (res.ok) {
-        ok++;
-        if (row.website && row.email) PS2Api.enrichWebsite(row.email, row.website);
-      } else fail++;
+  function parseOcrLeadResponse(data) {
+    if (!data) return null;
+    if (data.error) return { error: data.error };
+    if (data.message && /workflow was started/i.test(String(data.message))) {
+      return { error: 'OCR webhook acknowledged but returned no contact — set Respond to Webhook' };
     }
-    return { ok: ok, fail: fail, dup: dup, skipped: skipped };
+    if (Array.isArray(data.contacts) && data.contacts[0]) data = data.contacts[0];
+    else if (Array.isArray(data.leads) && data.leads[0]) data = data.leads[0];
+    else if (Array.isArray(data) && data[0]) data = data[0];
+    if (typeof data !== 'object' || Array.isArray(data)) return null;
+    if (!(data.name || data.Name || data.email || data.Email || data.company || data.Company || data.phone || data.Phone)) {
+      if (!Object.keys(data).length) {
+        return { error: 'Empty OCR response — check n8n PS2 Card OCR workflow' };
+      }
+      return null;
+    }
+    return mapOcrContact(data);
+  }
+
+  function renderOcrResults(extractedLeads) {
+    var resultsEl = $('ocr-results');
+    if (!resultsEl) return;
+    state.ocrExtractedLeads = extractedLeads || [];
+    if (!extractedLeads.length) {
+      resultsEl.innerHTML = '';
+      return;
+    }
+    resultsEl.innerHTML = extractedLeads.map(function(lead, i) {
+      return '<div class="panel" style="margin-bottom:12px;padding:14px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px">' +
+          '<strong>' + esc(lead._source_label || ('Card ' + (i + 1))) + '</strong>' +
+          '<button type="button" class="btn btn-primary btn-sm" data-ocr-add="' + i + '">+ Add Lead</button>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:120px 1fr;gap:4px 12px;font-size:13px">' +
+          '<span style="color:var(--muted)">Name</span><span>' + esc(lead.name || lead.full_name) + '</span>' +
+          '<span style="color:var(--muted)">Email</span><span>' + esc(lead.email) + '</span>' +
+          '<span style="color:var(--muted)">Phone</span><span>' + esc(lead.phone) + '</span>' +
+          '<span style="color:var(--muted)">Company</span><span>' + esc(lead.company) + '</span>' +
+          '<span style="color:var(--muted)">Designation</span><span>' + esc(lead.designation) + '</span>' +
+          '<span style="color:var(--muted)">Website</span><span>' + esc(lead.website) + '</span>' +
+        '</div></div>';
+    }).join('');
+
+    resultsEl.querySelectorAll('[data-ocr-add]').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var li = parseInt(btn.dataset.ocrAdd, 10);
+        var lead = (state.ocrExtractedLeads || [])[li];
+        if (!lead) return;
+        var err = leadContactValid(lead.full_name || lead.name, lead.email, lead.company);
+        if (err) { toast(err, true); return; }
+        if (lead.email) {
+          var existing = await loadSheetLeads(false);
+          if (PS2Sheet.findLeadByEmail(existing, lead.email)) {
+            toast('Duplicate lead — email already exists in master sheet', true);
+            return;
+          }
+        }
+        btn.disabled = true;
+        btn.textContent = 'Adding…';
+        var payload = mapOcrContact(lead);
+        payload.source = 'pdf';
+        try {
+          var addRes = await PS2Api.addLeadToSheet(payload);
+          if (addRes.ok) {
+            btn.textContent = 'Added ✓';
+            toast((payload.full_name || payload.email || 'Lead') + ' added to master sheet');
+            state.sheetFetchedAt = null;
+            if (payload.website && payload.email) PS2Api.enrichWebsite(payload.email, payload.website);
+          } else {
+            btn.disabled = false;
+            btn.textContent = '+ Add Lead';
+            toast((addRes.data && addRes.data.error) || 'Failed to add lead', true);
+          }
+        } catch (e) {
+          btn.disabled = false;
+          btn.textContent = '+ Add Lead';
+          toast('Error adding lead: ' + (e && e.message ? e.message : e), true);
+        }
+      });
+    });
   }
 
   async function handlePdfFiles(fileList) {
-    var files = Array.prototype.slice.call(fileList || []);
     var status = $('pdf-status');
+    var resultsEl = $('ocr-results');
+    var files = Array.prototype.slice.call(fileList || []);
     if (!files.length) return;
-    if (!PS2Api.cardOcr) {
-      toast('Card OCR webhook not configured', true);
-      return;
-    }
+
+    var allImages = [];
     for (var i = 0; i < files.length; i++) {
-      var f = files[i];
-      if (status) status.textContent = 'Preparing ' + f.name + '…';
-      try {
-        var isPdf = /pdf$/i.test(f.type || '') || /\.pdf$/i.test(f.name || '');
-        var payload;
-        if (isPdf) {
-          if (status) status.textContent = 'Reading pages in ' + f.name + '…';
-          var pages = await pdfFileToPngPages(f);
-          if (!pages.length) throw new Error('No pages');
-          // Prefer page PNGs for Claude vision (skip bulky raw PDF bytes)
-          payload = {
-            filename: f.name,
-            content_type: 'application/pdf',
-            page_count: pages.length,
-            pages: pages.map(function(b64, idx) {
-              return { page: idx + 1, content_type: 'image/png', content_base64: b64 };
-            }),
-          };
-          if (status) status.textContent = 'OCR via n8n · ' + pages.length + ' page(s) from ' + f.name + '…';
-        } else {
-          var imgB64 = await fileToBase64(f);
-          payload = {
-            filename: f.name,
-            content_type: f.type || 'image/png',
-            content_base64: imgB64,
-            pages: [{ page: 1, content_type: f.type || 'image/png', content_base64: imgB64 }],
-          };
-          if (status) status.textContent = 'OCR via n8n · ' + f.name + '…';
-        }
-        var res = await PS2Api.cardOcr(payload);
-        var data = res.data || {};
-        var isAck = data.message && /workflow was started/i.test(String(data.message));
-        var contacts = normalizeOcrContacts(data);
-        var alreadyImported = Number(data.imported) || 0;
-
-        if (!res.ok) {
-          toast((data && data.error) || 'OCR upload failed — is /webhook/ps2-card-ocr Active?', true);
-          if (status) status.textContent = 'Failed: ' + ((data && data.error) || 'OCR error');
-          continue;
-        }
-
-        if (alreadyImported > 0 && !contacts.length) {
-          toast('Imported ' + alreadyImported + ' lead(s) from ' + f.name);
-          if (status) status.textContent = 'Imported ' + alreadyImported + ' from ' + f.name + ' → master sheet';
-          state.sheetFetchedAt = null;
-          continue;
-        }
-
-        if (contacts.length) {
-          if (status) status.textContent = 'Writing ' + contacts.length + ' contact(s) to master sheet…';
-          var result = await importOcrContacts(contacts);
-          if (result.ok) {
-            toast('Added ' + result.ok + ' lead(s) from ' + f.name +
-              (result.dup ? ' · ' + result.dup + ' duplicate email(s) skipped' : '') +
-              (result.fail ? ' · ' + result.fail + ' failed' : ''));
-            if (status) status.textContent = 'Imported ' + result.ok + '/' + contacts.length + ' from ' + f.name;
-            state.sheetFetchedAt = null;
-          } else {
-            toast('OCR found contacts but none were saved' +
-              (result.dup ? ' (duplicates)' : '') +
-              (result.skipped ? ' (incomplete)' : '') +
-              (result.fail ? ' (write failed)' : ''), true);
-            if (status) status.textContent = 'No new leads saved from ' + f.name;
+      var file = files[i];
+      var isPdf = /pdf$/i.test(file.type || '') || /\.pdf$/i.test(file.name || '');
+      if (isPdf) {
+        if (status) status.textContent = 'Rendering PDF pages…';
+        try {
+          var pages = await pdfFileToPngPages(file);
+          for (var p = 0; p < pages.length; p++) {
+            allImages.push({ base64: pages[p], label: file.name + ' (page ' + (p + 1) + ')' });
           }
-          continue;
+        } catch (err) {
+          toast('Failed to read PDF: ' + (err && err.message ? err.message : err), true);
         }
-
-        var emptyBody = !data || (typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length === 0);
-        if (isAck || emptyBody) {
-          toast('Queued for n8n OCR — refresh Leads in a moment');
-          if (status) status.textContent = 'Queued · n8n is extracting ' + f.name +
-            (emptyBody ? ' (empty response — set Respond to Webhook with contacts[])' : ' (Respond Immediately mode)');
-          continue;
+      } else {
+        try {
+          var b64 = await fileToBase64(file);
+          allImages.push({ base64: b64, label: file.name });
+        } catch (err) {
+          toast('Failed to read image: ' + file.name, true);
         }
-
-        toast((data && data.message) || 'No contacts extracted from ' + f.name, true);
-        if (status) status.textContent = (data && data.message) || 'No contacts found';
-      } catch (err) {
-        console.error(err);
-        toast('Could not read ' + f.name, true);
-        if (status) status.textContent = 'Could not read file';
       }
     }
-    renderCapture();
+
+    if (!allImages.length) {
+      toast('No images found to scan.', true);
+      return;
+    }
+
+    if (status) status.textContent = 'Scanning ' + allImages.length + ' card(s) with AI…';
+    if (resultsEl) resultsEl.innerHTML = '';
+
+    var extractedLeads = [];
+    for (var idx = 0; idx < allImages.length; idx++) {
+      var img = allImages[idx];
+      if (status) status.textContent = 'Scanning card ' + (idx + 1) + ' of ' + allImages.length + '…';
+      try {
+        // Claude n8n WF expects { image_base64 } per page/image
+        var res = await PS2Api.cardOcr({ image_base64: img.base64, filename: img.label });
+        if (!res.ok) {
+          toast('Card ' + (idx + 1) + ': ' + ((res.data && res.data.error) || 'OCR failed'), true);
+          continue;
+        }
+        var parsed = parseOcrLeadResponse(res.data);
+        if (parsed && parsed.error) {
+          toast('Card ' + (idx + 1) + ': ' + parsed.error, true);
+          continue;
+        }
+        if (!parsed) {
+          toast('Card ' + (idx + 1) + ': no contact fields returned', true);
+          continue;
+        }
+        parsed._source_label = img.label;
+        extractedLeads.push(parsed);
+      } catch (err) {
+        toast('Card ' + (idx + 1) + ': Network error — ' + (err && err.message ? err.message : err), true);
+      }
+    }
+
+    if (!extractedLeads.length) {
+      if (status) status.textContent = 'No contacts could be extracted.';
+      return;
+    }
+
+    if (status) status.textContent = extractedLeads.length + ' contact(s) extracted. Review below and click Add to save.';
+    renderOcrResults(extractedLeads);
   }
 
   function parseCsv(text) {

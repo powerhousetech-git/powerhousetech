@@ -24,48 +24,19 @@ Portal static app at `sahasra/lead-management/` talks **only** to n8n.
 
 ### Card OCR — `POST /webhook/ps2-card-ocr`
 
-Portal Capture → PDF/image dropzone converts PDF pages to PNG base64, then POSTs:
+Portal sends **one page/image per request** (Claude vision WF):
 
 ```json
-{
-  "event": "card.ocr",
-  "filename": "cards.pdf",
-  "content_type": "application/pdf",
-  "page_count": 2,
-  "pages": [
-    { "page": 1, "content_type": "image/png", "content_base64": "<…>" },
-    { "page": 2, "content_type": "image/png", "content_base64": "<…>" }
-  ]
-}
+{ "image_base64": "<png base64>" }
 ```
 
-For a single image, `content_base64` is also set at the top level (same bytes as `pages[0]`).
-
-**Preferred response** (use **Respond to Webhook**, not Respond Immediately):
+**Preferred response** (Respond to Webhook) — single contact:
 
 ```json
-{
-  "contacts": [
-    {
-      "name": "Priya Sharma",
-      "email": "priya@example.com",
-      "phone": "+91…",
-      "company": "Acme",
-      "designation": "CTO",
-      "website": "https://acme.com"
-    }
-  ]
-}
+{ "name": "", "email": "", "phone": "", "company": "", "designation": "", "website": "" }
 ```
 
-Portal then dedupes by email and writes via `ps2-add-lead`.
-
-Alternatives the portal also accepts:
-- `{ "leads": [ … ] }`
-- `{ "imported": 2 }` if n8n already wrote rows to the sheet
-- Flat single contact object
-
-If the webhook only acks with `{"message":"Workflow was started"}`, the portal shows “Queued for OCR” and expects n8n to write leads itself.
+Portal shows review cards; user clicks **+ Add Lead** → `ps2-add-lead`.
 
 Auth header: `x-api-key` (also send `Shreyas09` for handshake compat).
 
