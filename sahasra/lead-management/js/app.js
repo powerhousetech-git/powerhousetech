@@ -338,16 +338,16 @@
     { key: 'custom_intro', label: 'Custom intro' },
   ];
   var FIELD_ALIASES = {
-    full_name: ['name','full name','contact','contact name','lead name','person'],
-    first_name: ['first','first name','firstname','given name'],
-    last_name: ['last','last name','lastname','surname'],
-    company: ['company','organisation','organization','firm','account','org'],
-    designation: ['designation','title','job title','role','position'],
-    email: ['email','e-mail','mail','email address','e mail'],
-    phone: ['phone','mobile','tel','telephone','contact number','cell'],
-    website: ['website','url','web','site','www'],
-    notes: ['notes','note','comments','remark','remarks'],
-    custom_intro: ['intro','custom intro','met at','source note','context'],
+    full_name: ['name','full name','contact','contact name','lead name','person','person name','client name','customer name','lead','client','customer','contact person','full_name','fullname','candidate','respondent','attendee'],
+    first_name: ['first','first name','firstname','given name','first_name','fname','given'],
+    last_name: ['last','last name','lastname','surname','last_name','lname','family name','family'],
+    company: ['company','organisation','organization','firm','account','org','company name','business','employer','institute','institution','agency','brand','venture','startup','corporate','corp','entity','company_name','co','affiliation'],
+    designation: ['designation','title','job title','role','position','job','job_title','post','department','dept','function','profile','level','seniority'],
+    email: ['email','e-mail','mail','email address','e mail','mail id','email id','mail_id','email_id','emailid','mailid','e_mail','email_address','contact email','work email','personal email','gmail','emailaddress','email addr','mail address'],
+    phone: ['phone','mobile','tel','telephone','contact number','cell','phone number','mobile number','mob','cell phone','ph','phone_number','mobile_number','contact no','mob no','mobile no','phone no','whatsapp','landline','contact_number','ph no','tel no','telephone number','mob.','ph.','cell no','cell number'],
+    website: ['website','url','web','site','www','homepage','domain','web address','website url','company url','company website','link','webpage','web_url','site url','web site','portal'],
+    notes: ['notes','note','comments','remark','remarks','description','info','additional','details','memo','observation','feedback','comment','additional info','extra','misc','other','additional_info'],
+    custom_intro: ['intro','custom intro','met at','source note','context','introduction','opening','icebreaker','personalization','custom_intro','how we met','referral','referred by','connection','mutual'],
   };
 
   async function renderCapture() {
@@ -442,7 +442,7 @@
           '<div class="drop-zone" id="xlsx-drop">' +
             '<div class="drop-zone-icon">📊</div>' +
             '<p><strong>Drop a spreadsheet</strong></p>' +
-            '<p>.xlsx, .xls, or .csv — map columns, then import into the master DB</p>' +
+            '<p>.xlsx, .xls, or .csv — columns are auto-mapped and imported into the master DB</p>' +
             '<input type="file" id="xlsx-file" accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />' +
           '</div>' +
         '</div>' + mappingHtml + '</div>';
@@ -750,14 +750,70 @@
   function autoMapHeaders(headers) {
     var mapping = {};
     var used = {};
-    EXCEL_FIELDS.forEach(function(f){
+
+    function norm(s) {
+      return String(s || '').trim().toLowerCase()
+        .replace(/[_\-\.\/\\]+/g, ' ')
+        .replace(/[^a-z0-9 ]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function matchScore(header, aliases) {
+      var h = norm(header);
+      if (!h) return 0;
+
+      for (var a = 0; a < aliases.length; a++) {
+        if (h === norm(aliases[a])) return 100;
+      }
+
+      var stripped = h.replace(/\b(id|no|number|address|addr|name)\b/g, '').trim();
+      for (var a = 0; a < aliases.length; a++) {
+        var an = norm(aliases[a]);
+        var as = an.replace(/\b(id|no|number|address|addr|name)\b/g, '').trim();
+        if (stripped && as && stripped === as) return 80;
+      }
+
+      for (var a = 0; a < aliases.length; a++) {
+        var an2 = norm(aliases[a]);
+        if (an2.length >= 3 && h.indexOf(an2) >= 0) return 60;
+        if (h.length >= 3 && an2.indexOf(h) >= 0) return 50;
+      }
+
+      var hWords = h.split(' ').filter(function(w){ return w.length >= 3; });
+      for (var a = 0; a < aliases.length; a++) {
+        var aWords = norm(aliases[a]).split(' ').filter(function(w){ return w.length >= 3; });
+        for (var wi = 0; wi < hWords.length; wi++) {
+          for (var wj = 0; wj < aWords.length; wj++) {
+            if (hWords[wi] === aWords[wj]) return 40;
+          }
+        }
+      }
+
+      return 0;
+    }
+
+    var candidates = [];
+    EXCEL_FIELDS.forEach(function(f) {
       var aliases = FIELD_ALIASES[f.key] || [f.key];
       for (var i = 0; i < headers.length; i++) {
-        if (used[i]) continue;
-        var h = String(headers[i] || '').trim().toLowerCase();
-        if (aliases.indexOf(h) >= 0) { mapping[f.key] = i; used[i] = true; break; }
+        var score = matchScore(headers[i], aliases);
+        if (score > 0) {
+          candidates.push({ field: f.key, col: i, score: score });
+        }
       }
     });
+
+    candidates.sort(function(a, b) { return b.score - a.score; });
+    var usedFields = {};
+    for (var c = 0; c < candidates.length; c++) {
+      var cand = candidates[c];
+      if (usedFields[cand.field] || used[cand.col]) continue;
+      mapping[cand.field] = cand.col;
+      usedFields[cand.field] = true;
+      used[cand.col] = true;
+    }
+
     return mapping;
   }
 
@@ -803,8 +859,19 @@
     var data = rows.slice(1).map(function(r){
       return headers.map(function(_, i){ return r[i] == null ? '' : String(r[i]).trim(); });
     });
-    state.excel = { headers: headers, rows: data, mapping: autoMapHeaders(headers), filename: filename };
-    renderCapture();
+    var mapping = autoMapHeaders(headers);
+    state.excel = { headers: headers, rows: data, mapping: mapping, filename: filename };
+
+    var mapped = Object.keys(mapping).filter(function(k){ return mapping[k] !== '' && mapping[k] != null; });
+    var hasNameOrEmail = mapped.indexOf('full_name') >= 0 || mapped.indexOf('first_name') >= 0 || mapped.indexOf('email') >= 0;
+
+    if (hasNameOrEmail && mapped.length >= 2) {
+      renderCapture();
+      setTimeout(function(){ submitExcelImport(); }, 300);
+    } else {
+      renderCapture();
+      toast('Could not auto-detect all columns — please map them manually', true);
+    }
   }
 
   async function submitExcelImport() {
@@ -818,12 +885,30 @@
         o[f.key] = r[idx] || '';
       });
       return o;
-    }).filter(function(o){ return o.full_name || o.email || o.company || o.phone; });
+    }).filter(function(o){ return o.full_name || o.first_name || o.email || o.company || o.phone; });
     if (!leads.length) { toast('Map at least name, email, company, or phone', true); return; }
-    var invalid = leads.filter(function(o){ return leadContactValid(o.full_name, o.email, o.company); });
-    if (invalid.length) { toast(invalid.length + ' row(s) missing name + (email or company)', true); return; }
+    // Skip invalid rows instead of blocking entire import
+    var valid = [];
+    var skippedValidation = 0;
+    leads.forEach(function(o){
+      var name = o.full_name || ((o.first_name || '') + ' ' + (o.last_name || '')).trim();
+      if (!name && !o.email) {
+        skippedValidation++;
+        return;
+      }
+      if (!name && o.email) {
+        o.full_name = o.email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+      }
+      if (!o.full_name && (o.first_name || o.last_name)) {
+        o.full_name = ((o.first_name || '') + ' ' + (o.last_name || '')).trim();
+      }
+      valid.push(o);
+    });
+    leads = valid;
+    if (!leads.length) { toast('No valid rows to import (need at least name or email)', true); return; }
     if (status) status.textContent = 'Writing ' + leads.length + ' to master sheet…';
     var ok = 0, fail = 0, dup = 0;
+    var lastErr = '';
     var existingLeads = await loadSheetLeads(true);
     var seenEmails = {};
     for (var i = 0; i < leads.length; i++) {
@@ -838,15 +923,21 @@
       }
       row.source = 'csv';
       var res = await PS2Api.addLeadToSheet(row);
-      if (res.ok) {
+      if (res.ok || (res.data && (res.data.ok || res.data.success))) {
         ok++;
         if (row.website && row.email) {
           PS2Api.enrichWebsite(row.email, row.website);
         }
-      } else fail++;
+      } else {
+        fail++;
+        lastErr = (res.data && res.data.error) || lastErr;
+      }
     }
-    if (ok) toast('Added ' + ok + ' lead(s) to sheet' + (dup ? ' · ' + dup + ' duplicate email(s) skipped' : '') + (fail ? ' · ' + fail + ' failed' : ''));
-    else toast('Import failed — is /webhook/ps2-add-lead Active in n8n?', true);
+    var skipMsg = (dup ? ' · ' + dup + ' duplicate email(s) skipped' : '') +
+      (skippedValidation ? ' · ' + skippedValidation + ' skipped (invalid)' : '') +
+      (fail ? ' · ' + fail + ' failed' : '');
+    if (ok) toast('Added ' + ok + ' lead(s) to sheet' + skipMsg);
+    else toast(lastErr || ('Import failed — is /webhook/ps2-add-lead Active in n8n?' + skipMsg), true);
     state.excel = { headers: [], rows: [], mapping: {}, filename: '' };
     state.sheetFetchedAt = null;
     renderCapture();
