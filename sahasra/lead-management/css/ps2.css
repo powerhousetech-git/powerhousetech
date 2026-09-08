@@ -259,6 +259,21 @@ body {
   border-radius: 16px; padding: 24px; max-height: 90vh; overflow-y: auto;
 }
 .modal-card h2 { margin: 0 0 16px; font-size: 17px; }
+.batch-modal-card { width: min(520px, 100%); }
+.batch-list { display: flex; flex-direction: column; gap: 8px; max-height: 48vh; overflow-y: auto; margin-bottom: 16px; }
+.batch-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface2, rgba(255,255,255,.03)); cursor: pointer;
+}
+.batch-row input { margin-top: 3px; }
+.batch-row-meta { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 13px; }
+.upload-options .field-label { max-width: 280px; }
+.form-select {
+  display: block; width: 100%; margin-top: 6px;
+  background: var(--surface2, var(--surface)); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 12px; color: var(--text); font: inherit; font-size: 13px;
+}
 
 /* ── Slide-out detail panel ──────────────────────────── */
 .detail-backdrop {
