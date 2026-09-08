@@ -30,7 +30,7 @@
     try {
       res = await fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(body || {}) });
     } catch (err) {
-      return { ok: false, status: 0, data: { error: 'Network error calling n8n' } };
+      return { ok: false, status: 0, data: { error: 'Network error' } };
     }
     var data = {};
     try { data = await res.json(); } catch (_) {
@@ -47,7 +47,7 @@
         status: res.status,
         ackOnly: true,
         data: {
-          error: (label || 'n8n write') + ' acknowledged but did not confirm sheet write — set Respond to Webhook after Sheets append',
+          error: (label || 'Write') + ' acknowledged but did not confirm sheet write — please try again',
           message: res.data && res.data.message,
         },
       };

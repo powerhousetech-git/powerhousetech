@@ -114,7 +114,7 @@
       return state.leads || [];
     }
     if (res.data && res.data.message && /workflow was started/i.test(String(res.data.message))) {
-      toast('n8n portal_data returned an ack only — set the webhook to Respond to Webhook with sheet rows', true);
+      toast('Could not load lead data — please try again or contact support', true);
       return state.leads || [];
     }
     var raw = Array.isArray(res.data) ? res.data
@@ -307,7 +307,7 @@
     var rate = s.conversion_rate != null ? s.conversion_rate + '%' : '—';
     var rateHint = (s.converted_leads || 0) + ' of ' + (s.contacted_leads || 0) + ' contacted';
     main.innerHTML =
-      '<div class="page-head"><div><h1 class="page-title">Dashboard</h1><p class="page-sub">KPIs from master Google Sheet · Pipeline funnel · n8n triggers</p></div>' +
+      '<div class="page-head"><div><h1 class="page-title">Dashboard</h1><p class="page-sub">KPIs from master Google Sheet · Pipeline funnel · outreach actions</p></div>' +
         '<select id="dashboard-batch-filter" class="form-select" style="min-width:180px">' +
           '<option value="">All Batches</option>' +
           batchOptions.map(function(b){
@@ -327,7 +327,7 @@
         kpi('Converted', s.converted_leads || 0, 'gold') +
         kpi('Discarded', s.discarded_leads || 0, '') +
       '</div>' +
-      (state.user && state.user.role !== 'pt_admin' ? n8nRunPanel() : '') +
+      (state.user && state.user.role !== 'pt_admin' ? emailAutomationsPanel() : '') +
       '<div style="display:grid;grid-template-columns:1fr 340px;gap:18px">' +
         '<div class="panel">' +
           '<div class="panel-head"><h2>Pipeline Funnel</h2></div>' +
@@ -364,17 +364,17 @@
       (hint ? '<div class="kpi-hint">' + esc(hint) + '</div>' : '') + '</div>';
   }
 
-  function n8nRunPanel() {
-    return '<div class="panel" style="margin-bottom:18px"><div class="panel-head"><h2>n8n automations</h2></div>' +
+  function emailAutomationsPanel() {
+    return '<div class="panel" style="margin-bottom:18px"><div class="panel-head"><h2>Email automations</h2></div>' +
       '<div style="padding:14px 18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">' +
-        '<button class="btn btn-primary btn-sm" id="n8n-btn-send_email" onclick="window.PS2App.openBatchRunModal()">Run email sequence</button>' +
-        '<button class="btn btn-sm" id="n8n-btn-process_replies" onclick="window.PS2App.triggerN8n(\'process_replies\')">Re-run reply ingest</button>' +
-        '<span id="n8n-run-status" style="font-size:12px;color:var(--muted)"></span>' +
+        '<button class="btn btn-primary btn-sm" id="auto-btn-send_email" onclick="window.PS2App.openBatchRunModal()">Run email sequence</button>' +
+        '<button class="btn btn-sm" id="auto-btn-process_replies" onclick="window.PS2App.triggerAutomation(\'process_replies\')">Re-run reply ingest</button>' +
+        '<span id="auto-run-status" style="font-size:12px;color:var(--muted)"></span>' +
       '</div>' +
       '<div style="padding:0 18px 14px;font-size:12px;color:var(--muted);line-height:1.55">' +
-        '<p style="margin:0 0 6px"><strong style="color:var(--text)">Adding a lead does not send mail by itself.</strong> Outbound runs on the n8n schedule (Workflow A) or when you click <em>Run email sequence</em>.</p>' +
+        '<p style="margin:0 0 6px"><strong style="color:var(--text)">Adding a lead does not send mail by itself.</strong> Outbound runs on the daily schedule or when you click <em>Run email sequence</em>.</p>' +
         '<p style="margin:0 0 6px"><strong style="color:var(--text)">Run email sequence</strong> requires batch selection. Choose which batches to process — day offsets are calculated from each batch\'s first trigger time. No emails are sent on weekends (Saturday/Sunday). US-region leads are processed at ~10 AM EST daily; India leads at 9 AM IST. Skips: responded / meeting proposed / meeting scheduled / human takeover / converted / discarded.</p>' +
-        '<p style="margin:0"><strong style="color:var(--text)">Re-run reply ingest</strong> also fires immediately — pulls Outlook replies now and updates matching leads. Website enrichment still runs when a lead with a website is saved. Sync Sheets is managed in n8n (WF-C retired from portal).</p>' +
+        '<p style="margin:0"><strong style="color:var(--text)">Re-run reply ingest</strong> also fires immediately — pulls inbox replies now and updates matching leads. Website enrichment still runs when a lead with a website is saved.</p>' +
       '</div></div>';
   }
 
@@ -385,7 +385,7 @@
 
   async function openBatchRunModal() {
     closeBatchModal();
-    var status = $('n8n-run-status');
+    var status = $('auto-run-status');
     if (status) status.textContent = 'Loading batches…';
     var leads = await loadSheetLeads(true);
     var batches = getUniqueBatches(leads);
@@ -429,8 +429,8 @@
       toast('Please select at least one batch', true);
       return;
     }
-    var btn = $('n8n-btn-send_email');
-    var status = $('n8n-run-status');
+    var btn = $('auto-btn-send_email');
+    var status = $('auto-run-status');
     var prev = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Running…'; }
     closeBatchModal();
@@ -444,7 +444,7 @@
         triggered_at: new Date().toISOString(),
       });
       if (!res.ok) {
-        toast((res.data && res.data.error) || 'Trigger failed — is the workflow Active?', true);
+        toast((res.data && res.data.error) || 'Trigger failed — please try again', true);
         if (status) status.textContent = 'Error';
         return;
       }
@@ -455,12 +455,12 @@
     }
   }
 
-  async function triggerN8n(workflow) {
+  async function triggerAutomation(workflow) {
     if (workflow === 'send_email') {
       return openBatchRunModal();
     }
-    var btn = $('n8n-btn-' + workflow);
-    var status = $('n8n-run-status');
+    var btn = $('auto-btn-' + workflow);
+    var status = $('auto-run-status');
     var prev = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Running…'; }
     if (status) status.textContent = '';
@@ -473,11 +473,11 @@
         triggered_at: new Date().toISOString(),
       });
       if (!res.ok) {
-        toast((res.data && res.data.error) || 'Trigger failed — is the workflow Active?', true);
+        toast((res.data && res.data.error) || 'Trigger failed — please try again', true);
         if (status) status.textContent = 'Error';
         return;
       }
-      toast('Triggered → n8n');
+      toast('Triggered successfully');
       if (status) status.textContent = 'OK · ' + new Date().toLocaleTimeString();
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = prev; }
@@ -643,7 +643,7 @@
     el.innerHTML =
       '<div class="panel" style="padding:18px">' +
         '<h2 style="margin:0 0 8px;font-size:16px">Master Google Sheet</h2>' +
-        '<p style="font-size:13px;color:var(--muted);margin:0 0 12px">Field-team sheet connections are managed in n8n. The portal uses one master sheet.</p>' +
+        '<p style="font-size:13px;color:var(--muted);margin:0 0 12px">The portal uses one master Google Sheet for all leads.</p>' +
         '<a class="btn btn-sm" href="' + esc(sheetUrl) + '" target="_blank" rel="noopener">Open master sheet</a>' +
       '</div>';
   }
@@ -742,7 +742,7 @@
     if (!data) return null;
     if (data.error) return { error: data.error };
     if (data.message && /workflow was started/i.test(String(data.message))) {
-      return { error: 'OCR webhook acknowledged but returned no contact — set Respond to Webhook' };
+      return { error: 'OCR acknowledged but returned no contact — please try again' };
     }
     if (Array.isArray(data.contacts) && data.contacts[0]) data = data.contacts[0];
     else if (Array.isArray(data.leads) && data.leads[0]) data = data.leads[0];
@@ -750,7 +750,7 @@
     if (typeof data !== 'object' || Array.isArray(data)) return null;
     if (!(data.name || data.Name || data.email || data.Email || data.company || data.Company || data.phone || data.Phone)) {
       if (!Object.keys(data).length) {
-        return { error: 'Empty OCR response — check n8n PS2 Card OCR workflow' };
+        return { error: 'Empty OCR response — card scan did not return contact fields' };
       }
       return null;
     }
@@ -1164,7 +1164,7 @@
       state.sheetFetchedAt = null;
       renderCapture();
     } else if (fail) {
-      toast(lastErr || ('Import failed — is /webhook/ps2-add-lead Active in n8n?' + (summary ? ' · ' + summary : '')), true);
+      toast(lastErr || ('Import failed — please try again' + (summary ? ' · ' + summary : '')), true);
       state.excelImportStatus = summary || lastErr || 'Import failed';
       if (status) status.textContent = state.excelImportStatus;
       if (btn) btn.disabled = false;
@@ -1333,7 +1333,7 @@
 
         '<div class="email-timeline" style="margin-top:22px">' +
           '<h3 style="font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Email detail</h3>' +
-          (sortedEmails.length === 0 ? '<p style="color:var(--muted);font-size:13px">No emails in Supabase log yet (n8n still writes sent/received here).</p>' : '') +
+          (sortedEmails.length === 0 ? '<p style="color:var(--muted);font-size:13px">No emails logged for this lead yet.</p>' : '') +
           sortedEmails.map(function(e){
             var dir = e.direction === 'inbound' ? '← Reply' : '→ Outbound';
             var dirColor = e.direction === 'inbound' ? 'var(--green)' : 'var(--gold)';
@@ -1725,7 +1725,7 @@
   async function renderTracker() {
     var main = $('main-content');
     main.innerHTML = '<div class="page-head"><div><h1 class="page-title">Client Tracker</h1>' +
-      '<p class="page-sub">Project tracker moved off Supabase. Rebuild on a Google Sheet tab if needed — currently managed in n8n.</p></div></div>';
+      '<p class="page-sub">Project tracker moved off the previous database. Rebuild on a Google Sheet tab if needed.</p></div></div>';
     return;
 
     var main = $('main-content');
@@ -1824,30 +1824,15 @@
     } else if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
       s = res.data.data || res.data || {};
     }
-    var wh = (window.PS2 && PS2.N8N_WEBHOOKS) || {};
     var rowsHtml = Object.keys(s).length
       ? Object.keys(s).map(function(k){
           return '<tr><td style="font-family:monospace;font-size:12px">' + esc(k) + '</td><td style="font-size:13px">' + esc(String(s[k])) + '</td></tr>';
         }).join('')
-      : '<tr><td colspan="2" style="color:var(--muted);padding:16px;text-align:center">No rows from portal_data?op=settings yet</td></tr>';
+      : '<tr><td colspan="2" style="color:var(--muted);padding:16px;text-align:center">No settings rows yet</td></tr>';
 
     main.innerHTML =
       '<div class="page-head"><div><h1 class="page-title">System Settings</h1>' +
-        '<p class="page-sub">Read from Google Sheet Settings tab via n8n · writes go through update-lead</p></div></div>' +
-      '<div class="settings-card">' +
-        '<h3>Portal ↔ n8n</h3>' +
-        '<p style="font-size:13px;color:var(--muted);margin:0 0 8px">Backend is n8n + Google Sheets. Supabase Edge Function is retired.</p>' +
-        '<div style="font-size:12px;line-height:1.7">' +
-          '<div><strong>N8N_BASE</strong> · ' + esc((window.PS2 && PS2.N8N_BASE) || '') + '</div>' +
-          '<div><strong>portal_data</strong> · ' + esc(wh.portal_data || '') + '</div>' +
-          '<div><strong>add_lead</strong> · ' + esc(wh.add_lead || '') + '</div>' +
-          '<div><strong>update_lead</strong> · ' + esc(wh.update_lead || '') + '</div>' +
-          '<div><strong>send_email</strong> · ' + esc(wh.send_email || '') + '</div>' +
-          '<div><strong>process_replies</strong> · ' + esc(wh.process_replies || '') + '</div>' +
-          '<div><strong>enrich_website</strong> · ' + esc(wh.enrich_website || '') + '</div>' +
-          '<div><strong>card_ocr</strong> · ' + esc(wh.card_ocr || '') + '</div>' +
-        '</div>' +
-      '</div>' +
+        '<p class="page-sub">Booking link, AI prompts, and sheet settings</p></div></div>' +
       '<div class="settings-card">' +
         '<h3>Sheet settings (key / value)</h3>' +
         '<table class="data-table"><thead><tr><th>Key</th><th>Value</th></tr></thead><tbody>' + rowsHtml + '</tbody></table>' +
@@ -1872,7 +1857,7 @@
   }
   function webhookField(label, id, val) {
     return '<div style="margin-bottom:12px"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">' + label + '</label>' +
-      '<input id="' + id + '" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font:inherit;font-size:13px" value="' + esc(val||'') + '" placeholder="https://n8n…/webhook/…" /></div>';
+      '<input id="' + id + '" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font:inherit;font-size:13px" value="' + esc(val||'') + '" placeholder="https://…" /></div>';
   }
   function promptField(label, id, val) {
     return '<div style="margin-bottom:12px"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">' + label + '</label>' +
@@ -1908,14 +1893,14 @@
   async function renderOutlook() {
     var main = $('main-content');
     main.innerHTML = '<div class="page-head"><div><h1 class="page-title">Outlook</h1>' +
-      '<p class="page-sub">Outlook OAuth is managed inside n8n credentials.</p></div></div>';
+      '<p class="page-sub">Mailbox connection is managed by your PowerhouseTech admin.</p></div></div>';
     return;
 
     var main = $('main-content');
     var res = await PS2Api.outlookAccounts();
     var accounts = (res.ok && res.data.data) || [];
     main.innerHTML =
-      '<div class="page-head"><div><h1 class="page-title">Outlook Accounts</h1><p class="page-sub">Connected via n8n OAuth — configured in n8n credentials</p></div></div>' +
+      '<div class="page-head"><div><h1 class="page-title">Outlook Accounts</h1><p class="page-sub">Connected mailboxes for outreach</p></div></div>' +
       '<div class="panel"><table class="data-table"><thead><tr><th>User</th><th>Email</th><th>Status</th></tr></thead><tbody>' +
         accounts.map(function(a){
           return '<tr><td>' + esc(a.display_name||'') + '</td><td>' + esc(a.email||'') + '</td>' +
@@ -1924,14 +1909,14 @@
       (accounts.length===0?'<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:24px">No accounts configured</td></tr>':'') +
       '</tbody></table></div>' +
       '<div class="settings-card" style="margin-top:0"><h3>About Outlook Integration</h3>' +
-        '<p style="font-size:13px;color:var(--muted);margin:0">Outlook OAuth is managed inside n8n. Connect accounts there and assign the email address to each user in the Users settings. n8n uses the assigned account to send outreach emails for that user\'s leads.</p>' +
+        '<p style="font-size:13px;color:var(--muted);margin:0">Connect accounts with your PowerhouseTech admin and assign the email address to each user. Outreach emails are sent from the assigned account.</p>' +
       '</div>';
   }
 
   async function renderSheets() {
     var main = $('main-content');
     main.innerHTML = '<div class="page-head"><div><h1 class="page-title">Google Sheets</h1>' +
-      '<p class="page-sub">One master sheet is configured in the portal. Field sync connections are managed in n8n.</p></div></div>';
+      '<p class="page-sub">One master sheet is configured in the portal.</p></div></div>';
     return;
 
     var main = $('main-content');
@@ -1954,7 +1939,7 @@
 
       '<div class="settings-card">' +
         '<h3>Master lead database</h3>' +
-        '<p style="font-size:13px;margin:0 0 8px">All leads live in this Google Sheet. Portal embeds it read-only; n8n reads/writes via Sheets API.</p>' +
+        '<p style="font-size:13px;margin:0 0 8px">All leads live in this Google Sheet. Portal embeds it read-only; automations read and write via the Sheets API.</p>' +
         '<p style="font-size:13px;margin:0"><a href="' + esc(master.url || PS2.SHEET_URL) + '" target="_blank" rel="noopener" style="color:var(--gold)">' + esc(master.url || PS2.SHEET_URL) + '</a></p>' +
         '<p style="font-size:12px;color:var(--muted);margin:8px 0 0">Tab: ' + esc(master.tab || 'Sheet1') + ' · ID: ' + esc(master.id || PS2.SHEET_ID) + '</p>' +
         '<p style="font-size:12px;color:var(--muted);margin:4px 0 0">Last portal fetch: ' + (state.sheetFetchedAt ? relTime(new Date(state.sheetFetchedAt).toISOString()) : '—') + '</p>' +
@@ -1969,7 +1954,7 @@
           : '<p style="font-size:13px;margin:0">' + (booking ? '<a href="' + esc(booking) + '" target="_blank" rel="noopener" style="color:var(--gold)">' + esc(booking) + '</a>' : '— not set —') + '</p>') +
       '</div>' +
 
-      '<div class="page-head" style="margin-top:8px"><div><h2 class="page-title" style="font-size:18px">Field team sheets (WF-C)</h2>' +
+      '<div class="page-head" style="margin-top:8px"><div><h2 class="page-title" style="font-size:18px">Field team sheets</h2>' +
         '<p class="page-sub">External collection sheets synced into the master</p></div></div>' +
       '<div class="panel"><table class="data-table"><thead><tr><th>Sheet URL</th><th>Tab</th><th>Sync Interval</th><th>Last Synced</th><th>Active</th><th></th></tr></thead><tbody>' +
         conns.map(function(c){
@@ -2076,7 +2061,7 @@
     body.region = normalizeRegion(body.region || 'IN');
     body.Region = body.region;
     var res = await PS2Api.addLeadToSheet(body);
-    if (!res.ok) { toast((res.data && res.data.error) || 'Failed — is /webhook/ps2-add-lead Active?', true); return; }
+    if (!res.ok) { toast((res.data && res.data.error) || 'Failed to save lead', true); return; }
     toast('Lead written to master sheet · ' + batch);
     closeModal();
     if (body.website && body.email) {
@@ -2121,7 +2106,7 @@
     body.region = normalizeRegion(body.region || 'IN');
     body.Region = body.region;
     var res = await PS2Api.updateLeadInSheet(body);
-    if (!res.ok) { toast((res.data && res.data.error) || 'Failed — is /webhook/ps2-update-lead Active?', true); return; }
+    if (!res.ok) { toast((res.data && res.data.error) || 'Failed to update lead', true); return; }
     toast('Lead updated in sheet');
     closeModal();
     state.sheetFetchedAt = null;
@@ -2198,7 +2183,7 @@
   }
 
   async function submitAddSheet() {
-    toast('Sheet connections managed in n8n', true); return;
+    toast('Sheet connections are managed by your admin', true); return;
 
     var body = {
       sheet_url: $('ns-url').value.trim(),
@@ -2373,11 +2358,11 @@
       leadOpts = '<option value="' + preselectedLeadId + '" selected>Current lead</option>' + leadOpts;
     }
     openModal('<div class="modal-card"><h2>Upload photo / PDF</h2><div class="form-panel">' +
-      '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">Attach a business card image or PDF to a lead. OCR via n8n (WF-E) is optional and only runs if configured.</p>' +
+      '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">Attach a business card image or PDF to a lead. OCR extraction is optional and only runs if configured.</p>' +
       '<label class="field-label">Lead<select id="lu-lead">' + leadOpts + '</select></label>' +
       '<label class="field-label">File<input id="lu-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.heic,.heif,application/pdf,image/*" /></label>' +
       '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)">' +
-        '<input type="checkbox" id="lu-ocr" /> Request OCR extraction (needs WF-E)</label>' +
+        '<input type="checkbox" id="lu-ocr" /> Request OCR extraction</label>' +
       '<div class="form-actions"><button class="btn btn-primary" onclick="window.PS2App.submitLeadUpload()">Upload</button>' +
       '<button class="btn btn-ghost" onclick="window.PS2App.closeModal()">Cancel</button></div></div></div>');
   }
@@ -2541,7 +2526,7 @@
   }
 
   async function toggleSheet(id, active) {
-    toast('Sheet connections managed in n8n', true); return;
+    toast('Sheet connections are managed by your admin', true); return;
 
     var res = await PS2Api.patchSheetConnection(id, { is_active: active });
     if (!res.ok) { toast((res.data && res.data.error) || 'Could not update sheet', true); return; }
@@ -2550,7 +2535,7 @@
   }
 
   async function deleteSheet(id) {
-    toast('Sheet connections managed in n8n', true); return;
+    toast('Sheet connections are managed by your admin', true); return;
 
     if (!confirm('Remove this field-team sheet connection?')) return;
     var res = await PS2Api.deleteSheetConnection(id);
@@ -2609,7 +2594,8 @@
     scheduleMeeting: scheduleMeeting, submitScheduleMeeting: submitScheduleMeeting,
     markMeetingBooked: markMeetingBooked,
     convertLead: convertLead, submitConvert: submitConvert, discardLead: discardLead, deleteLead: deleteLead,
-    triggerN8n: triggerN8n,
+    triggerAutomation: triggerAutomation,
+    triggerN8n: triggerAutomation,
     openBatchRunModal: openBatchRunModal,
     closeBatchModal: closeBatchModal,
     runSelectedBatches: runSelectedBatches,
