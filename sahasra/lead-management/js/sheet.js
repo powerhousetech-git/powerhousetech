@@ -53,8 +53,9 @@
     leads.forEach(function (l) {
       var st = normStatus(l.status);
       if (st === 'mail_1_sent' || FOLLOW_UP_STATUSES.indexOf(st) >= 0 || st === 'responded' ||
-          st === 'meeting_proposed' || st === 'meeting_scheduled' || st === 'human_takeover' || st === 'converted') contacted++;
-      if (st === 'mail_1_sent') mail1++;
+          st === 'meeting_proposed' || st === 'meeting_scheduled' || st === 'human_takeover' || st === 'converted' || st === 'discarded') contacted++;
+      // Count every lead past "new" — they all received at least Mail 1
+      if (st !== 'new') mail1++;
       if (FOLLOW_UP_STATUSES.indexOf(st) >= 0) fus++;
       if (st === 'responded') responded++;
       if (st === 'meeting_proposed') meetingProposed++;
