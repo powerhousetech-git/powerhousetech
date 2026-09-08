@@ -317,7 +317,7 @@
         '</select></div>' +
       '<div class="kpi-row">' +
         kpi('Total Leads', s.total_leads || 0, '') +
-        kpi('Mail 1s sent', s.mail_1_sent || 0, 'blue') +
+        kpi('Emailed', s.mail_1_sent || 0, 'blue') +
         kpi('Follow-ups', s.follow_ups_sent || 0, '') +
         kpi('Responses', s.responses || 0, 'green') +
       '</div>' +
