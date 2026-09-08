@@ -63,6 +63,10 @@
   function toSheetPayload(lead, extra) {
     lead = lead || {};
     var name = lead.name || lead.full_name || '';
+    var region = String(lead.region || lead.Region || 'IN').toUpperCase();
+    if (region !== 'US') region = 'IN';
+    var batch = lead.batch || lead.Batch || '';
+    var triggered = lead.batch_triggered_at || lead['Batch Triggered At'] || '';
     var out = {
       name: name,
       full_name: name,
@@ -75,7 +79,15 @@
       status: lead.status || 'new',
       notes: lead.notes || '',
       follow_up_count: lead.follow_up_count != null ? lead.follow_up_count : undefined,
+      batch: batch || undefined,
+      Batch: batch || undefined,
+      region: region,
+      Region: region,
     };
+    if (triggered) {
+      out.batch_triggered_at = triggered;
+      out['Batch Triggered At'] = triggered;
+    }
     if (extra) Object.keys(extra).forEach(function (k) { out[k] = extra[k]; });
     Object.keys(out).forEach(function (k) { if (out[k] === undefined) delete out[k]; });
     return out;

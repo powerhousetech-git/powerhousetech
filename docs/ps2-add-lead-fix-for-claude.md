@@ -39,11 +39,27 @@ That is **Respond Immediately**. Portal previously treated HTTP 200 as success (
   "website": "…",
   "source": "pdf",
   "status": "new",
-  "notes": ""
+  "notes": "",
+  "batch": "B-0908-1130",
+  "Batch": "B-0908-1130",
+  "region": "IN",
+  "Region": "IN"
 }
 ```
 
+Map sheet columns **Batch** (N), **Batch Triggered At** (O — leave blank on create), **Region** (P: `IN` or `US`).
+
 Auth: `x-api-key` + `Shreyas09`.
+
+## WF-A send email — batch body
+Portal `Run email sequence` now POSTs:
+```json
+{ "batches": ["B-0908-1130", "B-0908-1430"], "event": "portal.trigger", "workflow": "send_email" }
+```
+If `batches` is empty/missing, do nothing. Set **Batch Triggered At** on first trigger for that batch. Day offsets are relative to that timestamp; skip Sat/Sun. Region drives send window (IN ~9 AM IST, US ~10 AM EST).
+
+## Auto-reply / WF-B note
+Screenshot error `Invalid credentials: [Errno 110] Connection timed out` is an n8n Outlook/credential connectivity issue — not portal. Re-auth Microsoft credentials / check network egress.
 
 ## Verify
 After fix, POST a test lead → response JSON with `ok:true` → row visible in Sheet1 and in `GET /webhook/ps2-portal-data?op=leads`.

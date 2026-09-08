@@ -17,12 +17,68 @@
     excelImportStatus: '',
     sheetFetchedAt: null,
     ocrExtractedLeads: [],
+    uploadRegion: 'IN',
+    dashboardBatchFilter: '',
+    leadTrackerBatch: '',
   };
+
+  var REGION_LABELS = { IN: 'India', US: 'US' };
+  var REGION_BADGE = { IN: 'badge-gray', US: 'badge-blue' };
+
+  function generateBatchNumber() {
+    var now = new Date();
+    var mm = String(now.getMonth() + 1).padStart(2, '0');
+    var dd = String(now.getDate()).padStart(2, '0');
+    var hh = String(now.getHours()).padStart(2, '0');
+    var min = String(now.getMinutes()).padStart(2, '0');
+    return 'B-' + mm + dd + '-' + hh + min;
+  }
+
+  function normalizeRegion(r) {
+    r = String(r || 'IN').toUpperCase().trim();
+    return r === 'US' ? 'US' : 'IN';
+  }
+
+  function regionBadge(r) {
+    r = normalizeRegion(r);
+    return '<span class="badge ' + (REGION_BADGE[r] || 'badge-gray') + '">' + esc(REGION_LABELS[r] || r) + '</span>';
+  }
+
+  function getUniqueBatches(leads) {
+    var batches = {};
+    (leads || []).forEach(function(lead) {
+      var b = lead.Batch || lead.batch || '';
+      if (!b) return;
+      if (!batches[b]) {
+        batches[b] = {
+          batch: b,
+          count: 0,
+          triggered: !!(lead['Batch Triggered At'] || lead.batch_triggered_at),
+          triggeredAt: lead['Batch Triggered At'] || lead.batch_triggered_at || '',
+        };
+      }
+      batches[b].count++;
+      if (lead['Batch Triggered At'] || lead.batch_triggered_at) {
+        batches[b].triggered = true;
+        batches[b].triggeredAt = lead['Batch Triggered At'] || lead.batch_triggered_at || batches[b].triggeredAt;
+      }
+    });
+    return Object.values(batches).sort(function(a, b) { return b.batch.localeCompare(a.batch); });
+  }
+
+  function readUploadRegion(id) {
+    var el = $(id || 'upload-region');
+    if (el && el.value) {
+      state.uploadRegion = normalizeRegion(el.value);
+      return state.uploadRegion;
+    }
+    return normalizeRegion(state.uploadRegion || 'IN');
+  }
 
   function normalizeSheetLead(row) {
     row = row || {};
     return {
-      id: (row.Email || row.Email || row.Email || '').toLowerCase().trim() || (row.Name || row.name || ''),
+      id: (row.Email || row.email || '').toLowerCase().trim() || (row.Name || row.name || ''),
       name: row.Name || row.name || '',
       full_name: row.Name || row.name || row.full_name || '',
       email: (row.Email || row.email || '').toLowerCase().trim(),
@@ -39,6 +95,12 @@
       notes: row.Notes || row.notes || '',
       updated_at: row['Updated At'] || row.updated_at || '',
       last_activity_at: row['Last Activity'] || row.last_activity_at || '',
+      batch: row.Batch || row.batch || '',
+      Batch: row.Batch || row.batch || '',
+      batch_triggered_at: row['Batch Triggered At'] || row.batch_triggered_at || '',
+      'Batch Triggered At': row['Batch Triggered At'] || row.batch_triggered_at || '',
+      region: normalizeRegion(row.Region || row.region || 'IN'),
+      Region: normalizeRegion(row.Region || row.region || 'IN'),
     };
   }
 
@@ -220,7 +282,12 @@
   ──────────────────────────────────────────────────────────────────────────── */
   async function renderDashboard() {
     var main = $('main-content');
-    var [leads, emailLogRes] = await Promise.all([loadSheetLeads(true), PS2Api.listEmails()]);
+    var [leadsAll, emailLogRes] = await Promise.all([loadSheetLeads(true), PS2Api.listEmails()]);
+    var batchFilter = state.dashboardBatchFilter || '';
+    var batchOptions = getUniqueBatches(leadsAll);
+    var leads = batchFilter
+      ? leadsAll.filter(function(l){ return (l.Batch || l.batch || '') === batchFilter; })
+      : leadsAll;
     var s = PS2Sheet.computeKpis(leads);
     var emailLog = Array.isArray(emailLogRes.data) ? emailLogRes.data
       : (emailLogRes.data && Array.isArray(emailLogRes.data.data) ? emailLogRes.data.data : []);
@@ -240,7 +307,14 @@
     var rate = s.conversion_rate != null ? s.conversion_rate + '%' : '—';
     var rateHint = (s.converted_leads || 0) + ' of ' + (s.contacted_leads || 0) + ' contacted';
     main.innerHTML =
-      '<div class="page-head"><div><h1 class="page-title">Dashboard</h1><p class="page-sub">KPIs from master Google Sheet · Pipeline funnel · n8n triggers</p></div></div>' +
+      '<div class="page-head"><div><h1 class="page-title">Dashboard</h1><p class="page-sub">KPIs from master Google Sheet · Pipeline funnel · n8n triggers</p></div>' +
+        '<select id="dashboard-batch-filter" class="form-select" style="min-width:180px">' +
+          '<option value="">All Batches</option>' +
+          batchOptions.map(function(b){
+            return '<option value="' + esc(b.batch) + '"' + (batchFilter === b.batch ? ' selected' : '') + '>' +
+              esc(b.batch) + ' (' + b.count + ')</option>';
+          }).join('') +
+        '</select></div>' +
       '<div class="kpi-row">' +
         kpi('Total Leads', s.total_leads || 0, '') +
         kpi('Mail 1s sent', s.mail_1_sent || 0, 'blue') +
@@ -276,6 +350,13 @@
           (activity.length === 0 ? '<li class="activity-item"><div class="activity-dot"></div><div style="color:var(--muted)">No activity yet</div></li>' : '') +
           '</ul></div>' +
       '</div>';
+    var batchSel = $('dashboard-batch-filter');
+    if (batchSel) {
+      batchSel.addEventListener('change', function(){
+        state.dashboardBatchFilter = this.value;
+        renderDashboard();
+      });
+    }
   }
 
   function kpi(label, val, colorClass, hint) {
@@ -286,18 +367,98 @@
   function n8nRunPanel() {
     return '<div class="panel" style="margin-bottom:18px"><div class="panel-head"><h2>n8n automations</h2></div>' +
       '<div style="padding:14px 18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">' +
-        '<button class="btn btn-primary btn-sm" id="n8n-btn-send_email" onclick="window.PS2App.triggerN8n(\'send_email\')">Run email sequence</button>' +
+        '<button class="btn btn-primary btn-sm" id="n8n-btn-send_email" onclick="window.PS2App.openBatchRunModal()">Run email sequence</button>' +
         '<button class="btn btn-sm" id="n8n-btn-process_replies" onclick="window.PS2App.triggerN8n(\'process_replies\')">Re-run reply ingest</button>' +
         '<span id="n8n-run-status" style="font-size:12px;color:var(--muted)"></span>' +
       '</div>' +
       '<div style="padding:0 18px 14px;font-size:12px;color:var(--muted);line-height:1.55">' +
         '<p style="margin:0 0 6px"><strong style="color:var(--text)">Adding a lead does not send mail by itself.</strong> Outbound runs on the n8n schedule (Workflow A) or when you click <em>Run email sequence</em>.</p>' +
-        '<p style="margin:0 0 6px"><strong style="color:var(--text)">Run email sequence</strong> fires immediately. n8n asks who is due — only those contacts get mail (skips responded / meeting proposed / meeting scheduled / human takeover / converted / discarded, and anyone emailed in the last 24h).</p>' +
+        '<p style="margin:0 0 6px"><strong style="color:var(--text)">Run email sequence</strong> requires batch selection. Choose which batches to process — day offsets are calculated from each batch\'s first trigger time. No emails are sent on weekends (Saturday/Sunday). US-region leads are processed at ~10 AM EST daily; India leads at 9 AM IST. Skips: responded / meeting proposed / meeting scheduled / human takeover / converted / discarded.</p>' +
         '<p style="margin:0"><strong style="color:var(--text)">Re-run reply ingest</strong> also fires immediately — pulls Outlook replies now and updates matching leads. Website enrichment still runs when a lead with a website is saved. Sync Sheets is managed in n8n (WF-C retired from portal).</p>' +
       '</div></div>';
   }
 
+  function closeBatchModal() {
+    var m = $('batch-modal');
+    if (m) m.remove();
+  }
+
+  async function openBatchRunModal() {
+    closeBatchModal();
+    var status = $('n8n-run-status');
+    if (status) status.textContent = 'Loading batches…';
+    var leads = await loadSheetLeads(true);
+    var batches = getUniqueBatches(leads);
+    if (status) status.textContent = '';
+    if (!batches.length) {
+      toast('No batches found — upload leads first so each row gets a Batch id', true);
+      return;
+    }
+    var listHtml = batches.map(function(b) {
+      var badge = b.triggered
+        ? '<span class="badge badge-blue">ACTIVE</span>' +
+          (b.triggeredAt ? ' <span style="font-size:11px;color:var(--muted)">' + esc(fmtDateTime(b.triggeredAt)) + '</span>' : '')
+        : '<span class="badge badge-emerald">NEW</span>';
+      return '<label class="batch-row">' +
+        '<input type="checkbox" value="' + esc(b.batch) + '"' + (b.triggered ? '' : ' checked') + ' />' +
+        '<span class="batch-row-meta"><strong>' + esc(b.batch) + '</strong>' +
+        '<span style="color:var(--muted)">' + b.count + ' lead' + (b.count === 1 ? '' : 's') + '</span>' +
+        badge + '</span></label>';
+    }).join('');
+    document.body.insertAdjacentHTML('beforeend',
+      '<div id="batch-modal" class="modal-backdrop">' +
+        '<div class="modal-card batch-modal-card">' +
+          '<h2>Select batches to run</h2>' +
+          '<p class="text-muted" style="margin:0 0 14px;font-size:13px;color:var(--muted)">Only selected batches will be processed. Unselected batches are skipped. Day offsets start from each batch\'s first trigger time.</p>' +
+          '<div id="batch-list" class="batch-list">' + listHtml + '</div>' +
+          '<div class="form-actions modal-actions">' +
+            '<button type="button" class="btn btn-ghost" onclick="window.PS2App.closeBatchModal()">Cancel</button>' +
+            '<button type="button" class="btn btn-primary" onclick="window.PS2App.runSelectedBatches()">Run Sequence</button>' +
+          '</div>' +
+        '</div></div>');
+    var backdrop = $('batch-modal');
+    if (backdrop) backdrop.addEventListener('click', function(e){ if (e.target === backdrop) closeBatchModal(); });
+  }
+
+  async function runSelectedBatches() {
+    var selected = [];
+    document.querySelectorAll('#batch-list input[type=checkbox]:checked').forEach(function(cb) {
+      selected.push(cb.value);
+    });
+    if (selected.length === 0) {
+      toast('Please select at least one batch', true);
+      return;
+    }
+    var btn = $('n8n-btn-send_email');
+    var status = $('n8n-run-status');
+    var prev = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Running…'; }
+    closeBatchModal();
+    toast('Triggering email sequence for ' + selected.length + ' batch(es)…');
+    try {
+      var res = await PS2Api.triggerN8nDirect('send_email', {
+        event: 'portal.trigger',
+        workflow: 'send_email',
+        batches: selected,
+        triggered_by: state.user && state.user.username,
+        triggered_at: new Date().toISOString(),
+      });
+      if (!res.ok) {
+        toast((res.data && res.data.error) || 'Trigger failed — is the workflow Active?', true);
+        if (status) status.textContent = 'Error';
+        return;
+      }
+      toast('Email sequence triggered for ' + selected.length + ' batch(es)');
+      if (status) status.textContent = 'OK · ' + selected.length + ' batch(es) · ' + new Date().toLocaleTimeString();
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = prev || 'Run email sequence'; }
+    }
+  }
+
   async function triggerN8n(workflow) {
+    if (workflow === 'send_email') {
+      return openBatchRunModal();
+    }
     var btn = $('n8n-btn-' + workflow);
     var status = $('n8n-run-status');
     var prev = btn ? btn.textContent : '';
@@ -305,7 +466,6 @@
     if (status) status.textContent = '';
     toast('Triggering ' + workflow + '…');
     try {
-      // Prefer direct n8n webhook (v6); fall back to Edge proxy
       var res = await PS2Api.triggerN8nDirect(workflow, {
         event: 'portal.trigger',
         workflow: workflow,
@@ -396,9 +556,17 @@
   }
 
   function renderPdfCapture(el) {
+    var region = normalizeRegion(state.uploadRegion || 'IN');
     el.innerHTML =
       '<div class="panel"><div class="panel-head"><h2>PDF / image business cards</h2></div>' +
         '<div style="padding:18px">' +
+          '<div class="upload-options" style="margin-bottom:14px">' +
+            '<label class="field-label">Region for this batch' +
+              '<select id="upload-region" class="form-select">' +
+                '<option value="IN"' + (region === 'IN' ? ' selected' : '') + '>India (default)</option>' +
+                '<option value="US"' + (region === 'US' ? ' selected' : '') + '>United States</option>' +
+              '</select></label>' +
+          '</div>' +
           '<div class="drop-zone" id="pdf-drop">' +
             '<div class="drop-zone-icon">📇</div>' +
             '<p><strong>Drop a business card photo or PDF</strong></p>' +
@@ -408,11 +576,14 @@
           '<p id="pdf-status" style="font-size:13px;color:var(--muted);margin:12px 0 0"></p>' +
           '<div id="ocr-results" style="margin-top:16px"></div>' +
         '</div></div>';
+    var regionSel = $('upload-region');
+    if (regionSel) regionSel.addEventListener('change', function(){ state.uploadRegion = normalizeRegion(this.value); });
     bindDropZone($('pdf-drop'), $('pdf-file'), handlePdfFiles);
   }
 
   function renderExcelCapture(el) {
     var ex = state.excel;
+    var region = normalizeRegion(state.uploadRegion || 'IN');
     var mappingHtml = '';
     if (ex.headers.length) {
       mappingHtml =
@@ -441,6 +612,13 @@
     el.innerHTML =
       '<div class="panel"><div class="panel-head"><h2>Excel or CSV</h2></div>' +
         '<div style="padding:18px">' +
+          '<div class="upload-options" style="margin-bottom:14px">' +
+            '<label class="field-label">Region for this batch' +
+              '<select id="upload-region" class="form-select">' +
+                '<option value="IN"' + (region === 'IN' ? ' selected' : '') + '>India</option>' +
+                '<option value="US"' + (region === 'US' ? ' selected' : '') + '>United States</option>' +
+              '</select></label>' +
+          '</div>' +
           '<div class="drop-zone" id="xlsx-drop">' +
             '<div class="drop-zone-icon">📊</div>' +
             '<p><strong>Drop a spreadsheet</strong></p>' +
@@ -448,6 +626,8 @@
             '<input type="file" id="xlsx-file" accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />' +
           '</div>' +
         '</div>' + mappingHtml + '</div>';
+    var regionSel = $('upload-region');
+    if (regionSel) regionSel.addEventListener('change', function(){ state.uploadRegion = normalizeRegion(this.value); });
     bindDropZone($('xlsx-drop'), $('xlsx-file'), handleExcelFiles);
     el.querySelectorAll('select[data-map]').forEach(function(sel){
       sel.addEventListener('change', function(){
@@ -582,9 +762,15 @@
     var existingLeads = await loadSheetLeads(true);
     var seenEmails = {};
     var imported = [];
+    var batch = generateBatchNumber();
+    var region = readUploadRegion('upload-region');
     for (var i = 0; i < extractedLeads.length; i++) {
       var row = mapOcrContact(extractedLeads[i]);
       row.source = 'pdf';
+      row.batch = batch;
+      row.Batch = batch;
+      row.region = region;
+      row.Region = region;
       var emailKey = String(row.email || '').trim().toLowerCase();
       if (!emailKey) { skipped++; continue; }
       if (leadContactValid(row.full_name, row.email, row.company)) { skipped++; continue; }
@@ -601,7 +787,7 @@
         if (row.website && row.email) PS2Api.enrichWebsite(row.email, row.website);
       } else fail++;
     }
-    return { ok: ok, fail: fail, dup: dup, skipped: skipped, imported: imported };
+    return { ok: ok, fail: fail, dup: dup, skipped: skipped, imported: imported, batch: batch, region: region };
   }
 
   function renderOcrSummary(result, extractedLeads) {
@@ -617,6 +803,7 @@
     resultsEl.innerHTML =
       '<div class="panel" style="padding:14px">' +
         '<p style="margin:0 0 8px;font-size:13px">Saved to master sheet automatically. Edit rows there if anything needs fixing.</p>' +
+        (result.batch ? '<p style="margin:0 0 8px;font-size:12px;color:var(--muted)">Batch <code>' + esc(result.batch) + '</code> · Region ' + esc(REGION_LABELS[result.region] || result.region || 'India') + '</p>' : '') +
         '<ul style="margin:0;padding-left:18px;font-size:13px">' + lines + '</ul>' +
         '<p style="margin:10px 0 0;font-size:12px;color:var(--muted)">' +
           (result.ok || 0) + ' added' +
@@ -930,6 +1117,8 @@
     var lastErr = '';
     var existingLeads = await loadSheetLeads(true);
     var seenEmails = {};
+    var batch = generateBatchNumber();
+    var region = readUploadRegion('upload-region');
     for (var i = 0; i < leads.length; i++) {
       var row = leads[i];
       var emailKey = String(row.email || '').trim().toLowerCase();
@@ -944,6 +1133,10 @@
       }
       seenEmails[emailKey] = true;
       row.source = 'csv';
+      row.batch = batch;
+      row.Batch = batch;
+      row.region = region;
+      row.Region = region;
       var res = await PS2Api.addLeadToSheet(row);
       if (res.ok || (res.data && (res.data.ok || res.data.success))) {
         ok++;
@@ -965,8 +1158,8 @@
     var summary = summaryParts.join(' · ');
 
     if (ok) {
-      toast('Added ' + ok + ' lead(s) to sheet' + (dup ? ' · ' + dup + ' duplicate(s) skipped' : '') + (fail ? ' · ' + fail + ' failed' : ''));
-      state.excelImportStatus = summary;
+      toast('Added ' + ok + ' lead(s) to sheet · batch ' + batch + (dup ? ' · ' + dup + ' duplicate(s) skipped' : '') + (fail ? ' · ' + fail + ' failed' : ''));
+      state.excelImportStatus = summary + (batch ? ' · ' + batch : '');
       state.excel = { headers: [], rows: [], mapping: {}, filename: '' };
       state.sheetFetchedAt = null;
       renderCapture();
@@ -1110,9 +1303,12 @@
           detailField('Phone', lead.phone) +
           detailField('Designation', lead.designation) +
           detailField('Source', lead.source) +
+          detailField('Batch', lead.Batch || lead.batch || '—') +
+          '<div class="detail-field"><label>Region</label><span>' + regionBadge(lead.region || lead.Region) + '</span></div>' +
           '<div class="detail-field"><label>Website</label><span>' + websiteHtml + '</span></div>' +
           detailField('Follow-ups', String(lead.follow_up_count != null ? lead.follow_up_count : '—')) +
           detailField('Last email sent', lead.last_email_sent ? fmtDateTime(lead.last_email_sent) : '—') +
+          detailField('Batch triggered', (lead['Batch Triggered At'] || lead.batch_triggered_at) ? fmtDateTime(lead['Batch Triggered At'] || lead.batch_triggered_at) : '—') +
           detailField('Created', lead.created_at || '—') +
         '</div>' +
         (lead.notes ? '<div style="margin-top:14px"><label style="font-size:11px;color:var(--muted);text-transform:uppercase">Notes</label><p style="font-size:13px;margin:4px 0">' + esc(lead.notes) + '</p></div>' : '') +
@@ -1426,6 +1622,8 @@
     var all = state.leadTrackerList || [];
     var q = String(state.leadTrackerFilter || '').trim().toLowerCase();
     var stFilter = state.leadTrackerStatus || '';
+    var batchFilter = state.leadTrackerBatch || '';
+    var batchOptions = getUniqueBatches(all);
     var rows = all.filter(function(l){
       var st = PS2Sheet.normStatus(l.status);
       if (stFilter === 'follow_up') {
@@ -1433,8 +1631,9 @@
       } else if (stFilter && st !== stFilter) {
         return false;
       }
+      if (batchFilter && (l.Batch || l.batch || '') !== batchFilter) return false;
       if (!q) return true;
-      var blob = [l.full_name, l.email, l.company, l.phone, l.designation, l.source].join(' ').toLowerCase();
+      var blob = [l.full_name, l.email, l.company, l.phone, l.designation, l.source, l.Batch || l.batch, l.region].join(' ').toLowerCase();
       return blob.indexOf(q) >= 0;
     });
     rows = rows.slice().sort(function(a, b){
@@ -1466,10 +1665,17 @@
             return '<option value="' + o.key + '"' + (stFilter === o.key ? ' selected' : '') + '>' + o.label + '</option>';
           }).join('') +
         '</select>' +
+        '<select id="lt-batch">' +
+          '<option value="">All batches</option>' +
+          batchOptions.map(function(b){
+            return '<option value="' + esc(b.batch) + '"' + (batchFilter === b.batch ? ' selected' : '') + '>' +
+              esc(b.batch) + ' (' + b.count + ')</option>';
+          }).join('') +
+        '</select>' +
         '<span class="filter-note" style="font-size:13px;color:var(--muted)">' + rows.length + ' of ' + all.length + ' leads</span>' +
       '</div>' +
       '<div class="panel lead-tracker-panel"><table class="data-table"><thead><tr>' +
-        '<th>Name</th><th>Company</th><th>Email</th><th>Status</th><th>Follow-ups</th><th>Last email</th><th>Source</th>' +
+        '<th>Name</th><th>Company</th><th>Email</th><th>Status</th><th>Batch</th><th>Region</th><th>Follow-ups</th><th>Last email</th><th>Source</th>' +
       '</tr></thead><tbody>' +
       (rows.length ? rows.map(function(l){
         var st = PS2Sheet.normStatus(l.status);
@@ -1481,16 +1687,19 @@
           '<td>' + esc(l.company || '—') + '</td>' +
           '<td style="font-size:12px">' + esc(l.email || '—') + '</td>' +
           '<td>' + statusBadge(st) + '</td>' +
+          '<td style="font-size:12px;font-family:ui-monospace,monospace">' + esc(l.Batch || l.batch || '—') + '</td>' +
+          '<td>' + regionBadge(l.region || l.Region) + '</td>' +
           '<td>' + esc(String(fu)) + '</td>' +
           '<td style="font-size:12px;color:var(--muted)">' + esc(l.last_email_sent ? fmtDateTime(l.last_email_sent) : '—') + '</td>' +
           '<td style="font-size:12px">' + esc(l.source || '—') + '</td>' +
         '</tr>';
-      }).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:28px">No pre-conversion leads match this filter</td></tr>') +
+      }).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:28px">No pre-conversion leads match this filter</td></tr>') +
       '</tbody></table></div>' +
       '<p style="font-size:12px;color:var(--muted);margin-top:10px">Converted clients move to <a href="#tracker">Client Tracker</a> (projects). The Google Sheet embed stays under Leads Database.</p>';
 
     var search = $('lt-search');
     var sel = $('lt-status');
+    var batchSel = $('lt-batch');
     if (search) {
       search.addEventListener('input', function(){
         state.leadTrackerFilter = this.value;
@@ -1502,6 +1711,12 @@
     if (sel) {
       sel.addEventListener('change', function(){
         state.leadTrackerStatus = this.value;
+        paintLeadTracker();
+      });
+    }
+    if (batchSel) {
+      batchSel.addEventListener('change', function(){
+        state.leadTrackerBatch = this.value;
         paintLeadTracker();
       });
     }
@@ -1797,6 +2012,7 @@
 
   function leadFormFields(prefix, lead) {
     lead = lead || {};
+    var region = normalizeRegion(lead.region || lead.Region || 'IN');
     return '<label class="field-label">Full Name *<input id="' + prefix + '-name" value="' + esc(lead.full_name || '') + '" placeholder="Priya Sharma" required /></label>' +
       '<label class="field-label">Company<input id="' + prefix + '-company" value="' + esc(lead.company || '') + '" placeholder="Acme Corp" /></label>' +
       '<label class="field-label">Email<input id="' + prefix + '-email" type="email" value="' + esc(lead.email || '') + '" /></label>' +
@@ -1804,6 +2020,10 @@
       '<label class="field-label">Phone<input id="' + prefix + '-phone" value="' + esc(lead.phone || '') + '" /></label>' +
       '<label class="field-label">Designation<input id="' + prefix + '-desig" value="' + esc(lead.designation || '') + '" /></label>' +
       '<label class="field-label">Website<input id="' + prefix + '-website" type="url" value="' + esc(lead.website || '') + '" /></label>' +
+      '<label class="field-label">Region<select id="' + prefix + '-region" class="form-select">' +
+        '<option value="IN"' + (region === 'IN' ? ' selected' : '') + '>India (default)</option>' +
+        '<option value="US"' + (region === 'US' ? ' selected' : '') + '>United States</option>' +
+      '</select></label>' +
       '<label class="field-label">Source<select id="' + prefix + '-source">' +
         ['manual','business_card','excel','google_sheet'].map(function(s){
           return '<option value="' + s + '"' + ((lead.source || 'manual') === s ? ' selected' : '') + '>' +
@@ -1811,6 +2031,9 @@
             '</option>';
         }).join('') +
       '</select></label>' +
+      (lead.batch || lead.Batch
+        ? '<p style="font-size:12px;color:var(--muted);margin:0 0 10px">Batch: <code>' + esc(lead.batch || lead.Batch) + '</code></p>'
+        : '') +
       '<label class="field-label">Notes<textarea id="' + prefix + '-notes">' + esc(lead.notes || '') + '</textarea></label>';
   }
 
@@ -1822,6 +2045,7 @@
       phone: ($(prefix + '-phone') || {value:''}).value.trim(),
       designation: ($(prefix + '-desig') || {value:''}).value.trim(),
       website: ($(prefix + '-website') || {value:''}).value.trim(),
+      region: normalizeRegion(($(prefix + '-region') || {value:'IN'}).value),
       source: ($(prefix + '-source') || {value:'manual'}).value,
       notes: ($(prefix + '-notes') || {value:''}).value.trim(),
     };
@@ -1846,9 +2070,14 @@
       }
     }
     body.source = body.source === 'business_card' ? 'pdf' : (body.source === 'excel' ? 'csv' : (body.source || 'manual'));
+    var batch = generateBatchNumber();
+    body.batch = batch;
+    body.Batch = batch;
+    body.region = normalizeRegion(body.region || 'IN');
+    body.Region = body.region;
     var res = await PS2Api.addLeadToSheet(body);
     if (!res.ok) { toast((res.data && res.data.error) || 'Failed — is /webhook/ps2-add-lead Active?', true); return; }
-    toast('Lead written to master sheet');
+    toast('Lead written to master sheet · ' + batch);
     closeModal();
     if (body.website && body.email) {
       PS2Api.enrichWebsite(body.email, body.website);
@@ -1881,6 +2110,16 @@
     if (err) { toast(err, true); return; }
     // Identity is email — keep original email if form cleared incorrectly
     if (!body.email) body.email = key;
+    var existing = PS2Sheet.findLeadByEmail(state.leads, body.email || key) || state.selectedLead || {};
+    if (existing.batch || existing.Batch) {
+      body.batch = existing.batch || existing.Batch;
+      body.Batch = body.batch;
+    }
+    if (existing.batch_triggered_at || existing['Batch Triggered At']) {
+      body.batch_triggered_at = existing.batch_triggered_at || existing['Batch Triggered At'];
+    }
+    body.region = normalizeRegion(body.region || 'IN');
+    body.Region = body.region;
     var res = await PS2Api.updateLeadInSheet(body);
     if (!res.ok) { toast((res.data && res.data.error) || 'Failed — is /webhook/ps2-update-lead Active?', true); return; }
     toast('Lead updated in sheet');
@@ -2371,6 +2610,9 @@
     markMeetingBooked: markMeetingBooked,
     convertLead: convertLead, submitConvert: submitConvert, discardLead: discardLead, deleteLead: deleteLead,
     triggerN8n: triggerN8n,
+    openBatchRunModal: openBatchRunModal,
+    closeBatchModal: closeBatchModal,
+    runSelectedBatches: runSelectedBatches,
     closeDetail: closeDetail,
     refreshSheetEmbed: refreshSheetEmbed,
     renderPipeline: renderPipeline, renderLeads: renderLeads,
