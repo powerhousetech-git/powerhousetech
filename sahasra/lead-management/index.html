@@ -20,10 +20,25 @@
       <p class="gate-logo">Sahasra Group · PS2</p>
       <h1>Lead Management Portal</h1>
       <p class="gate-sub">Built by PowerhouseTech</p>
-      <p id="gate-status" class="gate-sub" style="margin-top:12px">Opening portal…</p>
-      <form id="login-form" class="login-form" style="display:none;margin-top:16px">
-        <button type="submit" class="btn btn-primary btn-block" id="btn-login">Enter portal</button>
+      <p id="gate-status" class="gate-sub" style="margin-top:12px;margin-bottom:14px">Sign in to continue</p>
+      <form id="login-form" class="login-form" style="margin-top:4px">
+        <label>Username
+          <input id="login-username" name="username" type="text" autocomplete="username" required placeholder="Sahasra_admin" />
+        </label>
+        <label>Password
+          <span style="display:flex;gap:8px;align-items:center">
+            <input id="login-password" name="password" type="password" autocomplete="current-password" required placeholder="••••••••" style="flex:1" />
+            <button type="button" class="btn btn-sm btn-ghost" onclick="window.PS2App.togglePassword('login-password', this)">Show</button>
+          </span>
+        </label>
+        <p id="login-error" style="display:none;margin:0;font-size:13px;color:#f87171"></p>
+        <button type="submit" class="btn btn-primary btn-block" id="btn-login">Sign in</button>
       </form>
+      <details class="demo-creds">
+        <summary>Sample credentials</summary>
+        <p>Username: <code>Sahasra_admin</code></p>
+        <p>Password: <code>Sahasra_admin</code></p>
+      </details>
     </div>
   </div>
 

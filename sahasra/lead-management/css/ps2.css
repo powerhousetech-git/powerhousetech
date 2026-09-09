@@ -58,9 +58,17 @@ body {
   border-radius: 8px; padding: 10px 12px; color: var(--text); font: inherit; font-size: 14px;
 }
 .login-form input:focus { outline: none; border-color: var(--primary); }
-.demo-creds { margin-top: 14px; text-align: left; font-size: 12px; color: var(--muted); }
-.demo-creds summary { cursor: pointer; color: var(--text); margin-bottom: 6px; }
-.demo-creds p { margin: 3px 0; }
+.demo-creds {
+  margin-top: 16px; text-align: left; font-size: 12px; color: var(--muted);
+  border-top: 1px solid var(--border); padding-top: 12px;
+}
+.demo-creds summary { cursor: pointer; color: var(--text); margin-bottom: 8px; font-weight: 500; }
+.demo-creds p { margin: 4px 0; }
+.demo-creds code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; color: var(--gold);
+  background: rgba(255,255,255,.04); padding: 1px 6px; border-radius: 4px;
+}
 
 /* ── App shell ────────────────────────────────────────── */
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 240px 1fr; }
