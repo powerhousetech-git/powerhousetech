@@ -1585,7 +1585,9 @@
     var main = $('main-content');
     var leads = await loadSheetLeads(true);
     if (state.leadsStatus) {
-      leads = leads.filter(function(l){ return PS2Sheet.normStatus(l.status) === state.leadsStatus || PS2Sheet.pipelineBucket(l.status) === state.leadsStatus; });
+      leads = leads.filter(function(l){
+        return PS2Sheet.normStatus(l.status) === state.leadsStatus || PS2Sheet.pipelineBucket(l) === state.leadsStatus;
+      });
     }
 
     var columns = [
@@ -1593,15 +1595,13 @@
       { key: 'mail_1_sent', label: 'MAIL 1 SENT' },
       { key: 'follow_up', label: 'FOLLOW-UP' },
       { key: 'responded', label: 'RESPONDED' },
-      { key: 'meeting_proposed', label: 'MEETING PROPOSED' },
-      { key: 'meeting_scheduled', label: 'MEETING' },
-      { key: 'human_takeover', label: 'HUMAN TAKEOVER' },
+      { key: 'meeting_proposed', label: 'MEETING' },
       { key: 'converted', label: 'CONVERTED' },
       { key: 'discarded', label: 'DISCARDED' },
     ];
 
     function leadsForCol(col) {
-      return leads.filter(function(l){ return PS2Sheet.pipelineBucket(l.status) === col.key; });
+      return leads.filter(function(l){ return PS2Sheet.pipelineBucket(l) === col.key; });
     }
 
     var kpis = PS2Sheet.computeKpis(leads);
@@ -1711,7 +1711,7 @@
     var rows = all.filter(function(l){
       var st = PS2Sheet.normStatus(l.status);
       if (stFilter === 'follow_up') {
-        if (PS2Sheet.pipelineBucket(l.status) !== 'follow_up') return false;
+        if (PS2Sheet.pipelineBucket(l) !== 'follow_up') return false;
       } else if (stFilter && st !== stFilter) {
         return false;
       }
