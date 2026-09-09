@@ -50,6 +50,14 @@
     leads = leads || [];
     var total = leads.length;
     var mail1 = 0, fus = 0, responded = 0, meetings = 0, meetingProposed = 0, humanTakeover = 0, converted = 0, discarded = 0, contacted = 0;
+    var RESPONSE_STATUSES = {
+      responded: true,
+      meeting_proposed: true,
+      meeting_scheduled: true,
+      human_takeover: true,
+      converted: true,
+      discarded: true,
+    };
     leads.forEach(function (l) {
       var st = normStatus(l.status);
       if (st === 'mail_1_sent' || FOLLOW_UP_STATUSES.indexOf(st) >= 0 || st === 'responded' ||
@@ -57,7 +65,8 @@
       // Count every lead past "new" — they all received at least Mail 1
       if (st !== 'new') mail1++;
       if (FOLLOW_UP_STATUSES.indexOf(st) >= 0) fus++;
-      if (st === 'responded') responded++;
+      // Any reply outcome (positive, neutral, or negative) counts as a response
+      if (RESPONSE_STATUSES[st]) responded++;
       if (st === 'meeting_proposed') meetingProposed++;
       if (st === 'meeting_scheduled') meetings++;
       if (st === 'human_takeover') humanTakeover++;
@@ -68,15 +77,15 @@
         // count already reflected via status usually
       }
     });
+    // Meeting interest = proposed + booked (+ human takeover after Calendly)
+    var meetingsTotal = meetingProposed + meetings + humanTakeover;
     var rate = contacted ? Math.round((converted / contacted) * 1000) / 10 : 0;
     var funnel = [
       { key: 'new', label: 'New', count: leads.filter(function (l) { return pipelineBucket(l.status) === 'new'; }).length },
       { key: 'mail_1_sent', label: 'Mail 1 Sent', count: leads.filter(function (l) { return pipelineBucket(l.status) === 'mail_1_sent'; }).length },
       { key: 'follow_up', label: 'Follow-up', count: leads.filter(function (l) { return pipelineBucket(l.status) === 'follow_up'; }).length },
-      { key: 'responded', label: 'Responded', count: responded },
-      { key: 'meeting_proposed', label: 'Meeting Proposed', count: meetingProposed },
-      { key: 'meeting_scheduled', label: 'Meeting', count: meetings },
-      { key: 'human_takeover', label: 'Human Takeover', count: humanTakeover },
+      { key: 'responded', label: 'Responded', count: leads.filter(function (l) { return pipelineBucket(l.status) === 'responded'; }).length },
+      { key: 'meeting', label: 'Meeting', count: meetingsTotal },
       { key: 'converted', label: 'Converted', count: converted },
       { key: 'discarded', label: 'Discarded', count: discarded },
     ];
@@ -88,6 +97,7 @@
       responded_leads: responded,
       meetings_proposed: meetingProposed,
       meetings_scheduled: meetings,
+      meetings: meetingsTotal,
       human_takeover: humanTakeover,
       converted_leads: converted,
       discarded_leads: discarded,
