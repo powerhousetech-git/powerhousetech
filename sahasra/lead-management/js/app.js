@@ -105,7 +105,7 @@
   }
 
   async function loadSheetLeads(force) {
-    if (!force && state.leads && state.leads.length && state.sheetFetchedAt && (Date.now() - state.sheetFetchedAt) < 15000) {
+    if (!force && state.leads && state.leads.length && state.sheetFetchedAt && (Date.now() - state.sheetFetchedAt) < 5000) {
       return state.leads;
     }
     var res = await PS2Api.sheetLeads();
@@ -332,7 +332,7 @@
       (state.user && state.user.role !== 'pt_admin' ? emailAutomationsPanel() : '') +
       '<div style="display:grid;grid-template-columns:1fr 340px;gap:18px">' +
         '<div class="panel">' +
-          '<div class="panel-head"><h2>Pipeline Funnel</h2></div>' +
+          '<div class="panel-head"><h2>Pipeline Funnel</h2><span style="font-size:12px;color:var(--muted)">Same counts as KPI cards</span></div>' +
           '<div style="padding:18px"><div class="funnel">' +
           funnel.map(function(f){
             var w = Math.round((f.count / maxFunnel) * 100);
@@ -1523,10 +1523,12 @@
       return leads.filter(function(l){ return PS2Sheet.pipelineBucket(l.status) === col.key; });
     }
 
-    var maxFunnel = Math.max(1, ...columns.map(function(c){ return leadsForCol(c).length; }));
+    var kpis = PS2Sheet.computeKpis(leads);
+    var kpiFunnel = kpis.funnel || [];
+    var maxKpiFunnel = Math.max(1, ...kpiFunnel.map(function(f){ return f.count; }));
     var barColors = {
       new:'#94a3b8', mail_1_sent:'#3b82f6', follow_up:'#0ea5e9',
-      responded:'#22c55e', meeting_proposed:'#c084fc', meeting_scheduled:'#a855f7',
+      responded:'#22c55e', meeting:'#a855f7', meeting_proposed:'#c084fc', meeting_scheduled:'#a855f7',
       human_takeover:'#f97316', converted:'#eab308', discarded:'#ef4444',
     };
 
@@ -1554,11 +1556,10 @@
             '</div></div>';
         }).join('') +
       '</div>' +
-      '<div id="pipeline-funnel" class="hidden"><div class="panel"><div class="panel-head"><h2>Status Funnel</h2></div><div style="padding:20px"><div class="funnel">' +
-        columns.map(function(col){
-          var count = leadsForCol(col).length;
-          var w = Math.round((count / maxFunnel) * 100);
-          return '<div class="funnel-row"><span class="funnel-label">' + esc(col.label) + '</span><div class="funnel-bar-wrap"><div class="funnel-bar" style="width:' + w + '%;background:' + (barColors[col.key]||'var(--primary)') + '"></div></div><span class="funnel-count">' + count + '</span></div>';
+      '<div id="pipeline-funnel" class="hidden"><div class="panel"><div class="panel-head"><h2>Status Funnel</h2><span style="font-size:12px;color:var(--muted)">Same counts as dashboard KPIs</span></div><div style="padding:20px"><div class="funnel">' +
+        kpiFunnel.map(function(f){
+          var w = Math.round((f.count / maxKpiFunnel) * 100);
+          return '<div class="funnel-row"><span class="funnel-label">' + esc(f.label) + '</span><div class="funnel-bar-wrap"><div class="funnel-bar" style="width:' + w + '%;background:' + (barColors[f.key]||'var(--primary)') + '"></div></div><span class="funnel-count">' + f.count + '</span></div>';
         }).join('') +
       '</div></div></div></div>';
   }
