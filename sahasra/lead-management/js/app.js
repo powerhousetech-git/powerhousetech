@@ -205,10 +205,29 @@
   }
 
   /* ─ Auth ─────────────────────────────────────────────────────────────────── */
+  var SIGNED_OUT_KEY = 'ps2_signed_out';
+
+  function setGateMode(mode) {
+    var status = $('gate-status');
+    var form = $('login-form');
+    if (mode === 'signed_out') {
+      if (status) status.textContent = 'You are signed out.';
+      if (form) form.style.display = '';
+    } else if (mode === 'ready') {
+      if (status) status.textContent = 'Private portal — click below to continue.';
+      if (form) form.style.display = '';
+    } else {
+      if (status) status.textContent = 'Opening portal…';
+      if (form) form.style.display = 'none';
+    }
+  }
+
   async function login(username, password) {
     var btn = $('btn-login');
     if (btn) btn.disabled = true;
     try {
+      try { sessionStorage.removeItem(SIGNED_OUT_KEY); } catch (_) {}
+      setGateMode('booting');
       // Local gate only — Supabase auth retired
       await enterApp({
         role: 'sahasra_admin',
@@ -219,16 +238,31 @@
   }
 
   async function bootSession() {
+    var signedOut = false;
+    try { signedOut = sessionStorage.getItem(SIGNED_OUT_KEY) === '1'; } catch (_) {}
+    if (signedOut) {
+      setGateMode('signed_out');
+      show('gate-view');
+      return;
+    }
+    setGateMode('booting');
     // Option A: no Supabase auth — enter as sahasra_admin (portal URL is private)
-    await enterApp({
-      role: 'sahasra_admin',
-      username: 'admin',
-      full_name: 'Admin',
-    });
+    try {
+      await enterApp({
+        role: 'sahasra_admin',
+        username: 'admin',
+        full_name: 'Admin',
+      });
+    } catch (err) {
+      setGateMode('ready');
+      show('gate-view');
+      toast('Could not open portal — try Enter portal', true);
+    }
   }
 
   async function enterApp(user) {
     state.user = user;
+    try { sessionStorage.removeItem(SIGNED_OUT_KEY); } catch (_) {}
     show('app-shell');
     $('nav-user-name').textContent = user.full_name || user.username;
     $('nav-user-role').textContent = user.role.replace('_', ' ');
@@ -254,8 +288,16 @@
   function signOut() {
     PS2Api.clearToken();
     state.user = null;
+    state.leads = [];
+    state.sheetFetchedAt = null;
+    try { sessionStorage.setItem(SIGNED_OUT_KEY, '1'); } catch (_) {}
+    setGateMode('signed_out');
     show('gate-view');
-    location.hash = '';
+    if (location.hash) {
+      // Avoid hashchange re-routing while signed out
+      history.replaceState(null, '', location.pathname + location.search);
+    }
+    toast('Signed out');
   }
 
   /* ─ Router ───────────────────────────────────────────────────────────────── */
