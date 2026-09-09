@@ -355,7 +355,12 @@
     else if (v === 'settings') renderSettings();
     else if (v === 'users') renderUsers();
     else if (v === 'outlook') renderOutlook();
-    else if (v === 'sheets') renderSheets();
+    else if (v === 'sheets') {
+      // Google Sheets settings page removed — sheet embed lives under Leads Database
+      state.view = 'leads';
+      location.hash = 'leads';
+      renderLeads();
+    }
   }
 
   /* ─────────────────────────────────────────────────────────────────────────
@@ -1713,13 +1718,15 @@
     var stFilter = state.leadTrackerStatus || '';
     var batchFilter = state.leadTrackerBatch || '';
     var batchOptions = getUniqueBatches(all);
+    // Drop legacy status keys (responded / meeting / discarded) — pipeline buckets only
+    if (stFilter && stFilter !== 'new' && stFilter !== 'mail_1_sent' && stFilter !== 'follow_up') {
+      stFilter = '';
+      state.leadTrackerStatus = '';
+    }
     var rows = all.filter(function(l){
-      var st = PS2Sheet.normStatus(l.status);
-      if (stFilter === 'follow_up') {
-        if (PS2Sheet.pipelineBucket(l) !== 'follow_up') return false;
-      } else if (stFilter && st !== stFilter) {
-        return false;
-      }
+      // Same buckets as Pipeline: New / Mail 1 / Follow-up
+      // Mail 1 includes positive/negative replies (meeting_*, discarded, responded)
+      if (stFilter && PS2Sheet.pipelineBucket(l) !== stFilter) return false;
       if (batchFilter && (l.Batch || l.batch || '') !== batchFilter) return false;
       if (!q) return true;
       var blob = [l.full_name, l.email, l.company, l.phone, l.designation, l.source, l.Batch || l.batch, l.region].join(' ').toLowerCase();
@@ -1736,11 +1743,6 @@
       { key: 'new', label: 'New' },
       { key: 'mail_1_sent', label: 'Mail 1' },
       { key: 'follow_up', label: 'Follow-up' },
-      { key: 'responded', label: 'Responded' },
-      { key: 'meeting_proposed', label: 'Meeting proposed' },
-      { key: 'meeting_scheduled', label: 'Meeting' },
-      { key: 'human_takeover', label: 'Human takeover' },
-      { key: 'discarded', label: 'Discarded' },
     ];
 
     main.innerHTML =
@@ -1764,7 +1766,7 @@
         '<span class="filter-note" style="font-size:13px;color:var(--muted)">' + rows.length + ' of ' + all.length + ' leads</span>' +
       '</div>' +
       '<div class="panel lead-tracker-panel"><table class="data-table"><thead><tr>' +
-        '<th>Name</th><th>Company</th><th>Email</th><th>Status</th><th>Batch</th><th>Region</th><th>Follow-ups</th><th>Last email</th><th>Source</th>' +
+        '<th>Name</th><th>Company</th><th>Email</th><th>Status</th><th>Batch</th><th>Region</th><th title="Follow Up Count includes Mail 1 (1 = Mail 1; 2+ = follow-ups)">FU Count</th><th>Last email</th><th>Source</th>' +
       '</tr></thead><tbody>' +
       (rows.length ? rows.map(function(l){
         var st = PS2Sheet.normStatus(l.status);
@@ -1784,7 +1786,7 @@
         '</tr>';
       }).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:28px">No pre-conversion leads match this filter</td></tr>') +
       '</tbody></table></div>' +
-      '<p style="font-size:12px;color:var(--muted);margin-top:10px">Converted clients move to <a href="#tracker">Client Tracker</a> (projects). The Google Sheet embed stays under Leads Database.</p>';
+      '<p style="font-size:12px;color:var(--muted);margin-top:10px">Mail 1 filter includes replies (positive/negative). FU Count: 1 = Mail 1; 2+ = follow-ups. Converted clients move to <a href="#tracker">Client Tracker</a>.</p>';
 
     var search = $('lt-search');
     var sel = $('lt-status');
@@ -2003,59 +2005,10 @@
   }
 
   async function renderSheets() {
-    var main = $('main-content');
-    main.innerHTML = '<div class="page-head"><div><h1 class="page-title">Google Sheets</h1>' +
-      '<p class="page-sub">One master sheet is configured in the portal.</p></div></div>';
-    return;
-
-    var main = $('main-content');
-    var [connRes, portalRes] = await Promise.all([PS2Api.sheetConnections(), PS2Api.portalSettings()]);
-    var conns = (connRes.ok && connRes.data.data) || [];
-    var portal = (portalRes.ok && portalRes.data.data) || {};
-    var master = portal.master_sheet || {
-      url: window.PS2.SHEET_URL,
-      id: window.PS2.SHEET_ID,
-      tab: 'Sheet1',
-    };
-    var booking = portal.booking_link || '';
-    var isAdmin = state.user && (state.user.role === 'sahasra_admin' || state.user.role === 'pt_admin');
-    var addBtn = state.user && state.user.role === 'sahasra_admin'
-      ? '<button class="btn btn-primary btn-sm" onclick="window.PS2App.openAddSheet()">+ Connect field sheet</button>' : '';
-
-    main.innerHTML =
-      '<div class="page-head"><div><h1 class="page-title">Settings · Google Sheets</h1>' +
-        '<p class="page-sub">Master database + booking link + field-team sync sources</p></div>' + addBtn + '</div>' +
-
-      '<div class="settings-card">' +
-        '<h3>Master lead database</h3>' +
-        '<p style="font-size:13px;margin:0 0 8px">All leads live in this Google Sheet. Portal embeds it read-only; automations read and write via the Sheets API.</p>' +
-        '<p style="font-size:13px;margin:0"><a href="' + esc(master.url || PS2.SHEET_URL) + '" target="_blank" rel="noopener" style="color:var(--gold)">' + esc(master.url || PS2.SHEET_URL) + '</a></p>' +
-        '<p style="font-size:12px;color:var(--muted);margin:8px 0 0">Tab: ' + esc(master.tab || 'Sheet1') + ' · ID: ' + esc(master.id || PS2.SHEET_ID) + '</p>' +
-        '<p style="font-size:12px;color:var(--muted);margin:4px 0 0">Last portal fetch: ' + (state.sheetFetchedAt ? relTime(new Date(state.sheetFetchedAt).toISOString()) : '—') + '</p>' +
-      '</div>' +
-
-      '<div class="settings-card">' +
-        '<h3>Booking link</h3>' +
-        '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">Calendly / Cal.com URL injected into follow-up email templates.</p>' +
-        (isAdmin
-          ? '<label class="field-label">URL<input id="booking-link" type="url" placeholder="https://calendly.com/…" value="' + esc(booking) + '" /></label>' +
-            '<button class="btn btn-primary btn-sm" onclick="window.PS2App.saveBookingLink()">Save booking link</button>'
-          : '<p style="font-size:13px;margin:0">' + (booking ? '<a href="' + esc(booking) + '" target="_blank" rel="noopener" style="color:var(--gold)">' + esc(booking) + '</a>' : '— not set —') + '</p>') +
-      '</div>' +
-
-      '<div class="page-head" style="margin-top:8px"><div><h2 class="page-title" style="font-size:18px">Field team sheets</h2>' +
-        '<p class="page-sub">External collection sheets synced into the master</p></div></div>' +
-      '<div class="panel"><table class="data-table"><thead><tr><th>Sheet URL</th><th>Tab</th><th>Sync Interval</th><th>Last Synced</th><th>Active</th><th></th></tr></thead><tbody>' +
-        conns.map(function(c){
-          return '<tr><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis"><a href="' + esc(c.sheet_url) + '" target="_blank" style="color:var(--gold)">' + esc((c.sheet_url||'').slice(0,50)) + '…</a></td>' +
-            '<td>' + esc(c.tab_name||'—') + '</td>' +
-            '<td>' + c.sync_interval_hours + 'h</td>' +
-            '<td>' + relTime(c.last_synced_at) + '</td>' +
-            '<td><label><input type="checkbox" ' + (c.is_active?'checked':'') + ' onchange="window.PS2App.toggleSheet(\'' + c.id + '\',this.checked)" /></label></td>' +
-            '<td><button class="btn-icon btn-danger" onclick="window.PS2App.deleteSheet(\'' + c.id + '\')">✕</button></td></tr>';
-        }).join('') +
-      (conns.length===0?'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">No field-team connections yet</td></tr>':'') +
-      '</tbody></table></div>';
+    // Deprecated — Settings · Google Sheets removed from nav
+    state.view = 'leads';
+    location.hash = 'leads';
+    return renderLeads();
   }
 
   async function saveBookingLink() {
