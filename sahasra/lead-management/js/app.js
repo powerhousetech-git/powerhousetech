@@ -304,8 +304,10 @@
     var funnel = s.funnel || [];
     var maxFunnel = Math.max(1, ...funnel.map(function(f){ return f.count; }));
 
-    var rate = s.conversion_rate != null ? s.conversion_rate + '%' : '—';
-    var rateHint = (s.converted_leads || 0) + ' of ' + (s.contacted_leads || 0) + ' contacted';
+    var rate = s.meeting_conversion_rate != null ? s.meeting_conversion_rate + '%'
+      : (s.conversion_rate != null ? s.conversion_rate + '%' : '—');
+    var meetingsCount = s.meetings != null ? s.meetings : ((s.meetings_proposed || 0) + (s.meetings_scheduled || 0) + (s.human_takeover || 0));
+    var rateHint = meetingsCount + ' of ' + (s.contacted_leads || 0) + ' emailed';
     main.innerHTML =
       '<div class="page-head"><div><h1 class="page-title">Dashboard</h1><p class="page-sub">KPIs from master Google Sheet · Pipeline funnel · outreach actions</p></div>' +
         '<select id="dashboard-batch-filter" class="form-select" style="min-width:180px">' +
@@ -322,8 +324,8 @@
         kpi('Responses', s.responses || 0, 'green') +
       '</div>' +
       '<div class="kpi-row">' +
-        kpi('Conversion rate', rate, 'gold', rateHint) +
-        kpi('Meetings', s.meetings != null ? s.meetings : ((s.meetings_proposed || 0) + (s.meetings_scheduled || 0) + (s.human_takeover || 0)), 'purple') +
+        kpi('Meeting conversion', rate, 'gold', rateHint) +
+        kpi('Meetings', meetingsCount, 'purple') +
         kpi('Converted', s.converted_leads || 0, 'gold') +
         kpi('Discarded', s.discarded_leads || 0, '') +
       '</div>' +

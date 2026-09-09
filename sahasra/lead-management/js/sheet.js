@@ -79,7 +79,8 @@
     });
     // Meeting interest = proposed + booked (+ human takeover after Calendly)
     var meetingsTotal = meetingProposed + meetings + humanTakeover;
-    var rate = contacted ? Math.round((converted / contacted) * 1000) / 10 : 0;
+    // Meeting conversion = share of contacted leads that reached meeting proposed/finalized
+    var rate = contacted ? Math.round((meetingsTotal / contacted) * 1000) / 10 : 0;
     var funnel = [
       { key: 'new', label: 'New', count: leads.filter(function (l) { return pipelineBucket(l.status) === 'new'; }).length },
       { key: 'mail_1_sent', label: 'Mail 1 Sent', count: leads.filter(function (l) { return pipelineBucket(l.status) === 'mail_1_sent'; }).length },
@@ -103,6 +104,7 @@
       discarded_leads: discarded,
       contacted_leads: contacted,
       conversion_rate: rate,
+      meeting_conversion_rate: rate,
       funnel: funnel,
     };
   }
