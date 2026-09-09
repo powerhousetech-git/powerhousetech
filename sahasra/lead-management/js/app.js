@@ -205,64 +205,99 @@
   }
 
   /* ─ Auth ─────────────────────────────────────────────────────────────────── */
-  var SIGNED_OUT_KEY = 'ps2_signed_out';
+  var SESSION_KEY = 'ps2_session';
+  var DEMO_USER = 'Sahasra_admin';
+  var DEMO_PASS = 'Sahasra_admin';
+
+  function setLoginError(msg) {
+    var el = $('login-error');
+    if (!el) return;
+    if (msg) {
+      el.style.display = '';
+      el.textContent = msg;
+    } else {
+      el.style.display = 'none';
+      el.textContent = '';
+    }
+  }
 
   function setGateMode(mode) {
     var status = $('gate-status');
     var form = $('login-form');
+    if (form) form.style.display = '';
     if (mode === 'signed_out') {
-      if (status) status.textContent = 'You are signed out.';
-      if (form) form.style.display = '';
-    } else if (mode === 'ready') {
-      if (status) status.textContent = 'Private portal — click below to continue.';
-      if (form) form.style.display = '';
+      if (status) status.textContent = 'You are signed out. Sign in again to continue.';
+    } else if (mode === 'booting') {
+      if (status) status.textContent = 'Signing in…';
     } else {
-      if (status) status.textContent = 'Opening portal…';
-      if (form) form.style.display = 'none';
+      if (status) status.textContent = 'Sign in to continue';
     }
+  }
+
+  function saveSession(user) {
+    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(user)); } catch (_) {}
+  }
+
+  function loadSession() {
+    try {
+      var raw = sessionStorage.getItem(SESSION_KEY);
+      if (!raw) return null;
+      var user = JSON.parse(raw);
+      if (!user || !user.username || !user.role) return null;
+      return user;
+    } catch (_) { return null; }
+  }
+
+  function clearSession() {
+    try { sessionStorage.removeItem(SESSION_KEY); } catch (_) {}
   }
 
   async function login(username, password) {
     var btn = $('btn-login');
     if (btn) btn.disabled = true;
+    setLoginError('');
     try {
-      try { sessionStorage.removeItem(SIGNED_OUT_KEY); } catch (_) {}
+      username = String(username || '').trim();
+      password = String(password || '');
+      if (!username || !password) {
+        setLoginError('Enter username and password');
+        return;
+      }
+      if (username !== DEMO_USER || password !== DEMO_PASS) {
+        setLoginError('Invalid username or password');
+        toast('Invalid username or password', true);
+        return;
+      }
       setGateMode('booting');
-      // Local gate only — Supabase auth retired
       await enterApp({
         role: 'sahasra_admin',
-        username: username || 'admin',
-        full_name: username || 'Admin',
+        username: DEMO_USER,
+        full_name: 'Sahasra Admin',
       });
     } finally { if (btn) btn.disabled = false; }
   }
 
   async function bootSession() {
-    var signedOut = false;
-    try { signedOut = sessionStorage.getItem(SIGNED_OUT_KEY) === '1'; } catch (_) {}
-    if (signedOut) {
-      setGateMode('signed_out');
-      show('gate-view');
-      return;
+    var existing = loadSession();
+    if (existing) {
+      setGateMode('booting');
+      try {
+        await enterApp(existing);
+        return;
+      } catch (err) {
+        clearSession();
+      }
     }
-    setGateMode('booting');
-    // Option A: no Supabase auth — enter as sahasra_admin (portal URL is private)
-    try {
-      await enterApp({
-        role: 'sahasra_admin',
-        username: 'admin',
-        full_name: 'Admin',
-      });
-    } catch (err) {
-      setGateMode('ready');
-      show('gate-view');
-      toast('Could not open portal — try Enter portal', true);
-    }
+    setGateMode('ready');
+    show('gate-view');
+    var userInput = $('login-username');
+    if (userInput) setTimeout(function(){ userInput.focus(); }, 50);
   }
 
   async function enterApp(user) {
     state.user = user;
-    try { sessionStorage.removeItem(SIGNED_OUT_KEY); } catch (_) {}
+    saveSession(user);
+    setLoginError('');
     show('app-shell');
     $('nav-user-name').textContent = user.full_name || user.username;
     $('nav-user-role').textContent = user.role.replace('_', ' ');
@@ -287,17 +322,21 @@
 
   function signOut() {
     PS2Api.clearToken();
+    clearSession();
     state.user = null;
     state.leads = [];
     state.sheetFetchedAt = null;
-    try { sessionStorage.setItem(SIGNED_OUT_KEY, '1'); } catch (_) {}
     setGateMode('signed_out');
+    setLoginError('');
     show('gate-view');
+    var pass = $('login-password');
+    if (pass) pass.value = '';
     if (location.hash) {
-      // Avoid hashchange re-routing while signed out
       history.replaceState(null, '', location.pathname + location.search);
     }
     toast('Signed out');
+    var userInput = $('login-username');
+    if (userInput) setTimeout(function(){ userInput.focus(); }, 50);
   }
 
   /* ─ Router ───────────────────────────────────────────────────────────────── */
