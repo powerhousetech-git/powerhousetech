@@ -1594,10 +1594,7 @@
       { key: 'new', label: 'NEW' },
       { key: 'mail_1_sent', label: 'MAIL 1 SENT' },
       { key: 'follow_up', label: 'FOLLOW-UP' },
-      { key: 'responded', label: 'RESPONDED' },
-      { key: 'meeting_proposed', label: 'MEETING' },
       { key: 'converted', label: 'CONVERTED' },
-      { key: 'discarded', label: 'DISCARDED' },
     ];
 
     function leadsForCol(col) {
@@ -1616,6 +1613,12 @@
     main.innerHTML =
       '<div class="page-head"><div><h1 class="page-title">Pipeline</h1><p class="page-sub">From master Google Sheet · click a card for actions</p></div>' +
         '<button class="btn btn-sm" onclick="window.PS2App.renderPipeline()">Refresh</button></div>' +
+      '<div class="pipeline-legend" aria-label="Mail 1 card colours">' +
+        '<span class="pipeline-legend-item"><i class="tone-swatch tone-pos"></i> Positive reply</span>' +
+        '<span class="pipeline-legend-item"><i class="tone-swatch tone-neg"></i> Negative reply</span>' +
+        '<span class="pipeline-legend-item"><i class="tone-swatch tone-none"></i> No response</span>' +
+        '<span class="pipeline-legend-note">Follow Up Count includes Mail 1 (1 = Mail 1; 2+ = follow-ups)</span>' +
+      '</div>' +
       '<div class="tabs"><button class="tab active" onclick="this.parentElement.querySelectorAll(\'.tab\').forEach(t=>t.classList.remove(\'active\')); this.classList.add(\'active\'); document.getElementById(\'pipeline-kanban\').classList.remove(\'hidden\'); document.getElementById(\'pipeline-funnel\').classList.add(\'hidden\')">Kanban</button>' +
       '<button class="tab" onclick="this.parentElement.querySelectorAll(\'.tab\').forEach(t=>t.classList.remove(\'active\')); this.classList.add(\'active\'); document.getElementById(\'pipeline-kanban\').classList.add(\'hidden\'); document.getElementById(\'pipeline-funnel\').classList.remove(\'hidden\')">Funnel</button></div>' +
       '<div id="pipeline-kanban" class="kanban-board">' +
@@ -1627,7 +1630,9 @@
               colLeads.map(function(l){
                 var fu = PS2Sheet.followUpLabel(l);
                 var key = encodeURIComponent(l.email || l.id);
-                return '<div class="kanban-card" role="button" tabindex="0" onclick="window.PS2App.openLead(decodeURIComponent(\'' + key + '\'))">' +
+                var tone = col.key === 'mail_1_sent' ? PS2Sheet.mail1CardTone(l) : '';
+                var toneClass = tone ? ' tone-' + tone : '';
+                return '<div class="kanban-card' + toneClass + '" role="button" tabindex="0" onclick="window.PS2App.openLead(decodeURIComponent(\'' + key + '\'))">' +
                   '<div class="card-name">' + esc(l.full_name || '—') + '</div>' +
                   '<div class="card-company">' + esc(l.company || '') + '</div>' +
                   (fu ? '<div class="card-val">' + esc(fu) + '</div>' : '') +

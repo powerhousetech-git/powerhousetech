@@ -23,34 +23,57 @@
     return aliases[s] || s || 'new';
   }
 
+  /**
+   * Sheet "Follow Up Count" includes Mail 1 as 1.
+   *   0 / empty → not mailed (or unknown)
+   *   1         → Mail 1 only
+   *   2+        → real follow-ups sent (display as Follow-up (n-1))
+   */
+  function followUpTouchCount(lead) {
+    var n = Number(lead && lead.follow_up_count);
+    return isNaN(n) ? 0 : n;
+  }
+
+  function isRealFollowUp(lead) {
+    var st = normStatus(lead && lead.status);
+    if (FOLLOW_UP_STATUSES.indexOf(st) >= 0) return true;
+    // Count ≥ 2 means at least one follow-up after Mail 1
+    return followUpTouchCount(lead) >= 2;
+  }
+
   function followUpLabel(lead) {
-    var st = normStatus(lead.status);
-    var n = Number(lead.follow_up_count);
-    if (!isNaN(n) && n > 0) return 'Follow-up ' + n + '/5';
+    var st = normStatus(lead && lead.status);
     var m = st.match(/^follow_up_(\d+)$/);
     if (m) return 'Follow-up ' + m[1] + '/5';
+    var n = followUpTouchCount(lead);
+    // Count includes Mail 1 — only label real follow-ups (n ≥ 2)
+    if (n >= 2) return 'Follow-up ' + (n - 1) + '/5';
+    if (n === 1 || st === 'mail_1_sent') return 'Mail 1';
     return '';
+  }
+
+  /** Card tone inside MAIL 1 SENT: pos / neg / none */
+  function mail1CardTone(lead) {
+    var st = normStatus(lead && lead.status);
+    if (st === 'discarded') return 'neg';
+    if (st === 'meeting_proposed' || st === 'meeting_scheduled' || st === 'human_takeover' ||
+        st === 'responded' || st === 'converted') {
+      return 'pos';
+    }
+    return 'none';
   }
 
   function pipelineBucket(statusOrLead, maybeLead) {
     var lead = (statusOrLead && typeof statusOrLead === 'object') ? statusOrLead : (maybeLead || null);
     var status = normStatus(lead ? lead.status : statusOrLead);
-    var fu = lead && lead.follow_up_count != null ? Number(lead.follow_up_count) : NaN;
 
-    if (status === 'new') return 'new';
-    // Sheet often keeps Status=mail_1_sent after follow-ups — use Follow Up Count too
-    if (FOLLOW_UP_STATUSES.indexOf(status) >= 0 || (status === 'mail_1_sent' && !isNaN(fu) && fu > 0)) {
-      return 'follow_up';
-    }
-    if (status === 'mail_1_sent') return 'mail_1_sent';
-    if (status === 'responded') return 'responded';
-    // Meeting proposed / meeting / human takeover → one Meeting column
-    if (status === 'meeting_proposed' || status === 'meeting_scheduled' || status === 'human_takeover') {
-      return 'meeting_proposed';
-    }
+    if (status === 'new' || !status) return 'new';
     if (status === 'converted') return 'converted';
-    if (status === 'discarded') return 'discarded';
-    return 'new';
+    // Real follow-ups only (status follow_up_* OR Follow Up Count ≥ 2)
+    if (isRealFollowUp(lead || { status: status })) return 'follow_up';
+    // Mail 1 cohort: first-touch emailed leads (incl. positive/negative replies)
+    // Status may be mail_1_sent, responded, meeting_*, discarded, etc.
+    return 'mail_1_sent';
   }
 
   function computeKpis(leads) {
@@ -71,7 +94,8 @@
           st === 'meeting_proposed' || st === 'meeting_scheduled' || st === 'human_takeover' || st === 'converted' || st === 'discarded') contacted++;
       // Count every lead past "new" — they all received at least Mail 1
       if (st !== 'new') mail1++;
-      if (FOLLOW_UP_STATUSES.indexOf(st) >= 0) fus++;
+      // Follow-ups KPI: real follow-ups only (not Mail 1). Count includes Mail 1 as 1.
+      if (isRealFollowUp(l)) fus++;
       // Any reply outcome (positive, neutral, or negative) counts as a response
       if (RESPONSE_STATUSES[st]) responded++;
       if (st === 'meeting_proposed') meetingProposed++;
@@ -79,10 +103,6 @@
       if (st === 'human_takeover') humanTakeover++;
       if (st === 'converted') converted++;
       if (st === 'discarded') discarded++;
-      var n = Number(l.follow_up_count);
-      if (!isNaN(n) && n > 0 && FOLLOW_UP_STATUSES.indexOf(st) < 0 && st !== 'mail_1_sent') {
-        // count already reflected via status usually
-      }
     });
     // Meeting interest = proposed + booked (+ human takeover after Calendly)
     var meetingsTotal = meetingProposed + meetings + humanTakeover;
@@ -130,7 +150,10 @@
   global.PS2Sheet = {
     FOLLOW_UP_STATUSES: FOLLOW_UP_STATUSES,
     normStatus: normStatus,
+    followUpTouchCount: followUpTouchCount,
+    isRealFollowUp: isRealFollowUp,
     followUpLabel: followUpLabel,
+    mail1CardTone: mail1CardTone,
     pipelineBucket: pipelineBucket,
     computeKpis: computeKpis,
     findLeadByEmail: findLeadByEmail,

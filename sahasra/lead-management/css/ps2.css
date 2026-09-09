@@ -326,11 +326,40 @@ body {
 }
 .kanban-card {
   background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; cursor: pointer;
+  border-left: 3px solid transparent;
 }
 .kanban-card:hover { border-color: var(--primary); }
+.kanban-card.tone-pos:hover { border-left-color: #22c55e; }
+.kanban-card.tone-neg:hover { border-left-color: #ef4444; }
+.kanban-card.tone-none:hover { border-left-color: #94a3b8; }
+.kanban-card.tone-pos {
+  border-left-color: #22c55e;
+  background: color-mix(in srgb, #22c55e 12%, var(--surface2));
+}
+.kanban-card.tone-neg {
+  border-left-color: #ef4444;
+  background: color-mix(in srgb, #ef4444 12%, var(--surface2));
+}
+.kanban-card.tone-none {
+  border-left-color: #94a3b8;
+  background: color-mix(in srgb, #94a3b8 10%, var(--surface2));
+}
 .kanban-card .card-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
 .kanban-card .card-company { font-size: 11px; color: var(--muted); }
 .kanban-card .card-val { font-size: 12px; color: var(--gold); margin-top: 4px; }
+
+.pipeline-legend {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 14px 18px;
+  margin: 0 0 14px; font-size: 12px; color: var(--muted);
+}
+.pipeline-legend-item { display: inline-flex; align-items: center; gap: 6px; color: var(--text); }
+.pipeline-legend-note { font-size: 11px; color: var(--muted); }
+.tone-swatch {
+  display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0;
+}
+.tone-swatch.tone-pos { background: #22c55e; }
+.tone-swatch.tone-neg { background: #ef4444; }
+.tone-swatch.tone-none { background: #94a3b8; }
 
 /* ── Pipeline funnel bars ─────────────────────────────── */
 .funnel { display: flex; flex-direction: column; gap: 6px; }
