@@ -803,11 +803,10 @@ Deno.serve(async (req) => {
 
     if (req.method === 'GET' && op === 'dashboard') {
       assertRole(member, ['admin']);
+      // Full rows so Leadership can live-compute missing calc_* (matches Costings list).
       const { data, error } = await db
         .from('sahasra_costings')
-        .select(
-          'id, status, client_name, assembly_name, quantity, created_by, updated_by, updated_at, exported_at, calc_margin, calc_quote_price, calc_value_addition, true_margin, true_quote_price, true_value_addition, currency',
-        )
+        .select('*')
         .eq('org_id', member.org_id)
         .is('deleted_at', null)
         .order('updated_at', { ascending: false })
@@ -820,17 +819,14 @@ Deno.serve(async (req) => {
         byStatus[r.status] = (byStatus[r.status] || 0) + 1;
         byCreator[r.created_by] = (byCreator[r.created_by] || 0) + 1;
       }
-      // Final costings with calc values — same population as Leadership graphs (PM cards).
+      // All non-deleted costings — same population as Costings filters / PM cards.
       const PM_PROFILES = ['Sahasra_1', 'Sahasra_2', 'Sahasra_3', 'Sahasra_4', 'Sahasra_5'];
-      const chartRows = rows.filter((r) => {
-        const st = r.status === 'submitted' ? 'final' : r.status;
-        return st === 'final' && r.calc_quote_price != null;
-      });
-      const byPmFinal: Record<string, number> = {};
-      for (const pm of PM_PROFILES) byPmFinal[pm] = 0;
+      const chartRows = rows;
+      const byPmCount: Record<string, number> = {};
+      for (const pm of PM_PROFILES) byPmCount[pm] = 0;
       for (const r of chartRows) {
         if (PM_PROFILES.includes(r.created_by)) {
-          byPmFinal[r.created_by] = (byPmFinal[r.created_by] || 0) + 1;
+          byPmCount[r.created_by] = (byPmCount[r.created_by] || 0) + 1;
         }
       }
       const { data: recentAudit } = await db
@@ -850,7 +846,8 @@ Deno.serve(async (req) => {
           total: rows.length,
           by_status: byStatus,
           by_creator: byCreator,
-          by_pm_final: byPmFinal,
+          by_pm_final: byPmCount,
+          by_pm_count: byPmCount,
         },
         recent_costings,
         chart_rows: chartRows,

@@ -1478,20 +1478,50 @@
     }
   }
 
-  function isFinalChartRow(r) {
-    if (!r) return false;
-    var st = r.status === 'submitted' ? 'final' : r.status;
-    return st === 'final' && r.calc_quote_price != null;
+  function toChartNumber(v) {
+    if (v == null || v === '') return null;
+    var n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  /** Fill missing calc_* from live formula so drafts / legacy finals still plot. */
+  function enrichChartRow(r) {
+    if (!r) return r;
+    var calcM = toChartNumber(r.calc_margin);
+    var calcQ = toChartNumber(r.calc_quote_price);
+    var calcV = toChartNumber(r.calc_value_addition);
+    if (
+      (calcM == null || calcQ == null || calcV == null) &&
+      typeof SahasraCompute !== 'undefined' &&
+      state.profile &&
+      state.profile.defaults
+    ) {
+      try {
+        var live = SahasraCompute.computeCosting(r, state.profile.defaults);
+        if (calcM == null) calcM = toChartNumber(live.margin);
+        if (calcQ == null) calcQ = toChartNumber(live.quote_price_per_unit);
+        if (calcV == null) calcV = toChartNumber(live.value_addition_pct);
+      } catch (_) {}
+    }
+    return Object.assign({}, r, {
+      calc_margin: calcM,
+      calc_quote_price: calcQ,
+      calc_value_addition: calcV,
+      true_margin: toChartNumber(r.true_margin),
+      true_quote_price: toChartNumber(r.true_quote_price),
+      true_value_addition: toChartNumber(r.true_value_addition),
+    });
   }
 
   function chartRowTime(r) {
-    return new Date(r.exported_at || r.updated_at || 0).getTime();
+    return new Date(r.exported_at || r.updated_at || r.created_at || 0).getTime();
   }
 
-  /** Newest-first list of final chart-eligible rows. */
+  /** Newest-first list of all costings (matches Costings filters). */
   function normalizeChartRows(rows) {
     return (rows || [])
-      .filter(isFinalChartRow)
+      .filter(Boolean)
+      .map(enrichChartRow)
       .slice()
       .sort(function (a, b) {
         return chartRowTime(b) - chartRowTime(a);
@@ -1509,14 +1539,17 @@
 
   function chartLabels(rows) {
     return rows.map(function (r, i) {
-      return (r.assembly_name || r.client_name || '#' + (i + 1)).slice(0, 16);
+      var name = (r.assembly_name || r.client_name || '#' + (i + 1)).slice(0, 14);
+      var st = r.status === 'submitted' ? 'final' : r.status || '';
+      return st && st !== 'final' ? name + ' (' + st + ')' : name;
     });
   }
 
-  function buildLineChart(canvasId, labels, calcData, trueData, labelCalc, labelTrue, chartList) {
+  function buildLineChart(canvasId, labels, calcData, trueData, labelCalc, labelTrue, chartList, opts) {
     if (typeof Chart === 'undefined') return null;
     var ctx = document.getElementById(canvasId);
     if (!ctx) return null;
+    opts = opts || {};
     var ch = new Chart(ctx, {
       type: 'line',
       data: {
@@ -1528,6 +1561,7 @@
             borderColor: '#e87a2e',
             backgroundColor: 'transparent',
             tension: 0.25,
+            spanGaps: true,
           },
           {
             label: labelTrue,
@@ -1536,15 +1570,20 @@
             backgroundColor: 'transparent',
             tension: 0.25,
             borderDash: [4, 4],
+            spanGaps: true,
           },
         ],
       },
       options: {
         responsive: true,
-        maintainAspectRatio: true,
+        maintainAspectRatio: opts.maintainAspectRatio !== false,
+        layout: { padding: { top: 4, right: 8, bottom: 8, left: 4 } },
         plugins: { legend: { labels: { color: '#c8cdd8' } } },
         scales: {
-          x: { ticks: { color: '#8b93a7' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          x: {
+            ticks: { color: '#8b93a7', maxRotation: 45, minRotation: 0, autoSkip: true },
+            grid: { color: 'rgba(255,255,255,0.06)' },
+          },
           y: { ticks: { color: '#8b93a7' }, grid: { color: 'rgba(255,255,255,0.06)' } },
         },
       },
@@ -1615,15 +1654,19 @@
         return r.true_quote_price;
       });
     }
-    state.enlargeChart = buildLineChart(
-      'chart-enlarge-canvas',
-      labels,
-      calc,
-      tru,
-      'Calculated',
-      'True',
-      [],
-    );
+    // Defer so modal layout is measured before Chart.js sizes the canvas.
+    requestAnimationFrame(function () {
+      state.enlargeChart = buildLineChart(
+        'chart-enlarge-canvas',
+        labels,
+        calc,
+        tru,
+        'Calculated',
+        'True',
+        [],
+        { maintainAspectRatio: false },
+      );
+    });
   }
 
   function closeChartEnlarge() {
@@ -1678,7 +1721,7 @@
       })
       .join('');
 
-    // KPI cards = final chart population per PM (matches full graph data set, not drafts / non-PM).
+    // KPI cards = all costings per PM (same as Costings "Created by" filter).
     var pmHtml = PM_PROFILES.map(function (k) {
       var n = byPmNewest[k] ? byPmNewest[k].length : 0;
       return (
@@ -1695,8 +1738,8 @@
       orgNewest.length > 5
         ? 'Last 5 of ' + orgNewest.length + ' · click for all'
         : orgNewest.length
-          ? orgNewest.length + ' final · click to enlarge'
-          : 'No final chart data';
+          ? orgNewest.length + ' costings · click to enlarge'
+          : 'No chart data';
 
     $('main-content').innerHTML =
       '<div class="kpi-row"><div class="kpi"><div class="kpi-label">Total costings</div><div class="kpi-val">' +
@@ -1704,7 +1747,7 @@
       '</div></div></div><p>' +
       statusHtml +
       '</p>' +
-      '<h3>Final costings by PM</h3><p class="muted section-note">Counts match graph data (final with calculated quote). Non-PM creators are excluded from these cards.</p><div class="kpi-row">' +
+      '<h3>Costings by PM</h3><p class="muted section-note">Counts match Costings filters (all non-deleted). Graphs include drafts; missing calc quotes are computed live. Non-PM creators are excluded from these cards.</p><div class="kpi-row">' +
       pmHtml +
       '</div>' +
       '<div class="charts-grid">' +
@@ -1776,8 +1819,8 @@
           all.length > 5
             ? 'Last 5 of ' + all.length + ' · click for all'
             : all.length
-              ? all.length + ' final · click to enlarge'
-              : 'No final chart data';
+              ? all.length + ' costings · click to enlarge'
+              : 'No chart data';
         return chartCardHtml(pm, 'chart-pm-' + idx, hint);
       }).join('');
       PM_PROFILES.forEach(function (pm, idx) {
@@ -1793,21 +1836,21 @@
         if (key === 'chart-margin') {
           openChartEnlarge({
             title: 'Margins (calc vs true) — full history',
-            sub: (data.org || []).length + ' final costings',
+            sub: (data.org || []).length + ' costings',
             rowsNewestFirst: data.org || [],
             metric: 'margin',
           });
         } else if (key === 'chart-quote') {
           openChartEnlarge({
             title: 'Quote price (calc vs true) — full history',
-            sub: (data.org || []).length + ' final costings',
+            sub: (data.org || []).length + ' costings',
             rowsNewestFirst: data.org || [],
             metric: 'quote',
           });
         } else if (key === 'chart-va') {
           openChartEnlarge({
             title: 'Value addition % (calc vs true) — full history',
-            sub: (data.org || []).length + ' final costings',
+            sub: (data.org || []).length + ' costings',
             rowsNewestFirst: data.org || [],
             metric: 'va',
           });
@@ -1817,7 +1860,7 @@
           var rows = (data.byPm && data.byPm[pm]) || [];
           openChartEnlarge({
             title: pm + ' — quote calc vs true (full history)',
-            sub: rows.length + ' final costings',
+            sub: rows.length + ' costings',
             rowsNewestFirst: rows,
             metric: 'quote',
           });
