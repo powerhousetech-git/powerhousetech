@@ -1389,7 +1389,7 @@
           detailField('Batch', lead.Batch || lead.batch || '—') +
           '<div class="detail-field"><label>Region</label><span>' + regionBadge(lead.region || lead.Region) + '</span></div>' +
           '<div class="detail-field"><label>Website</label><span>' + websiteHtml + '</span></div>' +
-          detailField('Follow-ups', String(lead.follow_up_count != null ? lead.follow_up_count : '—')) +
+          detailField('Follow Up Count', String(lead.follow_up_count != null ? lead.follow_up_count : '—') + ' · 1 = Mail 1, 2+ = follow-ups') +
           detailField('Last email sent', lead.last_email_sent ? fmtDateTime(lead.last_email_sent) : '—') +
           detailField('Batch triggered', (lead['Batch Triggered At'] || lead.batch_triggered_at) ? fmtDateTime(lead['Batch Triggered At'] || lead.batch_triggered_at) : '—') +
           detailField('Created', lead.created_at || '—') +
