@@ -323,7 +323,7 @@
       '</div>' +
       '<div class="kpi-row">' +
         kpi('Conversion rate', rate, 'gold', rateHint) +
-        kpi('Meetings', s.meetings_scheduled || 0, 'purple') +
+        kpi('Meetings', s.meetings != null ? s.meetings : ((s.meetings_proposed || 0) + (s.meetings_scheduled || 0) + (s.human_takeover || 0)), 'purple') +
         kpi('Converted', s.converted_leads || 0, 'gold') +
         kpi('Discarded', s.discarded_leads || 0, '') +
       '</div>' +
@@ -334,7 +334,7 @@
           '<div style="padding:18px"><div class="funnel">' +
           funnel.map(function(f){
             var w = Math.round((f.count / maxFunnel) * 100);
-            var colors = { new:'#94a3b8', mail_1_sent:'#3b82f6', follow_up:'#0ea5e9', responded:'#22c55e', meeting_proposed:'#c084fc', meeting_scheduled:'#a855f7', human_takeover:'#f97316', converted:'#eab308', discarded:'#ef4444' };
+            var colors = { new:'#94a3b8', mail_1_sent:'#3b82f6', follow_up:'#0ea5e9', responded:'#22c55e', meeting:'#a855f7', meeting_proposed:'#c084fc', meeting_scheduled:'#a855f7', human_takeover:'#f97316', converted:'#eab308', discarded:'#ef4444' };
             var barColor = colors[f.key] || 'var(--primary)';
             return '<div class="funnel-row"><span class="funnel-label">' + esc(f.label) + '</span>' +
               '<div class="funnel-bar-wrap"><div class="funnel-bar" style="width:' + w + '%;background:' + barColor + '"></div></div>' +
