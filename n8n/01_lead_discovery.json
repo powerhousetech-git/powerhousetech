@@ -1,0 +1,445 @@
+{
+  "name": "01 Lead Discovery",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 3
+            }
+          ]
+        }
+      },
+      "id": "n1",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const sd = $getWorkflowStaticData('global');\nconst keys = ['REPLACE_APOLLO_KEY_1','REPLACE_APOLLO_KEY_2','REPLACE_APOLLO_KEY_3','REPLACE_APOLLO_KEY_4'];\nconst idx = (sd.apolloIdx || 0) % 4;\nsd.apolloIdx = idx + 1;\nconst page = ((sd.pageIdx || 0) % 5) + 1;\nsd.pageIdx = (sd.pageIdx || 0) + 1;\nreturn [{ json: { apiKey: keys[idx], keyIndex: idx, page } }];"
+      },
+      "id": "n2",
+      "name": "Rotate Apollo Key",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const input = $input.first().json;\nconst page = input.page || 1;\nreturn [{\n  json: {\n    apiKey: input.apiKey,\n    keyIndex: input.keyIndex,\n    page,\n    body: {\n      q_organization_keyword_tags: ['saas', 'artificial intelligence', 'ai startup', 'machine learning'],\n      person_titles: ['CEO', 'Founder', 'Co-Founder', 'VP Sales', 'Head of Growth', 'CTO'],\n      organization_num_employees_ranges: ['1,50', '51,200'],\n      page,\n      per_page: 25,\n    },\n  },\n}];"
+      },
+      "id": "na1",
+      "name": "Build Track A Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const input = $input.first().json;\nconst page = input.page || 1;\nreturn [{\n  json: {\n    apiKey: input.apiKey,\n    keyIndex: input.keyIndex,\n    page,\n    body: {\n      q_organization_keyword_tags: ['electronics manufacturing', 'ems', 'pcb assembly', 'contract manufacturing'],\n      person_titles: ['Procurement Manager', 'VP Operations', 'Plant Manager', 'Sourcing Manager', 'CEO'],\n      organization_num_employees_ranges: ['51,200', '201,500'],\n      page,\n      per_page: 25,\n    },\n  },\n}];"
+      },
+      "id": "nb1",
+      "name": "Build Track B Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apollo.io/v1/mixed_people/search",
+        "authentication": "none",
+        "sendHeaders": true,
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $json.apiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}"
+      },
+      "id": "na2",
+      "name": "Apollo Search Track A",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        940,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apollo.io/v1/mixed_people/search",
+        "authentication": "none",
+        "sendHeaders": true,
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $json.apiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}"
+      },
+      "id": "nb2",
+      "name": "Apollo Search Track B",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        940,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const trackLetter = 'A';\nconst trackToSlug = 'saas-startups';\nconst trackToLabel = 'Track A - Startups';\n\nconst resp = $input.first().json;\nconst people = resp.people || resp.contacts || [];\nif (!people.length) return [{ json: { _empty: true } }];\n\nreturn people.map((p) => {\n  const org = p.organization || {};\n  const first = p.first_name || (p.name ? p.name.split(' ')[0] : '') || '';\n  const last = p.last_name || (p.name ? p.name.split(' ').slice(1).join(' ') : '') || '';\n  const domain = String(org.primary_domain || org.website_url || '')\n    .replace(/^https?:\\/\\//, '')\n    .replace(/\\/.*$/, '')\n    .toLowerCase();\n\n  return {\n    json: {\n      name: p.name || `${first} ${last}`.trim(),\n      firstName: first,\n      lastName: last,\n      email: p.email || '',\n      company: org.name || p.organization_name || '',\n      domain,\n      title: p.title || '',\n      country: p.country || p.city || '',\n      track: trackToLabel,\n      industrySlug: trackToSlug,\n      trackLetter,\n    },\n  };\n});"
+      },
+      "id": "na3",
+      "name": "Normalise Track A",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1180,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const trackLetter = 'B';\nconst trackToSlug = 'ems';\nconst trackToLabel = 'Track B - EMS';\n\nconst resp = $input.first().json;\nconst people = resp.people || resp.contacts || [];\nif (!people.length) return [{ json: { _empty: true } }];\n\nreturn people.map((p) => {\n  const org = p.organization || {};\n  const first = p.first_name || (p.name ? p.name.split(' ')[0] : '') || '';\n  const last = p.last_name || (p.name ? p.name.split(' ').slice(1).join(' ') : '') || '';\n  const domain = String(org.primary_domain || org.website_url || '')\n    .replace(/^https?:\\/\\//, '')\n    .replace(/\\/.*$/, '')\n    .toLowerCase();\n\n  return {\n    json: {\n      name: p.name || `${first} ${last}`.trim(),\n      firstName: first,\n      lastName: last,\n      email: p.email || '',\n      company: org.name || p.organization_name || '',\n      domain,\n      title: p.title || '',\n      country: p.country || p.city || '',\n      track: trackToLabel,\n      industrySlug: trackToSlug,\n      trackLetter,\n    },\n  };\n});"
+      },
+      "id": "nb3",
+      "name": "Normalise Track B",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1180,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "numberInputs": 2
+      },
+      "id": "n3",
+      "name": "Merge Tracks",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1420,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json._empty === true }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n4",
+      "name": "Filter Empty",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        1660,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://msratyvmnuvozuthgkmi.supabase.co/functions/v1/outreach-api/api/contacts?{{ $json.email ? ('email=' + encodeURIComponent($json.email)) : ('domain=' + encodeURIComponent($json.domain) + '&name=' + encodeURIComponent($json.name)) }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 2e5559ab3d6c6c520534ad11841227924392e7a6d97f9bfb"
+            }
+          ]
+        }
+      },
+      "id": "n5",
+      "name": "Check Existing in Portal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1900,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.total }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n6",
+      "name": "Is New Contact?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2140,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://msratyvmnuvozuthgkmi.supabase.co/functions/v1/outreach-api/api/contacts",
+        "authentication": "none",
+        "sendHeaders": true,
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 2e5559ab3d6c6c520534ad11841227924392e7a6d97f9bfb"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"name\": $('Filter Empty').item.json.name,\n    \"firstName\": $('Filter Empty').item.json.firstName,\n    \"lastName\": $('Filter Empty').item.json.lastName,\n    \"email\": $('Filter Empty').item.json.email,\n    \"company\": $('Filter Empty').item.json.company,\n    \"domain\": $('Filter Empty').item.json.domain,\n    \"title\": $('Filter Empty').item.json.title,\n    \"country\": $('Filter Empty').item.json.country,\n    \"track\": $('Filter Empty').item.json.track,\n    \"status\": \"Queue\",\n    \"source\": \"Apollo\"\n  }\n}}"
+      },
+      "id": "n7",
+      "name": "Create Contact in Portal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2380,
+        260
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Rotate Apollo Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rotate Apollo Key": {
+      "main": [
+        [
+          {
+            "node": "Build Track A Payload",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Track B Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Track A Payload": {
+      "main": [
+        [
+          {
+            "node": "Apollo Search Track A",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Track B Payload": {
+      "main": [
+        [
+          {
+            "node": "Apollo Search Track B",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apollo Search Track A": {
+      "main": [
+        [
+          {
+            "node": "Normalise Track A",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apollo Search Track B": {
+      "main": [
+        [
+          {
+            "node": "Normalise Track B",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalise Track A": {
+      "main": [
+        [
+          {
+            "node": "Merge Tracks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalise Track B": {
+      "main": [
+        [
+          {
+            "node": "Merge Tracks",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Tracks": {
+      "main": [
+        [
+          {
+            "node": "Filter Empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Empty": {
+      "main": [
+        [
+          {
+            "node": "Check Existing in Portal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Existing in Portal": {
+      "main": [
+        [
+          {
+            "node": "Is New Contact?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is New Contact?": {
+      "main": [
+        [
+          {
+            "node": "Create Contact in Portal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "powerhousetech-outreach-21cd8e54bfca"
+  },
+  "pinData": {},
+  "versionId": "fe727b77-bf0f-43ea-abd6-26a98a6ca5eb",
+  "id": "e2c92e61-e7ba-40d1-b4d9-ceb4adca18d2",
+  "tags": []
+}

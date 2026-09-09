@@ -33,6 +33,19 @@
       </div>
 
       <div class="controls-stack">
+        <section class="card control-card kill-switch-card">
+          <div class="kill-switch-row">
+            <div>
+              <h2>Automation kill switch</h2>
+              <p class="muted">When paused, n8n cannot pull sequence-ready contacts or run Apollo search. Credentials and other settings still work.</p>
+            </div>
+            <button type="button" class="kill-switch-btn is-off" id="btn-kill-switch" aria-pressed="false">
+              <span class="kill-switch-dot" aria-hidden="true"></span>
+              <span class="kill-switch-label" id="kill-switch-label">Automation Paused</span>
+            </button>
+          </div>
+        </section>
+
         <section class="card control-card">
           <h2>Lead Discovery</h2>
           <p class="muted">Finds new contacts via Apollo and adds them to the database (both tracks).</p>
@@ -121,14 +134,79 @@
     </main>
   </div>
 
-  <script type="module" src="https://powerhousetech.in/js/firebase-boot.js"></script>
-  <script src="/app.js"></script>
+  <script type="module" src="/js/firebase-boot.js"></script>
+  <script src="/app.js?v=6"></script>
   <script>
     (async () => {
       const ui = window.OutreachUI;
       const me = await ui.requireAdminShell();
       if (!me) return;
       await ui.renderIndustrySidebar('controls', me.email);
+
+      const killBtn = document.getElementById('btn-kill-switch');
+      const killLabel = document.getElementById('kill-switch-label');
+      let systemEnabled = false;
+
+      function renderKillSwitch(enabled) {
+        systemEnabled = !!enabled;
+        killBtn.classList.toggle('is-on', systemEnabled);
+        killBtn.classList.toggle('is-off', !systemEnabled);
+        killBtn.setAttribute('aria-pressed', systemEnabled ? 'true' : 'false');
+        killLabel.textContent = systemEnabled ? 'Automation Active' : 'Automation Paused';
+      }
+
+      async function setSystemEnabled(enabled) {
+        const res = await ui.api('/api/system/toggle', {
+          method: 'POST',
+          body: { enabled },
+        });
+        renderKillSwitch(res.systemEnabled);
+      }
+
+      function confirmEnableAutomation() {
+        return new Promise((resolve) => {
+          const card = ui.openModal(`
+            <div class="modal-header">
+              <h2>Enable automation?</h2>
+              <button type="button" class="modal-x" data-modal-close aria-label="Close">×</button>
+            </div>
+            <div class="modal-body">
+              <p>This will allow n8n to send emails on schedule. Continue?</p>
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="btn" data-modal-close id="ks-cancel">Cancel</button>
+              <button type="button" class="btn btn-primary" id="ks-confirm">Continue</button>
+            </div>
+          `);
+          let settled = false;
+          const finish = (val) => {
+            if (settled) return;
+            settled = true;
+            ui.closeModal();
+            resolve(val);
+          };
+          card.querySelector('#ks-confirm').addEventListener('click', () => finish(true));
+          card.querySelector('#ks-cancel').addEventListener('click', () => finish(false));
+          card.querySelector('[data-modal-close]')?.addEventListener('click', () => finish(false));
+        });
+      }
+
+      killBtn.addEventListener('click', async () => {
+        killBtn.disabled = true;
+        try {
+          if (!systemEnabled) {
+            const ok = await confirmEnableAutomation();
+            if (!ok) return;
+            await setSystemEnabled(true);
+          } else {
+            await setSystemEnabled(false);
+          }
+        } catch (err) {
+          alert(err.message || 'Failed to update kill switch');
+        } finally {
+          killBtn.disabled = false;
+        }
+      });
 
       const dayInputs = Array.from({ length: 10 }, (_, i) =>
         document.getElementById('cadence-day-' + i),
@@ -228,6 +306,7 @@
           const cfg = await ui.api('/api/config');
           populateCadence(cfg.cadenceDays);
           setCadenceLastSaved(cfg.updatedAt);
+          renderKillSwitch(cfg.systemEnabled);
         } catch (err) {
           showCadenceStatus(err.message || 'Failed to load cadence', false);
         }

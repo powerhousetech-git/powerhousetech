@@ -2,6 +2,12 @@
 
 const FOLLOW_STATUSES = Array.from({ length: 10 }, (_, i) => `Follow${i + 1} Sent`);
 
+const LEGACY_STATUS_MAP = {
+  'Day1 Sent': 'Follow1 Sent',
+  'Day4 Sent': 'Follow2 Sent',
+  'Day9 Sent': 'Follow3 Sent',
+};
+
 const STATUSES = [
   'Queue',
   'Email Found',
@@ -12,6 +18,20 @@ const STATUSES = [
 ];
 
 const ACTIVE_PIPELINE = ['Email Found', ...FOLLOW_STATUSES];
+
+/** Statuses that mean "completed follow-up N" (1-indexed), including legacy Day labels. */
+function statusesCompletedFollowUp(n) {
+  const modern = `Follow${n} Sent`;
+  if (n === 1) return [modern, 'Day1 Sent'];
+  if (n === 2) return [modern, 'Day4 Sent'];
+  if (n === 3) return [modern, 'Day9 Sent'];
+  return [modern];
+}
+
+function normalizeStatus(status) {
+  const s = String(status || '');
+  return LEGACY_STATUS_MAP[s] || s;
+}
 
 const DEFAULT_CADENCE = [1, 4, 9, null, null, null, null, null, null, null];
 
@@ -197,12 +217,15 @@ module.exports = {
   STATUSES,
   FOLLOW_STATUSES,
   ACTIVE_PIPELINE,
+  LEGACY_STATUS_MAP,
   DEFAULT_CADENCE,
   DEFAULT_TEMPLATES,
   slugify,
   trackForIndustrySlug,
   parseCadenceDays,
   normalizeCadence,
+  normalizeStatus,
+  statusesCompletedFollowUp,
   renderTemplate,
   isValidEmail,
   parseCsv,
