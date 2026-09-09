@@ -197,7 +197,7 @@
 
   /* ─ Nav ──────────────────────────────────────────────────────────────────── */
   function setView(v) {
-    // v6: Google Sheets nav goes to Settings/sheets page — not Capture
+    if (v === 'sheets') v = 'leads'; // Settings · Google Sheets removed
     if (v === 'capture') state.captureTab = state.captureTab === 'sheets' ? 'pdf' : (state.captureTab || 'pdf');
     state.view = v;
     document.querySelectorAll('.nav-link').forEach(function(a){ a.classList.toggle('active', a.dataset.view === v); });
