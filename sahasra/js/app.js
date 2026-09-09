@@ -1581,8 +1581,8 @@
         maintainAspectRatio: opts.maintainAspectRatio !== false,
         layout: {
           padding: opts.maintainAspectRatio === false
-            ? { top: 10, right: 28, bottom: 36, left: 10 }
-            : { top: 4, right: 8, bottom: 8, left: 4 },
+            ? { top: 10, right: 32, bottom: 40, left: 10 }
+            : { top: 4, right: 16, bottom: 18, left: 4 },
         },
         plugins: { legend: { labels: { color: '#c8cdd8' } } },
         scales: {
@@ -1702,7 +1702,7 @@
       '</span></div>' +
       '<canvas id="' +
       canvasId +
-      '" height="140"></canvas></div>'
+      '" height="170"></canvas></div>'
     );
   }
 

@@ -681,7 +681,14 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 12px;
+  padding: 12px 12px 16px;
+  overflow: hidden;
+}
+
+.chart-card canvas {
+  display: block;
+  width: 100% !important;
+  max-height: 170px;
 }
 
 .chart-card h4 {
@@ -808,12 +815,13 @@ body {
 .chart-enlarge-wrap {
   position: relative;
   flex: 1 1 auto;
-  min-height: 260px;
-  height: min(48vh, 380px);
-  max-height: min(48vh, 380px);
+  min-height: 280px;
+  height: min(50vh, 420px);
+  max-height: min(50vh, 420px);
   width: 100%;
-  padding-bottom: 4px;
+  padding: 4px 8px 12px 4px;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .chart-enlarge-wrap canvas {
