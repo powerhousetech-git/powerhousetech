@@ -776,11 +776,11 @@ body {
 
 .modal-card-wide {
   width: min(960px, calc(100vw - 1.5rem));
-  max-height: min(92vh, 900px);
+  max-height: min(90vh, 880px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 18px 20px 16px;
+  padding: 16px 18px 20px;
   box-sizing: border-box;
 }
 
@@ -808,10 +808,12 @@ body {
 .chart-enlarge-wrap {
   position: relative;
   flex: 1 1 auto;
-  min-height: 240px;
-  height: min(52vh, 400px);
-  max-height: min(52vh, 400px);
+  min-height: 260px;
+  height: min(48vh, 380px);
+  max-height: min(48vh, 380px);
   width: 100%;
+  padding-bottom: 4px;
+  box-sizing: border-box;
 }
 
 .chart-enlarge-wrap canvas {

@@ -1577,14 +1577,27 @@
       options: {
         responsive: true,
         maintainAspectRatio: opts.maintainAspectRatio !== false,
-        layout: { padding: { top: 4, right: 8, bottom: 8, left: 4 } },
+        layout: {
+          padding: opts.maintainAspectRatio === false
+            ? { top: 8, right: 12, bottom: 28, left: 8 }
+            : { top: 4, right: 8, bottom: 8, left: 4 },
+        },
         plugins: { legend: { labels: { color: '#c8cdd8' } } },
         scales: {
           x: {
-            ticks: { color: '#8b93a7', maxRotation: 45, minRotation: 0, autoSkip: true },
+            ticks: {
+              color: '#8b93a7',
+              maxRotation: 40,
+              minRotation: 0,
+              autoSkip: true,
+              padding: opts.maintainAspectRatio === false ? 6 : 3,
+            },
             grid: { color: 'rgba(255,255,255,0.06)' },
           },
-          y: { ticks: { color: '#8b93a7' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          y: {
+            ticks: { color: '#8b93a7', padding: 4 },
+            grid: { color: 'rgba(255,255,255,0.06)' },
+          },
         },
       },
     });
