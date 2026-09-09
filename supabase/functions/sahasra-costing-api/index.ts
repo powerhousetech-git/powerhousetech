@@ -441,6 +441,19 @@ Deno.serve(async (req) => {
         byStatus[r.status] = (byStatus[r.status] || 0) + 1;
         byCreator[r.created_by] = (byCreator[r.created_by] || 0) + 1;
       }
+      // Final costings with calc values — same population as Leadership graphs (PM cards).
+      const PM_PROFILES = ['Sahasra_1', 'Sahasra_2', 'Sahasra_3', 'Sahasra_4', 'Sahasra_5'];
+      const chartRows = rows.filter((r) => {
+        const st = r.status === 'submitted' ? 'final' : r.status;
+        return st === 'final' && r.calc_quote_price != null;
+      });
+      const byPmFinal: Record<string, number> = {};
+      for (const pm of PM_PROFILES) byPmFinal[pm] = 0;
+      for (const r of chartRows) {
+        if (PM_PROFILES.includes(r.created_by)) {
+          byPmFinal[r.created_by] = (byPmFinal[r.created_by] || 0) + 1;
+        }
+      }
       const { data: recentAudit } = await db
         .from('sahasra_audit_log')
         .select('id, costing_id, user_email, field_name, old_value, new_value, changed_at')
@@ -454,9 +467,14 @@ Deno.serve(async (req) => {
           .length,
       }));
       return jsonResponse(200, {
-        summary: { total: rows.length, by_status: byStatus, by_creator: byCreator },
+        summary: {
+          total: rows.length,
+          by_status: byStatus,
+          by_creator: byCreator,
+          by_pm_final: byPmFinal,
+        },
         recent_costings,
-        chart_rows: rows.filter((r) => r.status === 'final' || r.calc_quote_price != null),
+        chart_rows: chartRows,
         recent_activity: recentAudit || [],
       });
     }

@@ -13,6 +13,9 @@
     saving: false,
     expandedId: null,
     charts: [],
+    costingFilters: { created_by: '', progress: '', status: '' },
+    dashboardCharts: null,
+    enlargeChart: null,
   };
 
   var PM_PROFILES = ['Sahasra_1', 'Sahasra_2', 'Sahasra_3', 'Sahasra_4', 'Sahasra_5'];
@@ -868,20 +871,109 @@
       counts.needTrue +
       '</div></div></div>' +
       '<div class="panel-head"><h2>All costings</h2></div>' +
-      renderCostingsTable(state.costings);
+      renderCostingsTable(filteredCostings());
     bindCostingsTable();
     await refreshTrueValueBanner();
   }
 
+  function uniqueSorted(values) {
+    var seen = {};
+    var out = [];
+    values.forEach(function (v) {
+      var key = String(v == null || v === '' ? '—' : v);
+      if (seen[key]) return;
+      seen[key] = true;
+      out.push(key);
+    });
+    out.sort(function (a, b) {
+      return a.localeCompare(b);
+    });
+    return out;
+  }
+
+  function filterSelectHtml(key, options, current) {
+    return (
+      '<select class="th-filter-select" data-costing-filter="' +
+      esc(key) +
+      '" aria-label="Filter ' +
+      esc(key) +
+      '">' +
+      '<option value="">All</option>' +
+      options
+        .map(function (o) {
+          return (
+            '<option value="' +
+            esc(o) +
+            '"' +
+            (current === o ? ' selected' : '') +
+            '>' +
+            esc(o) +
+            '</option>'
+          );
+        })
+        .join('') +
+      '</select>'
+    );
+  }
+
+  function filteredCostings() {
+    var f = state.costingFilters || {};
+    return (state.costings || []).filter(function (r) {
+      if (f.created_by) {
+        var creator = r.created_by || '—';
+        if (creator !== f.created_by) return false;
+      }
+      if (f.progress) {
+        var prog = SahasraFormat.progressLabel(r).label;
+        if (prog !== f.progress) return false;
+      }
+      if (f.status) {
+        var st = SahasraFormat.statusLabel(r);
+        if (st !== f.status) return false;
+      }
+      return true;
+    });
+  }
+
   function renderCostingsTable(rows) {
-    if (!rows.length) {
-      return '<p class="muted">No costings yet. Use <strong>+ New costing</strong> in the sidebar.</p>';
-    }
     var isAdmin = state.profile && state.profile.role === 'admin';
+    var all = state.costings || [];
+    var creators = uniqueSorted(
+      all.map(function (r) {
+        return r.created_by || '—';
+      }),
+    );
+    var progresses = uniqueSorted(
+      all.map(function (r) {
+        return SahasraFormat.progressLabel(r).label;
+      }),
+    );
+    var statuses = uniqueSorted(
+      all.map(function (r) {
+        return SahasraFormat.statusLabel(r);
+      }),
+    );
+    var f = state.costingFilters || {};
     var head =
       '<table class="data-table costings-table"><thead><tr><th>Client</th><th>Assembly</th>' +
-      (isAdmin ? '<th>Created by</th>' : '') +
-      '<th>Progress</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody>';
+      (isAdmin
+        ? '<th class="th-filter"><span class="th-label">Created by</span>' +
+          filterSelectHtml('created_by', creators, f.created_by) +
+          '</th>'
+        : '') +
+      '<th class="th-filter"><span class="th-label">Progress</span>' +
+      filterSelectHtml('progress', progresses, f.progress) +
+      '</th>' +
+      '<th class="th-filter"><span class="th-label">Status</span>' +
+      filterSelectHtml('status', statuses, f.status) +
+      '</th>' +
+      '<th>Updated</th><th></th></tr></thead><tbody>';
+    if (!rows.length) {
+      var emptyMsg = all.length
+        ? 'No costings match the selected filters.'
+        : 'No costings yet. Use <strong>+ New costing</strong> in the sidebar.';
+      return head + '<tr><td colspan="' + (isAdmin ? 7 : 6) + '" class="muted">' + emptyMsg + '</td></tr></tbody></table>';
+    }
     var body = rows
       .map(function (r) {
         var st = r.status === 'submitted' ? 'final' : r.status;
@@ -924,7 +1016,30 @@
     return head + body + '</tbody></table>';
   }
 
+  function refreshCostingsTableOnly() {
+    var panel = document.querySelector('.panel-head');
+    var table = document.querySelector('.costings-table');
+    if (!panel || !table) {
+      loadCostingsHome();
+      return;
+    }
+    var html = renderCostingsTable(filteredCostings());
+    table.outerHTML = html;
+    bindCostingsTable();
+  }
+
   function bindCostingsTable() {
+    document.querySelectorAll('[data-costing-filter]').forEach(function (sel) {
+      sel.addEventListener('change', function () {
+        var key = sel.getAttribute('data-costing-filter');
+        if (!state.costingFilters) state.costingFilters = { created_by: '', progress: '', status: '' };
+        state.costingFilters[key] = sel.value || '';
+        refreshCostingsTableOnly();
+      });
+      sel.addEventListener('click', function (e) {
+        e.stopPropagation();
+      });
+    });
     document.querySelectorAll('.costing-row').forEach(function (tr) {
       tr.addEventListener('click', function (e) {
         if (e.target.closest('[data-delete]') || e.target.closest('[data-open]')) return;
@@ -1354,10 +1469,54 @@
     state.charts = [];
   }
 
-  function buildLineChart(canvasId, labels, calcData, trueData, labelCalc, labelTrue) {
-    if (typeof Chart === 'undefined') return;
+  function destroyEnlargeChart() {
+    if (state.enlargeChart) {
+      try {
+        state.enlargeChart.destroy();
+      } catch (_) {}
+      state.enlargeChart = null;
+    }
+  }
+
+  function isFinalChartRow(r) {
+    if (!r) return false;
+    var st = r.status === 'submitted' ? 'final' : r.status;
+    return st === 'final' && r.calc_quote_price != null;
+  }
+
+  function chartRowTime(r) {
+    return new Date(r.exported_at || r.updated_at || 0).getTime();
+  }
+
+  /** Newest-first list of final chart-eligible rows. */
+  function normalizeChartRows(rows) {
+    return (rows || [])
+      .filter(isFinalChartRow)
+      .slice()
+      .sort(function (a, b) {
+        return chartRowTime(b) - chartRowTime(a);
+      });
+  }
+
+  /** Last N (most recent) in chronological order for line charts. */
+  function lastNChronological(newestFirst, n) {
+    return newestFirst.slice(0, n).slice().reverse();
+  }
+
+  function chronological(newestFirst) {
+    return newestFirst.slice().reverse();
+  }
+
+  function chartLabels(rows) {
+    return rows.map(function (r, i) {
+      return (r.assembly_name || r.client_name || '#' + (i + 1)).slice(0, 16);
+    });
+  }
+
+  function buildLineChart(canvasId, labels, calcData, trueData, labelCalc, labelTrue, chartList) {
+    if (typeof Chart === 'undefined') return null;
     var ctx = document.getElementById(canvasId);
-    if (!ctx) return;
+    if (!ctx) return null;
     var ch = new Chart(ctx, {
       type: 'line',
       data: {
@@ -1382,6 +1541,7 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: true,
         plugins: { legend: { labels: { color: '#c8cdd8' } } },
         scales: {
           x: { ticks: { color: '#8b93a7' }, grid: { color: 'rgba(255,255,255,0.06)' } },
@@ -1389,12 +1549,109 @@
         },
       },
     });
-    state.charts.push(ch);
+    if (chartList) chartList.push(ch);
+    else state.charts.push(ch);
+    return ch;
+  }
+
+  function buildQuoteChart(canvasId, rows, chartList) {
+    var plot = rows.length ? rows : [];
+    var labels = plot.length
+      ? chartLabels(plot)
+      : ['—'];
+    return buildLineChart(
+      canvasId,
+      labels,
+      plot.length
+        ? plot.map(function (r) {
+            return r.calc_quote_price;
+          })
+        : [null],
+      plot.length
+        ? plot.map(function (r) {
+            return r.true_quote_price;
+          })
+        : [null],
+      'Calculated',
+      'True',
+      chartList,
+    );
+  }
+
+  function openChartEnlarge(spec) {
+    var modal = $('chart-enlarge-modal');
+    if (!modal) return;
+    destroyEnlargeChart();
+    $('chart-enlarge-title').textContent = spec.title || 'Full history';
+    $('chart-enlarge-sub').textContent = spec.sub || '';
+    modal.classList.remove('hidden');
+    var rows = chronological(spec.rowsNewestFirst || []);
+    var metric = spec.metric || 'quote';
+    var labels = rows.length ? chartLabels(rows) : ['—'];
+    var calc = [];
+    var tru = [];
+    if (!rows.length) {
+      calc = [null];
+      tru = [null];
+    } else if (metric === 'margin') {
+      calc = rows.map(function (r) {
+        return r.calc_margin;
+      });
+      tru = rows.map(function (r) {
+        return r.true_margin;
+      });
+    } else if (metric === 'va') {
+      calc = rows.map(function (r) {
+        return r.calc_value_addition;
+      });
+      tru = rows.map(function (r) {
+        return r.true_value_addition;
+      });
+    } else {
+      calc = rows.map(function (r) {
+        return r.calc_quote_price;
+      });
+      tru = rows.map(function (r) {
+        return r.true_quote_price;
+      });
+    }
+    state.enlargeChart = buildLineChart(
+      'chart-enlarge-canvas',
+      labels,
+      calc,
+      tru,
+      'Calculated',
+      'True',
+      [],
+    );
+  }
+
+  function closeChartEnlarge() {
+    var modal = $('chart-enlarge-modal');
+    if (modal) modal.classList.add('hidden');
+    destroyEnlargeChart();
+  }
+
+  function chartCardHtml(title, canvasId, countHint) {
+    return (
+      '<div class="chart-card chart-card-clickable" data-enlarge="' +
+      esc(canvasId) +
+      '" role="button" tabindex="0" title="Click to view full history">' +
+      '<div class="chart-card-head"><h4>' +
+      esc(title) +
+      '</h4><span class="chart-card-hint">' +
+      esc(countHint || 'Last 5 · click for all') +
+      '</span></div>' +
+      '<canvas id="' +
+      canvasId +
+      '" height="140"></canvas></div>'
+    );
   }
 
   async function loadAdminDashboard() {
     setActiveNav('admin');
     destroyCharts();
+    closeChartEnlarge();
     $('main-title').textContent = 'Leadership';
     $('main-sub').textContent = 'Org-wide calc vs true values, per-PM trends, and flags.';
     var res = await SahasraApi.dashboard();
@@ -1403,26 +1660,43 @@
       return;
     }
     var s = res.data.summary;
-    var chartRows = (res.data.chart_rows || []).slice().reverse();
-    var labels = chartRows.map(function (r, i) {
-      return (r.assembly_name || r.client_name || '#' + (i + 1)).slice(0, 16);
+    var orgNewest = normalizeChartRows(res.data.chart_rows || []);
+    var byPmNewest = {};
+    PM_PROFILES.forEach(function (pm) {
+      byPmNewest[pm] = orgNewest.filter(function (r) {
+        return r.created_by === pm;
+      });
     });
+    state.dashboardCharts = {
+      org: orgNewest,
+      byPm: byPmNewest,
+    };
+
     var statusHtml = Object.keys(s.by_status || {})
       .map(function (k) {
         return '<span class="badge">' + esc(k) + ': ' + s.by_status[k] + '</span> ';
       })
       .join('');
 
-    var byPm = s.by_creator || {};
+    // KPI cards = final chart population per PM (matches full graph data set, not drafts / non-PM).
     var pmHtml = PM_PROFILES.map(function (k) {
+      var n = byPmNewest[k] ? byPmNewest[k].length : 0;
       return (
         '<div class="kpi"><div class="kpi-label">' +
         esc(k) +
         '</div><div class="kpi-val">' +
-        (byPm[k] || 0) +
+        n +
         '</div></div>'
       );
     }).join('');
+
+    var orgPreview = lastNChronological(orgNewest, 5);
+    var orgHint =
+      orgNewest.length > 5
+        ? 'Last 5 of ' + orgNewest.length + ' · click for all'
+        : orgNewest.length
+          ? orgNewest.length + ' final · click to enlarge'
+          : 'No final chart data';
 
     $('main-content').innerHTML =
       '<div class="kpi-row"><div class="kpi"><div class="kpi-label">Total costings</div><div class="kpi-val">' +
@@ -1430,13 +1704,13 @@
       '</div></div></div><p>' +
       statusHtml +
       '</p>' +
-      '<h3>By project manager</h3><div class="kpi-row">' +
+      '<h3>Final costings by PM</h3><p class="muted section-note">Counts match graph data (final with calculated quote). Non-PM creators are excluded from these cards.</p><div class="kpi-row">' +
       pmHtml +
       '</div>' +
       '<div class="charts-grid">' +
-      '<div class="chart-card"><h4>Margins (calc vs true)</h4><canvas id="chart-margin" height="160"></canvas></div>' +
-      '<div class="chart-card"><h4>Quote price (calc vs true)</h4><canvas id="chart-quote" height="160"></canvas></div>' +
-      '<div class="chart-card"><h4>Value addition % (calc vs true)</h4><canvas id="chart-va" height="160"></canvas></div>' +
+      chartCardHtml('Margins (calc vs true)', 'chart-margin', orgHint) +
+      chartCardHtml('Quote price (calc vs true)', 'chart-quote', orgHint) +
+      chartCardHtml('Value addition % (calc vs true)', 'chart-va', orgHint) +
       '</div>' +
       '<h3>Per project manager — quote calc vs true</h3><div class="charts-grid" id="pm-charts"></div>' +
       '<div class="panel-head"><h2>Recent costings</h2></div>' +
@@ -1458,84 +1732,105 @@
         .join('') +
       '</ul>';
 
-    buildLineChart(
-      'chart-margin',
-      labels,
-      chartRows.map(function (r) {
-        return r.calc_margin;
-      }),
-      chartRows.map(function (r) {
-        return r.true_margin;
-      }),
-      'Calculated',
-      'True',
-    );
-    buildLineChart(
-      'chart-quote',
-      labels,
-      chartRows.map(function (r) {
-        return r.calc_quote_price;
-      }),
-      chartRows.map(function (r) {
-        return r.true_quote_price;
-      }),
-      'Calculated',
-      'True',
-    );
-    buildLineChart(
-      'chart-va',
-      labels,
-      chartRows.map(function (r) {
-        return r.calc_value_addition;
-      }),
-      chartRows.map(function (r) {
-        return r.true_value_addition;
-      }),
-      'Calculated',
-      'True',
-    );
+    var orgLabels = orgPreview.length ? chartLabels(orgPreview) : ['—'];
+    var orgCalcM = orgPreview.length
+      ? orgPreview.map(function (r) {
+          return r.calc_margin;
+        })
+      : [null];
+    var orgTrueM = orgPreview.length
+      ? orgPreview.map(function (r) {
+          return r.true_margin;
+        })
+      : [null];
+    var orgCalcQ = orgPreview.length
+      ? orgPreview.map(function (r) {
+          return r.calc_quote_price;
+        })
+      : [null];
+    var orgTrueQ = orgPreview.length
+      ? orgPreview.map(function (r) {
+          return r.true_quote_price;
+        })
+      : [null];
+    var orgCalcVa = orgPreview.length
+      ? orgPreview.map(function (r) {
+          return r.calc_value_addition;
+        })
+      : [null];
+    var orgTrueVa = orgPreview.length
+      ? orgPreview.map(function (r) {
+          return r.true_value_addition;
+        })
+      : [null];
+
+    buildLineChart('chart-margin', orgLabels, orgCalcM, orgTrueM, 'Calculated', 'True');
+    buildLineChart('chart-quote', orgLabels, orgCalcQ, orgTrueQ, 'Calculated', 'True');
+    buildLineChart('chart-va', orgLabels, orgCalcVa, orgTrueVa, 'Calculated', 'True');
 
     var pmCharts = $('pm-charts');
     if (pmCharts) {
-      var pms = PM_PROFILES.slice();
-      pmCharts.innerHTML = pms
-        .map(function (pm, idx) {
-          return (
-            '<div class="chart-card"><h4>' +
-            esc(pm) +
-            '</h4><canvas id="chart-pm-' +
-            idx +
-            '" height="140"></canvas></div>'
-          );
-        })
-        .join('');
-      pms.forEach(function (pm, idx) {
-        var subset = chartRows.filter(function (r) {
-          return r.created_by === pm;
-        });
-        var plabels = subset.length
-          ? subset.map(function (r, i) {
-              return (r.assembly_name || '#' + (i + 1)).slice(0, 14);
-            })
-          : ['—'];
-        buildLineChart(
-          'chart-pm-' + idx,
-          plabels,
-          subset.length
-            ? subset.map(function (r) {
-                return r.calc_quote_price;
-              })
-            : [null],
-          subset.length
-            ? subset.map(function (r) {
-                return r.true_quote_price;
-              })
-            : [null],
-          'Calculated',
-          'True',
-        );
+      pmCharts.innerHTML = PM_PROFILES.map(function (pm, idx) {
+        var all = byPmNewest[pm] || [];
+        var hint =
+          all.length > 5
+            ? 'Last 5 of ' + all.length + ' · click for all'
+            : all.length
+              ? all.length + ' final · click to enlarge'
+              : 'No final chart data';
+        return chartCardHtml(pm, 'chart-pm-' + idx, hint);
+      }).join('');
+      PM_PROFILES.forEach(function (pm, idx) {
+        var preview = lastNChronological(byPmNewest[pm] || [], 5);
+        buildQuoteChart('chart-pm-' + idx, preview);
       });
     }
+
+    document.querySelectorAll('[data-enlarge]').forEach(function (card) {
+      function openFromCard() {
+        var key = card.getAttribute('data-enlarge');
+        var data = state.dashboardCharts || {};
+        if (key === 'chart-margin') {
+          openChartEnlarge({
+            title: 'Margins (calc vs true) — full history',
+            sub: (data.org || []).length + ' final costings',
+            rowsNewestFirst: data.org || [],
+            metric: 'margin',
+          });
+        } else if (key === 'chart-quote') {
+          openChartEnlarge({
+            title: 'Quote price (calc vs true) — full history',
+            sub: (data.org || []).length + ' final costings',
+            rowsNewestFirst: data.org || [],
+            metric: 'quote',
+          });
+        } else if (key === 'chart-va') {
+          openChartEnlarge({
+            title: 'Value addition % (calc vs true) — full history',
+            sub: (data.org || []).length + ' final costings',
+            rowsNewestFirst: data.org || [],
+            metric: 'va',
+          });
+        } else if (key.indexOf('chart-pm-') === 0) {
+          var idx = Number(key.replace('chart-pm-', ''));
+          var pm = PM_PROFILES[idx];
+          var rows = (data.byPm && data.byPm[pm]) || [];
+          openChartEnlarge({
+            title: pm + ' — quote calc vs true (full history)',
+            sub: rows.length + ' final costings',
+            rowsNewestFirst: rows,
+            metric: 'quote',
+          });
+        }
+      }
+      card.addEventListener('click', openFromCard);
+      card.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openFromCard();
+        }
+      });
+    });
     bindLeadershipTable();
   }
 
@@ -1679,6 +1974,17 @@
     if (googleBtn) googleBtn.addEventListener('click', loginWithGoogleAdmin);
     var signOutBtn = $('btn-signout');
     if (signOutBtn) signOutBtn.addEventListener('click', signOut);
+    var enlargeClose = $('chart-enlarge-close');
+    if (enlargeClose) enlargeClose.addEventListener('click', closeChartEnlarge);
+    var enlargeModal = $('chart-enlarge-modal');
+    if (enlargeModal) {
+      enlargeModal.addEventListener('click', function (e) {
+        if (e.target === enlargeModal) closeChartEnlarge();
+      });
+    }
+    window.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeChartEnlarge();
+    });
     window.addEventListener('hashchange', function () {
       if (state.profile) routeFromHash();
     });
