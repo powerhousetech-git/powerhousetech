@@ -81,12 +81,14 @@
     var meetingsTotal = meetingProposed + meetings + humanTakeover;
     // Meeting conversion = share of contacted leads that reached meeting proposed/finalized
     var rate = contacted ? Math.round((meetingsTotal / contacted) * 1000) / 10 : 0;
+    var newCount = leads.filter(function (l) { return pipelineBucket(l.status) === 'new'; }).length;
+    // Funnel bars use the SAME definitions as dashboard KPI cards (not exclusive pipeline buckets)
     var funnel = [
-      { key: 'new', label: 'New', count: leads.filter(function (l) { return pipelineBucket(l.status) === 'new'; }).length },
-      { key: 'mail_1_sent', label: 'Mail 1 Sent', count: leads.filter(function (l) { return pipelineBucket(l.status) === 'mail_1_sent'; }).length },
-      { key: 'follow_up', label: 'Follow-up', count: leads.filter(function (l) { return pipelineBucket(l.status) === 'follow_up'; }).length },
-      { key: 'responded', label: 'Responded', count: leads.filter(function (l) { return pipelineBucket(l.status) === 'responded'; }).length },
-      { key: 'meeting', label: 'Meeting', count: meetingsTotal },
+      { key: 'new', label: 'New', count: newCount },
+      { key: 'mail_1_sent', label: 'Emailed', count: mail1 },
+      { key: 'follow_up', label: 'Follow-ups', count: fus },
+      { key: 'responded', label: 'Responses', count: responded },
+      { key: 'meeting', label: 'Meetings', count: meetingsTotal },
       { key: 'converted', label: 'Converted', count: converted },
       { key: 'discarded', label: 'Discarded', count: discarded },
     ];
