@@ -1539,9 +1539,11 @@
 
   function chartLabels(rows) {
     return rows.map(function (r, i) {
-      var name = (r.assembly_name || r.client_name || '#' + (i + 1)).slice(0, 14);
       var st = r.status === 'submitted' ? 'final' : r.status || '';
-      return st && st !== 'final' ? name + ' (' + st + ')' : name;
+      var isDraftish = st && st !== 'final';
+      var raw = r.assembly_name || r.client_name || '#' + (i + 1);
+      var name = String(raw).slice(0, isDraftish ? 10 : 14);
+      return isDraftish ? name + ' · ' + st : name;
     });
   }
 
@@ -1579,7 +1581,7 @@
         maintainAspectRatio: opts.maintainAspectRatio !== false,
         layout: {
           padding: opts.maintainAspectRatio === false
-            ? { top: 8, right: 12, bottom: 28, left: 8 }
+            ? { top: 10, right: 28, bottom: 36, left: 10 }
             : { top: 4, right: 8, bottom: 8, left: 4 },
         },
         plugins: { legend: { labels: { color: '#c8cdd8' } } },
@@ -1587,15 +1589,15 @@
           x: {
             ticks: {
               color: '#8b93a7',
-              maxRotation: 40,
+              maxRotation: 35,
               minRotation: 0,
               autoSkip: true,
-              padding: opts.maintainAspectRatio === false ? 6 : 3,
+              padding: opts.maintainAspectRatio === false ? 8 : 3,
             },
             grid: { color: 'rgba(255,255,255,0.06)' },
           },
           y: {
-            ticks: { color: '#8b93a7', padding: 4 },
+            ticks: { color: '#8b93a7', padding: 6 },
             grid: { color: 'rgba(255,255,255,0.06)' },
           },
         },
