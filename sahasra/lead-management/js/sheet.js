@@ -32,15 +32,22 @@
     return '';
   }
 
-  function pipelineBucket(status) {
-    status = normStatus(status);
+  function pipelineBucket(statusOrLead, maybeLead) {
+    var lead = (statusOrLead && typeof statusOrLead === 'object') ? statusOrLead : (maybeLead || null);
+    var status = normStatus(lead ? lead.status : statusOrLead);
+    var fu = lead && lead.follow_up_count != null ? Number(lead.follow_up_count) : NaN;
+
     if (status === 'new') return 'new';
+    // Sheet often keeps Status=mail_1_sent after follow-ups — use Follow Up Count too
+    if (FOLLOW_UP_STATUSES.indexOf(status) >= 0 || (status === 'mail_1_sent' && !isNaN(fu) && fu > 0)) {
+      return 'follow_up';
+    }
     if (status === 'mail_1_sent') return 'mail_1_sent';
-    if (FOLLOW_UP_STATUSES.indexOf(status) >= 0) return 'follow_up';
     if (status === 'responded') return 'responded';
-    if (status === 'meeting_proposed') return 'meeting_proposed';
-    if (status === 'meeting_scheduled') return 'meeting_scheduled';
-    if (status === 'human_takeover') return 'human_takeover';
+    // Meeting proposed / meeting / human takeover → one Meeting column
+    if (status === 'meeting_proposed' || status === 'meeting_scheduled' || status === 'human_takeover') {
+      return 'meeting_proposed';
+    }
     if (status === 'converted') return 'converted';
     if (status === 'discarded') return 'discarded';
     return 'new';
@@ -81,7 +88,7 @@
     var meetingsTotal = meetingProposed + meetings + humanTakeover;
     // Meeting conversion = share of contacted leads that reached meeting proposed/finalized
     var rate = contacted ? Math.round((meetingsTotal / contacted) * 1000) / 10 : 0;
-    var newCount = leads.filter(function (l) { return pipelineBucket(l.status) === 'new'; }).length;
+    var newCount = leads.filter(function (l) { return pipelineBucket(l) === 'new'; }).length;
     // Funnel bars use the SAME definitions as dashboard KPI cards (not exclusive pipeline buckets)
     var funnel = [
       { key: 'new', label: 'New', count: newCount },
