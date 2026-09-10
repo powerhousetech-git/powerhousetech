@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  @apply bg-sand-50 text-ink-900 antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Skeleton shimmer for slow Sheets responses */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  @apply rounded-md;
+  background-image: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.06) 25%,
+    rgba(0, 0, 0, 0.12) 37%,
+    rgba(0, 0, 0, 0.06) 63%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* WhatsApp chat preview */
+.wa-wallpaper {
+  background-color: #e5ddd5;
+  background-image: radial-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.wa-bubble {
+  background: #dcf8c6;
+  border-radius: 8px 8px 8px 2px;
+  box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+}
+
+/* Hide scrollbars on the mobile nav */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
