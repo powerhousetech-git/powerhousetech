@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // This dashboard uses server-side API routes (Google Sheets / n8n / Evolution),
-  // so it runs as a Node server (`next start`) rather than a static export.
+  // Standalone output for the Docker image (see Dockerfile).
+  output: "standalone",
   images: { unoptimized: true },
 };
 
