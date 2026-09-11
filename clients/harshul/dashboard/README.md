@@ -89,6 +89,14 @@ On the shared VPS, merge the `harshul-dashboard` service from `docker-compose.ym
 into the existing compose file alongside `evolution-api` + `n8n` so it can reach
 them on the internal Docker network.
 
+## Evolution API (WhatsApp gateway)
+
+The WhatsApp sends run through **Evolution API** (driven by n8n; the dashboard
+only reads its status). For a **one-click managed deploy** on **Render** or
+**Railway** — no VPS to manage — see [`deploy/evolution/README.md`](./deploy/evolution/README.md)
+(includes the `render.yaml` blueprint, the Railway template link, QR linking, and
+how to wire `EVOLUTION_API_URL/KEY/INSTANCE` back into this dashboard and n8n).
+
 ## Google Sheet
 
 **Sheet ID:** `1BbtJp8j0HxFVxvEdyakjk8P4FMUL3l-FyJrgR2IO6mY`

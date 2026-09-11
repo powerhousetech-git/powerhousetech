@@ -1,0 +1,117 @@
+# ─────────────────────────────────────────────────────────────
+# Evolution API (WhatsApp gateway) — Render Blueprint
+# One-click deploy: API + PostgreSQL + Redis (Key Value), no VPS.
+#
+# Deploy:
+#   1. Push this repo to GitHub (already done for this project).
+#   2. Render Dashboard → New → Blueprint → pick this repo.
+#   3. Blueprint Path: clients/harshul/dashboard/deploy/evolution/render.yaml
+#   4. Click "Apply". Render creates all three resources and wires them.
+#
+# After it's live, read the generated AUTHENTICATION_API_KEY from the
+# evolution-api service → Environment tab, then create the WhatsApp
+# instance and scan the QR (see README.md in this folder).
+# ─────────────────────────────────────────────────────────────
+
+services:
+  # WhatsApp gateway (Evolution API v2)
+  - type: web
+    name: harshul-evolution-api
+    runtime: image
+    image:
+      url: docker.io/evoapicloud/evolution-api:v2.3.7
+    region: singapore            # closest Render region to India
+    plan: starter                # must stay always-on (free plans sleep and drop the WhatsApp link)
+    healthCheckPath: /
+    # Persist WhatsApp session/instance files across deploys & restarts.
+    disk:
+      name: evolution-instances
+      mountPath: /evolution/instances
+      sizeGB: 1
+    envVars:
+      # ── Server ──────────────────────────────────────────────
+      - key: SERVER_TYPE
+        value: http              # Render terminates TLS; Evolution serves HTTP internally
+      - key: SERVER_PORT
+        value: "8080"
+      - key: SERVER_URL          # public https URL, used for QR/webhook callbacks
+        fromService:
+          name: harshul-evolution-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: LOG_LEVEL
+        value: ERROR
+      - key: DEL_INSTANCE
+        value: "false"
+
+      # ── Auth (this becomes EVOLUTION_API_KEY in the dashboard/n8n) ──
+      - key: AUTHENTICATION_TYPE
+        value: apikey
+      - key: AUTHENTICATION_API_KEY
+        generateValue: true      # Render mints a strong random key
+
+      # ── Database (managed Postgres below) ───────────────────
+      - key: DATABASE_ENABLED
+        value: "true"
+      - key: DATABASE_PROVIDER
+        value: postgresql
+      - key: DATABASE_CONNECTION_URI
+        fromDatabase:
+          name: harshul-evolution-db
+          property: connectionString
+      - key: DATABASE_CONNECTION_CLIENT_NAME
+        value: evolution_harshul
+      - key: DATABASE_SAVE_DATA_INSTANCE
+        value: "true"
+      - key: DATABASE_SAVE_DATA_NEW_MESSAGE
+        value: "true"
+      - key: DATABASE_SAVE_MESSAGE_UPDATE
+        value: "true"
+      - key: DATABASE_SAVE_DATA_CONTACTS
+        value: "true"
+      - key: DATABASE_SAVE_DATA_CHATS
+        value: "true"
+
+      # ── Cache (managed Key Value / Redis below) ─────────────
+      - key: CACHE_REDIS_ENABLED
+        value: "true"
+      - key: CACHE_REDIS_URI
+        fromService:
+          name: harshul-evolution-redis
+          type: keyvalue
+          property: connectionString
+      - key: CACHE_REDIS_PREFIX_KEY
+        value: evolution_harshul
+      - key: CACHE_REDIS_SAVE_INSTANCES
+        value: "false"
+      - key: CACHE_LOCAL_ENABLED
+        value: "false"
+
+      # ── WhatsApp session identity (shown on the linked device) ──
+      - key: CONFIG_SESSION_PHONE_CLIENT
+        value: Harshul Tiles
+      - key: CONFIG_SESSION_PHONE_NAME
+        value: Chrome
+
+      # ── Webhooks: leave global off; n8n registers per-instance ──
+      - key: WEBHOOK_GLOBAL_ENABLED
+        value: "false"
+
+  # Cache — Render "Key Value" (Redis-compatible)
+  - type: keyvalue
+    name: harshul-evolution-redis
+    region: singapore
+    plan: free                   # cache only; safe to lose
+    maxmemoryPolicy: noeviction
+    ipAllowList: []              # internal connections only
+
+databases:
+  # Managed PostgreSQL
+  - name: harshul-evolution-db
+    databaseName: evolution
+    user: evolution
+    region: singapore
+    plan: basic-256mb            # persistent; free plan is deleted after 30 days
+    ipAllowList: []              # internal connections only
