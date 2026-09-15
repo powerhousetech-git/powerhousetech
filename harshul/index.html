@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Harshul Tiles &amp; Fittings — Dashboard</title>
+  <meta name="description" content="Post-sale automation & follow-up control panel for Harshul Tiles & Fittings.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/harshul/css/harshul.css?v=1">
+</head>
+<body>
+
+  <!-- ── Access gate ─────────────────────────────────────────── -->
+  <div id="gate-view" class="gate-shell">
+    <div class="gate-card">
+      <div class="gate-logo"><span class="logo-mark">◧</span> Harshul</div>
+      <p class="eyebrow">Tiles &amp; Fittings · Madhya Pradesh</p>
+      <h1>Dashboard</h1>
+      <p class="gate-lead">Post-sale automation &amp; follow-up control panel.</p>
+      <form id="login-form" class="login-form">
+        <label>Passcode
+          <input id="login-passcode" name="passcode" type="password" autocomplete="current-password" required placeholder="••••••••" />
+        </label>
+        <p id="login-error" class="login-error" style="display:none"></p>
+        <button type="submit" class="btn btn-primary btn-block">Enter</button>
+      </form>
+      <p class="gate-foot">Built by PowerhouseTech</p>
+    </div>
+  </div>
+
+  <!-- ── App shell ───────────────────────────────────────────── -->
+  <div id="app-shell" class="app-shell hidden">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark"><span class="logo-mark">◧</span> Harshul</div>
+        <div class="brand-sub">Tiles &amp; Fittings</div>
+      </div>
+      <nav class="nav">
+        <a href="#dashboard" class="nav-link active" data-view="dashboard"><span class="icon">📊</span> Dashboard</a>
+        <a href="#clients" class="nav-link" data-view="clients"><span class="icon">👥</span> Clients</a>
+        <a href="#follow-ups" class="nav-link" data-view="follow-ups"><span class="icon">🔔</span> Follow-Ups</a>
+        <a href="#replies" class="nav-link" data-view="replies"><span class="icon">💬</span> Replies</a>
+        <a href="#settings" class="nav-link" data-view="settings"><span class="icon">⚙️</span> Settings</a>
+      </nav>
+      <div class="side-foot">
+        <button type="button" class="btn btn-ghost btn-sm btn-block" id="btn-signout">Sign out</button>
+        <p class="built">by PowerhouseTech</p>
+      </div>
+    </aside>
+
+    <div class="content">
+      <header class="topbar">
+        <button class="icon-btn menu-btn" id="btn-menu" aria-label="Menu">☰</button>
+        <div class="topbar-title">Harshul Tiles &amp; Fittings</div>
+      </header>
+      <div id="demo-banner" class="demo-banner" style="display:none">
+        Demo data — the Google Sheet isn’t readable from the browser yet. Share it “Anyone with the link → Viewer”.
+      </div>
+      <main class="main"><div id="main-content"></div></main>
+    </div>
+  </div>
+
+  <div id="modal-root"></div>
+  <div id="toast" class="toast"></div>
+
+  <script src="/harshul/js/config.js?v=1"></script>
+  <script src="/harshul/js/util.js?v=1"></script>
+  <script src="/harshul/js/demo.js?v=1"></script>
+  <script src="/harshul/js/api.js?v=1"></script>
+  <script src="/harshul/js/app.js?v=1"></script>
+</body>
+</html>
