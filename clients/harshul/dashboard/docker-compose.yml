@@ -1,0 +1,22 @@
+# Standalone compose for the Harshul dashboard. On the shared VPS, merge this
+# service into the existing docker-compose.yml alongside evolution-api + n8n so
+# it can reach them over the internal network (EVOLUTION_API_URL=http://evolution-api:8080).
+services:
+  harshul-dashboard:
+    build: .
+    container_name: harshul-dashboard
+    ports:
+      - "3001:3000"
+    environment:
+      - GOOGLE_SERVICE_ACCOUNT_KEY=${GOOGLE_SERVICE_ACCOUNT_KEY}
+      - SHEET_ID=${SHEET_ID:-1BbtJp8j0HxFVxvEdyakjk8P4FMUL3l-FyJrgR2IO6mY}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - ALLOWED_EMAIL=${ALLOWED_EMAIL}
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL:-http://evolution-api:8080}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - EVOLUTION_INSTANCE_NAME=${EVOLUTION_INSTANCE_NAME:-harshul}
+      - N8N_BASE_URL=${N8N_BASE_URL:-https://shreyas-sinha.app.n8n.cloud}
+    restart: unless-stopped

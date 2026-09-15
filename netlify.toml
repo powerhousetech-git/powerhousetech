@@ -31,6 +31,18 @@
   to = "/sahasra/lead-management/index.html"
   status = 200
 
+# Harshul Tiles & Fittings dashboard (separate client — isolated from
+# Sahasra Quotation and PS2 Lead Management). Static app under /harshul.
+[[redirects]]
+  from = "/harshul"
+  to = "/harshul/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/harshul/"
+  to = "/harshul/index.html"
+  status = 200
+
 # PS2 lead management entry page on the static website.
 # The interactive Next.js app itself should be deployed to a server host
 # (for example Railway) and then proxied here as /ps2/*.
