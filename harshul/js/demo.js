@@ -1,69 +1,99 @@
 /**
- * Harshul dashboard — in-memory demo data.
- * Used when the Google Sheet can't be read from the browser (not shared
- * publicly / offline). Lets the UI render fully for review.
- * Loaded after util.js, before api.js is exercised.
+ * Harshul dashboard — in-memory demo data (v4).
+ * Used when the Google Sheet can't be read from the browser.
+ * Loaded after config/util, before api is exercised.
  */
 (function (global) {
   'use strict';
-  var U = global.HRSUtil;
+  var U = global.HRSUtil, CFG = global.HRS;
 
-  // Date N days from today (IST) as DD-MM-YYYY (to exercise the parser).
-  function rel(days) {
-    var d = new Date();
-    d.setDate(d.getDate() + days);
-    var key = U.istKey(d); // yyyy-mm-dd
-    var p = key.split('-');
-    return p[2] + '-' + p[1] + '-' + p[0];
-  }
+  function relISO(days) { return U.addDays(U.todayKey(), days); } // yyyy-mm-dd
+  function ddmmyyyy(key) { var p = key.split('-'); return p[2] + '-' + p[1] + '-' + p[0]; }
+  function todayAt(hhmm) { return U.todayKey() + 'T' + hhmm + ':00+05:30'; }
+
+  // Customer master (Sheet1 shape). saleOffset drives the message journey.
+  // [name, phone, product, saleOffset, followUpOffset, employee, status, notes, upsellPattern, upsellMsg]
+  var C = [
+    ['राजेश शर्मा', '919119188492', 'Floor Tiles', -5, 0, 'Mohit', 'in_progress', 'Confirm tile shade selection', 'default', ''],
+    ['प्रिया वर्मा', '919820011223', 'Bath Fittings', -3, 1, 'Ravi', 'new', 'Wants installation date', 'customised', 'Bought bath fittings → upsell shower panels + bath accessories'],
+    ['सुनील यादव', '919333445566', 'Sanitaryware', -35, -20, 'Ravi', 'completed', 'Delivered and installed', 'default', ''],
+    ['कविता नायर', '919665544332', 'Floor Tiles', -10, -7, 'Mohit', 'in_progress', 'Delivery pending, call back', 'default', ''],
+    ['अमित पटेल', '919776655443', 'Sanitaryware', -8, -2, 'Ravi', 'in_progress', 'Wants installation date', 'default', ''],
+    ['रीता गुप्ता', '919554433221', 'Wall Tiles', -15, -1, 'Sunil', 'completed', 'Marked done after site visit', 'default', ''],
+    ['मनोज सिंह', '919332211009', 'Floor Tiles', -1, 2, 'Suresh', 'new', 'Site visit scheduled', 'default', ''],
+    ['सीमा राव', '919221100998', 'Wall Tiles', -20, 0, 'Mohit', 'in_progress', 'Confirm grout colour', 'default', ''],
+    ['विक्रम पटेल', '919443322110', 'Bath Fittings', -12, -4, 'Raju', 'in_progress', 'Pending balance payment', 'customised', 'Bought bath fittings → upsell mirrors + storage cabinets'],
+    ['दीपक जोशी', '919000112233', 'Sanitaryware', -6, 1, 'Suresh', 'new', 'Requested quotation', 'default', ''],
+  ];
 
   function clients() {
-    var rows = [
-      ['राजेश शर्मा', '919119188492', 'in_progress', rel(0), 'Mohit', 'Wants glossy floor tiles', rel(-2), 'Floor Tiles'],
-      ['प्रिया वर्मा', '919820011223', 'new', rel(2), 'Raju', 'Enquiry for bathroom fittings', rel(0), 'Bath Fittings'],
-      ['दीपक जोशी', '919000112233', 'in_progress', rel(-1), 'Suresh', 'Follow up on wall tile sample', rel(-5), 'Wall Tiles'],
-      ['सुनील यादव', '919333445566', 'completed', rel(-10), 'Mohit', 'Delivered and installed', rel(-14), 'Sanitaryware'],
-      ['विक्रम पटेल', '919776655443', 'in_progress', rel(-4), 'Raju', 'Pending balance payment', rel(-7), 'Floor Tiles'],
-      ['कविता नायर', '919665544332', 'in_progress', rel(-8), 'Suresh', 'Needs grouting advice', rel(-12), 'Wall Tiles'],
-      ['रमेश कुमार', '919554433221', 'new', rel(5), 'Mohit', 'Requested quotation', rel(-1), 'Bath Fittings'],
-      ['अंजली गुप्ता', '919443322110', 'cancelled', rel(-3), 'Raju', 'Chose another vendor', rel(-9), 'Sanitaryware'],
-      ['मनोज सिंह', '919332211009', 'in_progress', rel(0), 'Suresh', 'Site visit scheduled', rel(-3), 'Floor Tiles'],
-      ['सीमा राव', '919221100998', 'in_progress', rel(-6), 'Mohit', 'Awaiting stock', rel(-6), 'Wall Tiles'],
-    ];
     var headers = ['ग्राहक का नाम', 'मोबाइल', 'स्थिति', 'अगला फॉलोअप', 'कर्मचारी', 'नोट्स', 'बिक्री तारीख', 'प्रोडक्ट'];
-    // Vertical AI_Config mapping: standard_field → actual (Hindi) column.
     var mapping = {
       customer_name: 'ग्राहक का नाम', phone: 'मोबाइल', status: 'स्थिति',
       follow_up_date: 'अगला फॉलोअप', assigned_to: 'कर्मचारी', notes: 'नोट्स',
       sale_date: 'बिक्री तारीख', product: 'प्रोडक्ट',
     };
-    var mapped = rows.map(function (r) {
+    var mapped = C.map(function (r) {
       return {
-        customer_name: r[0], phone: r[1], status: r[2], follow_up_date: r[3],
-        assigned_to: r[4], notes: r[5], sale_date: r[6], product: r[7], _raw: r,
+        customer_name: r[0], phone: r[1], product: r[2],
+        sale_date: ddmmyyyy(relISO(r[3])), follow_up_date: ddmmyyyy(relISO(r[4])),
+        assigned_to: r[5], status: r[6], notes: r[7], _raw: r,
       };
     });
     return { clients: mapped, mapping: mapping, headers: headers };
   }
 
-  function replies() {
-    function ago(mins) { var d = new Date(); d.setMinutes(d.getMinutes() - mins); return d.toISOString(); }
-    return [
-      { ts: ago(12), from: '919119188492', name: 'राजेश शर्मा', message: 'Tiles delivered, thank you!', type: 'text', id: 'wamid.demo1' },
-      { ts: ago(95), from: '919000112233', name: 'दीपक जोशी', message: 'Can you send the wall tile catalogue?', type: 'text', id: 'wamid.demo2' },
-      { ts: ago(240), from: '919776655443', name: 'विक्रम पटेल', message: 'I will pay the balance tomorrow.', type: 'text', id: 'wamid.demo3' },
-      { ts: ago(1400), from: '919665544332', name: 'कविता नायर', message: 'What grout colour do you recommend?', type: 'text', id: 'wamid.demo4' },
-    ];
+  // Override map: "<phone>:<stage>" → status (forces a specific step state).
+  var OVR = {
+    '919776655443:care_check': 'failed',      // अमित — one failed send
+    '919000112233:feedback': 'opted_out',     // दीपक — opted out mid-journey
+    '919000112233:upsell': 'opted_out',
+    '919000112233:referral': 'opted_out',
+  };
+  // A few messages "sent today" (drives Messages Sent Today + activity).
+  var SENT_TODAY = {
+    '919119188492:care_check': todayAt('14:30'),
+    '919820011223:thank_you': todayAt('13:15'),
+    '919332211009:thank_you': todayAt('11:05'),
+    '919221100998:feedback': todayAt('10:20'),
+  };
+
+  function messages() {
+    var out = [];
+    C.forEach(function (r) {
+      var phone = r[1], name = r[0], product = r[2], saleOff = r[3];
+      var pattern = r[8], custom = r[9];
+      CFG.MESSAGE_STAGES.forEach(function (st) {
+        var offset = saleOff + st.day;              // days from today the msg is scheduled
+        var schedKey = relISO(offset);
+        var status, sentDate = '';
+        var forced = OVR[phone + ':' + st.key];
+        if (forced) {
+          status = forced;
+          if (forced === 'sent') sentDate = schedKey;
+        } else if (offset < 0) { status = 'sent'; sentDate = schedKey; }
+        else { status = 'pending'; }              // offset >= 0 → pending (⏳ if today, · if future)
+        var todaySent = SENT_TODAY[phone + ':' + st.key];
+        if (todaySent) { status = 'sent'; sentDate = todaySent; }
+        out.push({
+          customer_phone: phone, customer_name: name, message_type: st.key,
+          scheduled_date: schedKey, status: status, sent_date: sentDate, product: product,
+          upsell_pattern: pattern, upsell_custom_message: st.key === 'upsell' ? custom : (pattern === 'customised' ? custom : ''),
+        });
+      });
+    });
+    return out;
   }
 
   function employees() {
     return [
       { name: 'Mohit', phone: '919111000111', role: 'Sales' },
-      { name: 'Raju', phone: '919111000222', role: 'Sales' },
-      { name: 'Suresh', phone: '919111000333', role: 'Sales' },
-      { name: 'Harshul', phone: '919119188492', role: 'Owner' },
+      { name: 'Ravi', phone: '919111000222', role: 'Sales' },
+      { name: 'Sunil', phone: '919111000333', role: 'Sales' },
+      { name: 'Suresh', phone: '919111000444', role: 'Sales' },
+      { name: 'Raju', phone: '919111000555', role: 'Sales' },
     ];
   }
 
-  global.HRSDemo = { clients: clients, replies: replies, employees: employees };
+  global.HRSDemo = { clients: clients, messages: messages, employees: employees };
 })(window);

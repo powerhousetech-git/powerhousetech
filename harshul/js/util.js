@@ -1,5 +1,5 @@
 /**
- * Harshul dashboard — shared helpers (dates in IST, statuses, phones).
+ * Harshul dashboard — shared helpers (IST dates, statuses, phones).
  * Loaded after config.js.
  */
 (function (global) {
@@ -18,16 +18,16 @@
   function normStatus(s) {
     s = String(s || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
     var aliases = {
-      'inprogress': 'in_progress', 'in_progress': 'in_progress',
-      'progress': 'in_progress', 'ongoing': 'in_progress',
-      'done': 'completed', 'complete': 'completed', 'closed': 'completed',
-      'cancel': 'cancelled', 'canceled': 'cancelled',
-      '': 'new',
+      inprogress: 'in_progress', progress: 'in_progress', ongoing: 'in_progress',
+      done: 'completed', complete: 'completed', closed: 'completed',
+      cancel: 'cancelled', canceled: 'cancelled', reschedule: 'rescheduled', '': 'new',
     };
     return aliases[s] || s || 'new';
   }
+  function isDone(s) { s = normStatus(s); return s === 'completed' || s === 'cancelled'; }
   var STATUS_LABELS = {
-    new: 'New', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled',
+    new: 'New', in_progress: 'In Progress', completed: 'Completed',
+    cancelled: 'Cancelled', rescheduled: 'Rescheduled',
   };
   function statusLabel(s) {
     s = normStatus(s);
@@ -39,28 +39,29 @@
   }
 
   // ── Dates (IST) ─────────────────────────────────────────────
-  // Returns YYYY-MM-DD for a date, evaluated in Asia/Kolkata.
   function istKey(d) {
     d = d || new Date();
     try {
       return new Intl.DateTimeFormat('en-CA', {
         timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit',
       }).format(d);
-    } catch (_) {
-      return d.toISOString().slice(0, 10);
-    }
+    } catch (_) { return d.toISOString().slice(0, 10); }
   }
   function todayKey() { return istKey(new Date()); }
 
-  // Parse ISO / DD-MM-YYYY / DD/MM/YYYY / YYYY-MM-DD → YYYY-MM-DD key (or '').
   function parseDateKey(v) {
     if (!v) return '';
     if (v instanceof Date && !isNaN(v)) return istKey(v);
     var s = String(v).trim();
     if (!s) return '';
-    var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); // ISO / yyyy-mm-dd
+    // gviz sometimes returns Date(y,m,d) literals.
+    var g = s.match(/^Date\((\d+),(\d+),(\d+)/);
+    if (g) {
+      return g[1] + '-' + ('0' + (parseInt(g[2], 10) + 1)).slice(-2) + '-' + ('0' + g[3]).slice(-2);
+    }
+    var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (m) return m[1] + '-' + m[2] + '-' + m[3];
-    m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/); // dd-mm-yyyy / dd/mm/yyyy
+    m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
     if (m) {
       var dd = ('0' + m[1]).slice(-2), mm = ('0' + m[2]).slice(-2);
       var yy = m[3].length === 2 ? '20' + m[3] : m[3];
@@ -70,32 +71,34 @@
     return isNaN(d) ? '' : istKey(d);
   }
 
-  // Whole days between two YYYY-MM-DD keys (a - b). +ve → a after b.
   function dayDiff(aKey, bKey) {
     if (!aKey || !bKey) return null;
     var a = new Date(aKey + 'T00:00:00Z'), b = new Date(bKey + 'T00:00:00Z');
     return Math.round((a - b) / 86400000);
   }
+  // Shift a YYYY-MM-DD key by n days.
+  function addDays(key, n) {
+    var d = new Date((key || todayKey()) + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
 
-  // Overdue bucket for a follow-up date (relative to today, IST).
-  //  due_today | overdue_1_3 | overdue_3_7 | overdue_7_plus | upcoming | none
-  function followUpBucket(followUpDate) {
+  // Overdue bucket relative to a reference date (default today).
+  function followUpBucket(followUpDate, refKey) {
     var key = parseDateKey(followUpDate);
     if (!key) return 'none';
-    var diff = dayDiff(todayKey(), key); // today - due; +ve = overdue
+    var diff = dayDiff(refKey || todayKey(), key); // ref - due; +ve = overdue
     if (diff === 0) return 'due_today';
     if (diff < 0) return 'upcoming';
     if (diff <= 3) return 'overdue_1_3';
     if (diff <= 7) return 'overdue_3_7';
     return 'overdue_7_plus';
   }
-  var BUCKET_LABELS = {
-    due_today: 'Due Today', overdue_1_3: 'Overdue 1–3 days',
-    overdue_3_7: 'Overdue 3–7 days', overdue_7_plus: 'Critical · 7+ days',
-    upcoming: 'Upcoming', none: '—',
-  };
+  function overdueTone(days) { return days >= 7 ? 'crit' : (days >= 3 ? 'red' : 'amber'); }
+  function overdueDot(days) { return days >= 7 ? '🔴' : (days >= 3 ? '🟠' : '🟡'); }
   function isOverdue(b) { return b === 'overdue_1_3' || b === 'overdue_3_7' || b === 'overdue_7_plus'; }
 
+  // ── Formatting ──────────────────────────────────────────────
   function fmtDate(v) {
     var key = parseDateKey(v);
     if (!key) return '—';
@@ -106,20 +109,46 @@
       }).format(d);
     } catch (_) { return key; }
   }
+  function fmtDayShort(key) {
+    key = parseDateKey(key) || todayKey();
+    var d = new Date(key + 'T00:00:00Z');
+    try {
+      return new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short' }).format(d);
+    } catch (_) { return key; }
+  }
+  // "TODAY · 15 Sep" / "YESTERDAY · 14 Sep" / "TOMORROW · 16 Sep" / "12 Sep 2026"
+  function dateNavLabel(key) {
+    var t = todayKey();
+    if (key === t) return 'TODAY · ' + fmtDayShort(key);
+    if (key === addDays(t, -1)) return 'YESTERDAY · ' + fmtDayShort(key);
+    if (key === addDays(t, 1)) return 'TOMORROW · ' + fmtDayShort(key);
+    return fmtDate(key);
+  }
   function fmtDateTime(v) {
     if (!v) return '—';
     var d = new Date(v);
     if (isNaN(d)) return String(v);
     try {
       return new Intl.DateTimeFormat('en-GB', {
-        timeZone: TZ, day: '2-digit', month: 'short', hour: '2-digit',
-        minute: '2-digit', hour12: true,
+        timeZone: TZ, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true,
       }).format(d);
     } catch (_) { return d.toLocaleString(); }
   }
+  // Activity-feed relative time: today → "2:30 pm", yesterday → "Yesterday", else "12 Sep".
+  function relTime(v) {
+    if (!v) return '';
+    var d = new Date(v);
+    if (isNaN(d)) return String(v);
+    var k = istKey(d), t = todayKey();
+    if (k === t) {
+      try { return new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: true }).format(d); }
+      catch (_) { return d.toLocaleTimeString(); }
+    }
+    if (k === addDays(t, -1)) return 'Yesterday';
+    return fmtDayShort(k);
+  }
 
   // ── Phone ───────────────────────────────────────────────────
-  // Normalize to digits with country code (assume +91 if 10 digits).
   function normPhone(p) {
     var d = String(p || '').replace(/[^\d]/g, '');
     if (d.length === 10) d = '91' + d;
@@ -129,9 +158,7 @@
   function fmtPhone(p) {
     var d = normPhone(p);
     if (!d) return '—';
-    if (d.length === 12 && d.slice(0, 2) === '91') {
-      return '+91 ' + d.slice(2, 7) + ' ' + d.slice(7);
-    }
+    if (d.length === 12 && d.slice(0, 2) === '91') return '+91 ' + d.slice(2, 7) + ' ' + d.slice(7);
     return '+' + d;
   }
 
@@ -141,22 +168,20 @@
     try {
       var list = JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
       list.unshift(Object.assign({ ts: new Date().toISOString() }, entry));
-      list = list.slice(0, 30);
-      localStorage.setItem(LOG_KEY, JSON.stringify(list));
+      localStorage.setItem(LOG_KEY, JSON.stringify(list.slice(0, 30)));
     } catch (_) {}
   }
-  function getActivity() {
+  function getLocalActivity() {
     try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch (_) { return []; }
   }
 
   global.HRSUtil = {
     esc: esc,
-    normStatus: normStatus, statusLabel: statusLabel, statusBadge: statusBadge,
-    STATUS_LABELS: STATUS_LABELS,
-    istKey: istKey, todayKey: todayKey, parseDateKey: parseDateKey, dayDiff: dayDiff,
-    followUpBucket: followUpBucket, BUCKET_LABELS: BUCKET_LABELS, isOverdue: isOverdue,
-    fmtDate: fmtDate, fmtDateTime: fmtDateTime,
+    normStatus: normStatus, isDone: isDone, statusLabel: statusLabel, statusBadge: statusBadge, STATUS_LABELS: STATUS_LABELS,
+    istKey: istKey, todayKey: todayKey, parseDateKey: parseDateKey, dayDiff: dayDiff, addDays: addDays,
+    followUpBucket: followUpBucket, isOverdue: isOverdue, overdueTone: overdueTone, overdueDot: overdueDot,
+    fmtDate: fmtDate, fmtDayShort: fmtDayShort, dateNavLabel: dateNavLabel, fmtDateTime: fmtDateTime, relTime: relTime,
     normPhone: normPhone, fmtPhone: fmtPhone,
-    logActivity: logActivity, getActivity: getActivity,
+    logActivity: logActivity, getLocalActivity: getLocalActivity,
   };
 })(window);
