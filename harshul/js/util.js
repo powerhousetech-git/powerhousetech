@@ -134,6 +134,16 @@
       }).format(d);
     } catch (_) { return d.toLocaleString(); }
   }
+  // Short IST clock time for the "Updated" freshness indicator, e.g. "2:30 pm".
+  function fmtTimeShort(v) {
+    var d = v ? new Date(v) : new Date();
+    if (isNaN(d)) return '';
+    try {
+      return new Intl.DateTimeFormat('en-GB', {
+        timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: true,
+      }).format(d);
+    } catch (_) { return d.toLocaleTimeString(); }
+  }
   // Activity-feed relative time: today → "2:30 pm", yesterday → "Yesterday", else "12 Sep".
   function relTime(v) {
     if (!v) return '';
@@ -180,7 +190,7 @@
     normStatus: normStatus, isDone: isDone, statusLabel: statusLabel, statusBadge: statusBadge, STATUS_LABELS: STATUS_LABELS,
     istKey: istKey, todayKey: todayKey, parseDateKey: parseDateKey, dayDiff: dayDiff, addDays: addDays,
     followUpBucket: followUpBucket, isOverdue: isOverdue, overdueTone: overdueTone, overdueDot: overdueDot,
-    fmtDate: fmtDate, fmtDayShort: fmtDayShort, dateNavLabel: dateNavLabel, fmtDateTime: fmtDateTime, relTime: relTime,
+    fmtDate: fmtDate, fmtDayShort: fmtDayShort, dateNavLabel: dateNavLabel, fmtDateTime: fmtDateTime, fmtTimeShort: fmtTimeShort, relTime: relTime,
     normPhone: normPhone, fmtPhone: fmtPhone,
     logActivity: logActivity, getLocalActivity: getLocalActivity,
   };

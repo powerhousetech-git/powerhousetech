@@ -8,13 +8,21 @@
   'use strict';
   var CFG = global.HRS, U = global.HRSUtil, API = global.HRSApi;
 
+  // How often to silently re-pull the sheet (gviz JSONP). Tune here.
+  var REFRESH_INTERVAL_MS = 45000;
+
   var state = {
     clients: [], messages: [], employees: [], grouped: [], mapping: {}, demo: false,
     view: 'home',
     fu: { selectedDate: U.todayKey() },
     msg: { status: 'all', product: 'all' },
     _booted: false,
+    _lastUpdated: null,   // Date of the last successful data pull.
+    _pendingRender: false, // A refresh landed while the UI was busy; re-render when free.
   };
+
+  var _refreshTimer = null;
+  var _refreshing = false;
 
   function $(s, r) { return (r || document).querySelector(s); }
   function main() { return $('#main-content'); }
@@ -28,7 +36,11 @@
 
   // ── Modal ───────────────────────────────────────────────────
   function modalRoot() { return $('#modal-root'); }
-  function closeModal() { modalRoot().innerHTML = ''; modalRoot().classList.remove('open'); }
+  function closeModal() {
+    modalRoot().innerHTML = ''; modalRoot().classList.remove('open');
+    // A background refresh may have arrived while the modal was open; apply it now.
+    flushPendingRender();
+  }
   function openModal(html) {
     modalRoot().innerHTML = '<div class="modal-backdrop" data-close><div class="modal" role="dialog">' + html + '</div></div>';
     modalRoot().classList.add('open');
@@ -75,14 +87,71 @@
     var h = location.hash.replace('#', ''); if (h) state.view = normView(h);
     main().innerHTML = '<div class="loading"><span class="spinner"></span>Loading dashboard…</div>';
     await reload();
+    startAutoRefresh();
   }
   async function reload() {
     var data = await API.loadAll();
+    applyData(data);
+    render();
+  }
+
+  // Shared state mutation for both the initial reload and background refreshes.
+  function applyData(data) {
     state.clients = data.clients; state.messages = data.messages; state.employees = data.employees;
     state.mapping = data.mapping; state.demo = data.demo;
     state.grouped = API.groupMessages(state.clients, state.messages);
     var b = $('#demo-banner'); if (b) b.style.display = state.demo ? 'block' : 'none';
-    render();
+    state._lastUpdated = new Date();
+    updateStamp();
+  }
+
+  // ── Auto-refresh (polling + visibility) ─────────────────────
+  function updateStamp() {
+    var el = $('#updated-label');
+    if (el) el.textContent = state._lastUpdated ? 'Updated ' + U.fmtTimeShort(state._lastUpdated) : 'Updated —';
+  }
+  // True when a re-render would clobber what the user is doing.
+  function uiBusy() {
+    if (modalRoot().classList.contains('open')) return true;
+    var ae = document.activeElement;
+    if (ae && main() && main().contains(ae)) {
+      var tag = ae.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    }
+    return false;
+  }
+  function flushPendingRender() {
+    if (state._pendingRender && !uiBusy()) { state._pendingRender = false; render(); }
+  }
+  // Silent background pull: refresh state, re-render the CURRENT view unless busy.
+  async function refreshData(manual) {
+    if (_refreshing) return;
+    _refreshing = true;
+    var btn = $('#btn-refresh');
+    if (manual && btn) btn.classList.add('is-busy');
+    try {
+      var data = await API.loadAll();
+      applyData(data);
+      if (manual || !uiBusy()) { state._pendingRender = false; render(); }
+      else { state._pendingRender = true; }
+    } catch (_) {
+      // loadAll already falls back to demo data; ignore transient errors.
+    } finally {
+      _refreshing = false;
+      if (manual && btn) btn.classList.remove('is-busy');
+    }
+  }
+  function startAutoRefresh() {
+    if (_refreshTimer) clearInterval(_refreshTimer);
+    _refreshTimer = setInterval(function () {
+      if (!document.hidden) refreshData(false); // pause polling while tab is hidden
+    }, REFRESH_INTERVAL_MS);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) refreshData(false); // near-instant catch-up on return
+    });
+    window.addEventListener('focus', function () { refreshData(false); });
+    var btn = $('#btn-refresh');
+    if (btn) btn.addEventListener('click', function () { refreshData(true); });
   }
 
   function normView(v) {
@@ -121,7 +190,7 @@
   var HRSApp = {
     state: state, main: main, esc: U.esc,
     toast: toast, openModal: openModal, closeModal: closeModal, setBusy: setBusy, webhookMiss: webhookMiss,
-    render: render, reload: reload, go: go, signOut: signOut, pageHead: pageHead,
+    render: render, reload: reload, refreshData: refreshData, go: go, signOut: signOut, pageHead: pageHead,
   };
   global.HRSApp = HRSApp;
   document.addEventListener('DOMContentLoaded', initGate);
