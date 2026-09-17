@@ -28,8 +28,8 @@ window.HRS = {
 
   // ── Google Sheet (read-only via gviz JSONP) ─────────────────
   // Must be shared "Anyone with the link → Viewer" for browser reads.
-  SHEET_ID: '1BbtJp8j0HxFVxvEdyakjk8P4FMUL3l-FyJrgR2IO6mY',
-  SHEET_URL: 'https://docs.google.com/spreadsheets/d/1BbtJp8j0HxFVxvEdyakjk8P4FMUL3l-FyJrgR2IO6mY/edit',
+  SHEET_ID: '1wD59Kx-0HXlEoXLWQrjJndDLkKVEjsic-adjBrjQdu4',
+  SHEET_URL: 'https://docs.google.com/spreadsheets/d/1wD59Kx-0HXlEoXLWQrjJndDLkKVEjsic-adjBrjQdu4/edit',
   TABS: {
     config: 'AI_Config',   // standard_field → actual_column
     clients: 'Sheet1',     // client master (Hindi headers, AI-mapped)
