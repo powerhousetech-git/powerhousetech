@@ -8,6 +8,7 @@
 (function (global) {
   'use strict';
   var CFG = global.HRS, U = global.HRSUtil, API = global.HRSApi;
+  var _qTimer = null;
 
   function overdueInfo(c) {
     // Only non-terminal leads can be overdue.
@@ -115,7 +116,11 @@
       body;
 
     var q = ctx.main().querySelector('#lead-q');
-    q.addEventListener('input', function () { f.q = this.value; renderKeepFocus(ctx); });
+    q.addEventListener('input', function () {
+      f.q = this.value;
+      clearTimeout(_qTimer);
+      _qTimer = setTimeout(function () { renderKeepFocus(ctx); }, 220);
+    });
     ctx.main().querySelector('#lead-cat').addEventListener('change', function () { f.category = this.value; render(ctx); });
     ctx.main().querySelector('#lead-emp').addEventListener('change', function () { f.employee = this.value; render(ctx); });
     ctx.main().querySelector('#lead-remind').addEventListener('click', function () { sendReminders(ctx, this); });

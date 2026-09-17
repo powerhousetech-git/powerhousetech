@@ -7,6 +7,12 @@
 
   var TZ = (global.HRS && global.HRS.TZ) || 'Asia/Kolkata';
 
+  // Canonical 7-stage vocabulary (kept in sync with HRS.STAGES).
+  var STAGE_SET = {
+    visited: 1, interested: 1, converted: 1, bill_finalised: 1,
+    bill_executed: 1, deal_closed: 1, not_interested: 1,
+  };
+
   // ── Text ────────────────────────────────────────────────────
   function esc(s) {
     return String(s == null ? '' : s)
@@ -33,7 +39,10 @@
       cancel: 'not_interested', cancelled: 'not_interested', canceled: 'not_interested',
       '': 'visited',
     };
-    return aliases[s] || s || 'visited';
+    var out = aliases[s] || s || 'visited';
+    // Clamp anything outside the 7-stage vocabulary (incl. old-style live
+    // statuses) to the default so the UI never shows an orphan category.
+    return STAGE_SET[out] ? out : 'visited';
   }
   // A lead in a terminal stage no longer needs active follow-up.
   function isClosedStage(s) { s = normStatus(s); return s === 'deal_closed' || s === 'not_interested'; }
