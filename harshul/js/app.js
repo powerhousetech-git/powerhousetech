@@ -14,7 +14,7 @@
   var state = {
     clients: [], messages: [], employees: [], grouped: [], mapping: {}, demo: false,
     view: 'home',
-    fu: { selectedDate: U.todayKey() },
+    leads: { category: 'all', employee: 'all', q: '' },
     msg: { status: 'all', product: 'all' },
     _booted: false,
     _lastUpdated: null,   // Date of the last successful data pull.
@@ -156,7 +156,8 @@
 
   function normView(v) {
     if (v === 'dashboard') return 'home';
-    if (v === 'messages' || v === 'follow-ups' || v === 'home') return v;
+    if (v === 'leads' || v === 'follow-ups') return 'leads'; // back-compat: old #follow-ups → leads
+    if (v === 'messages' || v === 'home') return v;
     return 'home';
   }
   function wireNav() {
@@ -175,7 +176,7 @@
     highlight();
     var V = global.HRSViews || {};
     if (state.view === 'messages' && V.messages) return V.messages(HRSApp);
-    if (state.view === 'follow-ups' && V.followups) return V.followups(HRSApp);
+    if (state.view === 'leads' && V.leads) return V.leads(HRSApp);
     if (V.home) return V.home(HRSApp);
     main().innerHTML = '<p class="muted center">View not available.</p>';
   }

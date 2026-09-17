@@ -165,13 +165,41 @@
     var sentToday = messages.filter(function (m) { return m.status === 'sent' && sentDayKey(m.sent_date) === today; }).length;
     var dueToday = 0, overdue = 0;
     clients.forEach(function (c) {
-      if (U.isDone(c.status)) return;
+      if (U.isClosedStage(c.status)) return;
       var k = U.parseDateKey(c.follow_up_date);
       if (!k) return;
       if (k === today) dueToday++;
       else if (U.dayDiff(today, k) > 0) overdue++;
     });
     return { sentToday: sentToday, dueToday: dueToday, overdue: overdue };
+  }
+
+  // Counts per stage across the master sheet, in pipeline order.
+  function computeStageStats(clients) {
+    var counts = {};
+    CFG.STAGES.forEach(function (s) { counts[s] = 0; });
+    (clients || []).forEach(function (c) {
+      var s = U.normStatus(c.status);
+      if (counts[s] == null) counts[s] = 0;
+      counts[s]++;
+    });
+    return CFG.STAGES.map(function (s) { return { stage: s, count: counts[s] || 0 }; });
+  }
+
+  // Employee leaderboard: deals closed (status === deal_closed) + total leads handled.
+  function computeLeaderboard(clients) {
+    var by = {};
+    (clients || []).forEach(function (c) {
+      var name = String(c.assigned_to || '').trim() || 'Unassigned';
+      if (!by[name]) by[name] = { employee: name, dealsClosed: 0, total: 0 };
+      by[name].total++;
+      if (U.normStatus(c.status) === 'deal_closed') by[name].dealsClosed++;
+    });
+    return Object.keys(by).map(function (k) { return by[k]; })
+      .sort(function (a, b) {
+        if (b.dealsClosed !== a.dealsClosed) return b.dealsClosed - a.dealsClosed;
+        return b.total - a.total;
+      });
   }
 
   function stageMeta(key) {
@@ -189,7 +217,7 @@
     });
     var today = U.todayKey();
     clients.forEach(function (c) {
-      if (U.isDone(c.status)) return;
+      if (U.isClosedStage(c.status)) return;
       var k = U.parseDateKey(c.follow_up_date); if (!k) return;
       var d = U.dayDiff(today, k);
       if (d >= 7) items.push({ icon: '🚨', tone: 'red', ts: today + 'T09:00:00+05:30', text: 'Escalation: ' + (c.customer_name || '') + ' overdue ' + d + ' days' });
@@ -225,6 +253,8 @@
     triggerWorkflow: triggerWorkflow,
     loadAll: loadAll,
     computeHomeStats: computeHomeStats,
+    computeStageStats: computeStageStats,
+    computeLeaderboard: computeLeaderboard,
     buildActivity: buildActivity,
     groupMessages: groupMessages,
     stageMeta: stageMeta,

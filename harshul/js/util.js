@@ -7,6 +7,12 @@
 
   var TZ = (global.HRS && global.HRS.TZ) || 'Asia/Kolkata';
 
+  // Canonical 7-stage vocabulary (kept in sync with HRS.STAGES).
+  var STAGE_SET = {
+    visited: 1, interested: 1, converted: 1, bill_finalised: 1,
+    bill_executed: 1, deal_closed: 1, not_interested: 1,
+  };
+
   // ── Text ────────────────────────────────────────────────────
   function esc(s) {
     return String(s == null ? '' : s)
@@ -15,19 +21,37 @@
   }
 
   // ── Status ──────────────────────────────────────────────────
+  // 7-stage lead model. Default (empty/unknown) → 'visited'.
+  //   visited → interested → converted → bill_finalised →
+  //   bill_executed → deal_closed | not_interested (terminal)
   function normStatus(s) {
     s = String(s || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
     var aliases = {
-      inprogress: 'in_progress', progress: 'in_progress', ongoing: 'in_progress',
-      done: 'completed', complete: 'completed', closed: 'completed',
-      cancel: 'cancelled', canceled: 'cancelled', reschedule: 'rescheduled', '': 'new',
+      deal_closed: 'deal_closed', dealclosed: 'deal_closed',
+      bill_finalised: 'bill_finalised', bill_finalized: 'bill_finalised',
+      bill_executed: 'bill_executed',
+      not_interested: 'not_interested', notinterested: 'not_interested',
+      visited: 'visited', interested: 'interested', converted: 'converted',
+      // legacy aliases → nearest new stage
+      new: 'visited', in_progress: 'interested', inprogress: 'interested',
+      progress: 'interested', ongoing: 'interested',
+      done: 'deal_closed', complete: 'deal_closed', completed: 'deal_closed', closed: 'deal_closed',
+      cancel: 'not_interested', cancelled: 'not_interested', canceled: 'not_interested',
+      '': 'visited',
     };
-    return aliases[s] || s || 'new';
+    var out = aliases[s] || s || 'visited';
+    // Clamp anything outside the 7-stage vocabulary (incl. old-style live
+    // statuses) to the default so the UI never shows an orphan category.
+    return STAGE_SET[out] ? out : 'visited';
   }
-  function isDone(s) { s = normStatus(s); return s === 'completed' || s === 'cancelled'; }
+  // A lead in a terminal stage no longer needs active follow-up.
+  function isClosedStage(s) { s = normStatus(s); return s === 'deal_closed' || s === 'not_interested'; }
+  // Legacy helper kept for any code that still needs a "finished" notion.
+  function isDone(s) { return isClosedStage(s); }
   var STATUS_LABELS = {
-    new: 'New', in_progress: 'In Progress', completed: 'Completed',
-    cancelled: 'Cancelled', rescheduled: 'Rescheduled',
+    visited: 'Visited', interested: 'Interested', converted: 'Converted',
+    bill_finalised: 'Bill Finalised', bill_executed: 'Bill Executed',
+    deal_closed: 'Deal Closed', not_interested: 'Not Interested',
   };
   function statusLabel(s) {
     s = normStatus(s);
@@ -187,7 +211,7 @@
 
   global.HRSUtil = {
     esc: esc,
-    normStatus: normStatus, isDone: isDone, statusLabel: statusLabel, statusBadge: statusBadge, STATUS_LABELS: STATUS_LABELS,
+    normStatus: normStatus, isDone: isDone, isClosedStage: isClosedStage, statusLabel: statusLabel, statusBadge: statusBadge, STATUS_LABELS: STATUS_LABELS,
     istKey: istKey, todayKey: todayKey, parseDateKey: parseDateKey, dayDiff: dayDiff, addDays: addDays,
     followUpBucket: followUpBucket, isOverdue: isOverdue, overdueTone: overdueTone, overdueDot: overdueDot,
     fmtDate: fmtDate, fmtDayShort: fmtDayShort, dateNavLabel: dateNavLabel, fmtDateTime: fmtDateTime, fmtTimeShort: fmtTimeShort, relTime: relTime,
