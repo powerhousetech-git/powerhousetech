@@ -1,6 +1,7 @@
 /**
- * Harshul dashboard — in-memory demo data (v4).
+ * Harshul dashboard — in-memory demo data (v5).
  * Used when the Google Sheet can't be read from the browser.
+ * Reshaped around the 7-stage lead model with admin_remark + next_step.
  * Loaded after config/util, before api is exercised.
  */
 (function (global) {
@@ -12,32 +13,36 @@
   function todayAt(hhmm) { return U.todayKey() + 'T' + hhmm + ':00+05:30'; }
 
   // Customer master (Sheet1 shape). saleOffset drives the message journey.
-  // [name, phone, product, saleOffset, followUpOffset, employee, status, notes, upsellPattern, upsellMsg]
+  // A realistic spread across all 7 stages; deal_closed customers drive Section 2.
+  // [name, phone, product, saleOffset, followUpOffset, employee, status, notes,
+  //  upsellPattern, upsellMsg, adminRemark, nextStep]
   var C = [
-    ['राजेश शर्मा', '919119188492', 'Floor Tiles', -5, 0, 'Mohit', 'in_progress', 'Confirm tile shade selection', 'default', ''],
-    ['प्रिया वर्मा', '919820011223', 'Bath Fittings', -3, 1, 'Ravi', 'new', 'Wants installation date', 'customised', 'Bought bath fittings → upsell shower panels + bath accessories'],
-    ['सुनील यादव', '919333445566', 'Sanitaryware', -35, -20, 'Ravi', 'completed', 'Delivered and installed', 'default', ''],
-    ['कविता नायर', '919665544332', 'Floor Tiles', -10, -7, 'Mohit', 'in_progress', 'Delivery pending, call back', 'default', ''],
-    ['अमित पटेल', '919776655443', 'Sanitaryware', -8, -2, 'Ravi', 'in_progress', 'Wants installation date', 'default', ''],
-    ['रीता गुप्ता', '919554433221', 'Wall Tiles', -15, -1, 'Sunil', 'completed', 'Marked done after site visit', 'default', ''],
-    ['मनोज सिंह', '919332211009', 'Floor Tiles', -1, 2, 'Suresh', 'new', 'Site visit scheduled', 'default', ''],
-    ['सीमा राव', '919221100998', 'Wall Tiles', -20, 0, 'Mohit', 'in_progress', 'Confirm grout colour', 'default', ''],
-    ['विक्रम पटेल', '919443322110', 'Bath Fittings', -12, -4, 'Raju', 'in_progress', 'Pending balance payment', 'customised', 'Bought bath fittings → upsell mirrors + storage cabinets'],
-    ['दीपक जोशी', '919000112233', 'Sanitaryware', -6, 1, 'Suresh', 'new', 'Requested quotation', 'default', ''],
+    ['राजेश शर्मा', '919119188492', 'Floor Tiles', -5, 0, 'Mohit', 'visited', 'Walked in, browsing floor tiles', 'default', '', '', 'Call back re: shade selection'],
+    ['प्रिया वर्मा', '919820011223', 'Bath Fittings', -3, 1, 'Ravi', 'interested', 'Wants installation date', 'customised', 'Bought bath fittings → upsell shower panels + bath accessories', 'Priority customer — repeat buyer', 'Share quotation'],
+    ['सुनील यादव', '919333445566', 'Sanitaryware', -35, -20, 'Ravi', 'deal_closed', 'Delivered and installed', 'default', '', '', ''],
+    ['कविता नायर', '919665544332', 'Floor Tiles', -10, -9, 'Mohit', 'bill_finalised', 'Delivery pending, call back', 'default', '', '', 'Confirm delivery slot'],
+    ['अमित पटेल', '919776655443', 'Sanitaryware', -8, -4, 'Ravi', 'bill_executed', 'Awaiting installation crew', 'default', '', 'Installation booked for weekend', 'Schedule site visit'],
+    ['रीता गुप्ता', '919554433221', 'Wall Tiles', -15, -1, 'Sunil', 'deal_closed', 'Completed after site visit', 'default', '', '', ''],
+    ['मनोज सिंह', '919332211009', 'Floor Tiles', -1, 2, 'Suresh', 'converted', 'Agreed to purchase, finalising bill', 'default', '', '', 'Prepare final bill'],
+    ['सीमा राव', '919221100998', 'Wall Tiles', -20, -2, 'Mohit', 'not_interested', 'Went with another vendor', 'default', '', 'Price was the deal-breaker', ''],
+    ['विक्रम पटेल', '919443322110', 'Bath Fittings', -12, -4, 'Raju', 'deal_closed', 'Full payment received', 'customised', 'Bought bath fittings → upsell mirrors + storage cabinets', '', ''],
+    ['दीपक जोशी', '919000112233', 'Sanitaryware', -6, 1, 'Suresh', 'deal_closed', 'Bought full sanitaryware set', 'default', '', 'Referral source: neighbour', ''],
   ];
 
   function clients() {
-    var headers = ['ग्राहक का नाम', 'मोबाइल', 'स्थिति', 'अगला फॉलोअप', 'कर्मचारी', 'नोट्स', 'बिक्री तारीख', 'प्रोडक्ट'];
+    var headers = ['ग्राहक का नाम', 'मोबाइल', 'स्थिति', 'अगला फॉलोअप', 'कर्मचारी', 'नोट्स', 'बिक्री तारीख', 'प्रोडक्ट', 'एडमिन टिप्पणी', 'अगला कदम'];
     var mapping = {
       customer_name: 'ग्राहक का नाम', phone: 'मोबाइल', status: 'स्थिति',
       follow_up_date: 'अगला फॉलोअप', assigned_to: 'कर्मचारी', notes: 'नोट्स',
       sale_date: 'बिक्री तारीख', product: 'प्रोडक्ट',
+      admin_remark: 'एडमिन टिप्पणी', next_step: 'अगला कदम',
     };
     var mapped = C.map(function (r) {
       return {
         customer_name: r[0], phone: r[1], product: r[2],
         sale_date: ddmmyyyy(relISO(r[3])), follow_up_date: ddmmyyyy(relISO(r[4])),
-        assigned_to: r[5], status: r[6], notes: r[7], _raw: r,
+        assigned_to: r[5], status: r[6], notes: r[7],
+        admin_remark: r[10] || '', next_step: r[11] || '', _raw: r,
       };
     });
     return { clients: mapped, mapping: mapping, headers: headers };
@@ -45,22 +50,19 @@
 
   // Override map: "<phone>:<stage>" → status (forces a specific step state).
   var OVR = {
-    '919776655443:care_check': 'failed',      // अमित — one failed send
-    '919000112233:feedback': 'opted_out',     // दीपक — opted out mid-journey
-    '919000112233:upsell': 'opted_out',
-    '919000112233:referral': 'opted_out',
+    '919333445566:feedback': 'failed',   // सुनील — one failed send
+    '919443322110:referral': 'opted_out', // विक्रम — opted out of referral
   };
   // A few messages "sent today" (drives Messages Sent Today + activity).
   var SENT_TODAY = {
-    '919119188492:care_check': todayAt('14:30'),
-    '919820011223:thank_you': todayAt('13:15'),
-    '919332211009:thank_you': todayAt('11:05'),
-    '919221100998:feedback': todayAt('10:20'),
+    '919000112233:feedback': todayAt('14:30'), // दीपक
+    '919443322110:upsell': todayAt('11:05'),   // विक्रम
   };
 
   function messages() {
     var out = [];
-    C.forEach(function (r) {
+    // Section 2 pipeline only exists for deal_closed customers.
+    C.filter(function (r) { return U.normStatus(r[6]) === 'deal_closed'; }).forEach(function (r) {
       var phone = r[1], name = r[0], product = r[2], saleOff = r[3];
       var pattern = r[8], custom = r[9];
       CFG.MESSAGE_STAGES.forEach(function (st) {
