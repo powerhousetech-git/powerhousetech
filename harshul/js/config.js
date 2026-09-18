@@ -15,7 +15,7 @@
 window.HRS = {
   // ── n8n webhooks ────────────────────────────────────────────
   N8N_HOST: 'https://shreyas-sinha.app.n8n.cloud',
-  USE_TEST: true, // dev: /webhook-test · prod: flip to false → /webhook
+  USE_TEST: false, // prod: /webhook (webhooks are active + CORS-enabled) · dev: true → /webhook-test
   get N8N_BASE() {
     return this.N8N_HOST + (this.USE_TEST ? '/webhook-test' : '/webhook');
   },
