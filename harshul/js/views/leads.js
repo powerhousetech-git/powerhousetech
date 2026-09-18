@@ -144,9 +144,24 @@
       '<details class="leads-all"><summary class="leads-all-sum">All leads by category ' +
       '<span class="count-pill count-brand">' + list.length + '</span></summary>' + stageSections + '</details>' : '';
 
+    // Per-employee follow-up reminders for the selected date (due + overdue).
+    var pending = overdueSel.concat(dueSel);
+    var byEmp = {};
+    pending.forEach(function (c) { var e = String(c.assigned_to || '').trim() || 'Unassigned'; byEmp[e] = (byEmp[e] || 0) + 1; });
+    var empPend = Object.keys(byEmp).sort(function (a, b) { return byEmp[b] - byEmp[a]; });
+    var remindHtml = empPend.length ?
+      '<div class="card"><div class="fu-head"><h3>🔔 Reminders · ' + esc(dayLabel) + '</h3>' +
+      '<button class="btn btn-sm btn-amber" id="lead-remind-all">Remind all</button></div>' +
+      '<div class="remind-list">' + empPend.map(function (e) {
+        var can = e !== 'Unassigned';
+        return '<div class="remind-row"><span class="remind-emp">' + esc(e) + '</span>' +
+          '<span class="remind-count">' + byEmp[e] + ' pending</span>' +
+          (can ? '<button class="btn btn-sm btn-ghost" data-remind-emp="' + esc(e) + '">Remind</button>' : '<span class="muted">unassigned</span>') +
+          '</div>';
+      }).join('') + '</div></div>' : '';
+
     ctx.main().innerHTML =
-      ctx.pageHead('Leads', 'Walk-in lead master · ' + st.clients.length + ' leads',
-        '<button class="btn btn-amber" id="lead-remind">🔔 Send All Reminders</button>') +
+      ctx.pageHead('Leads', 'Walk-in lead master · ' + st.clients.length + ' leads') +
       '<div class="card">' +
       '<div class="toolbar">' +
       '<input type="search" id="lead-q" class="input" placeholder="Search name or phone" value="' + esc(f.q || '') + '">' +
@@ -154,7 +169,7 @@
       '<select id="lead-emp" class="input">' + empOpts + '</select>' +
       '</div>' + nav +
       '</div>' +
-      stats + followBody + allHtml;
+      stats + remindHtml + followBody + allHtml;
 
     var q = ctx.main().querySelector('#lead-q');
     q.addEventListener('input', function () {
@@ -164,7 +179,11 @@
     });
     ctx.main().querySelector('#lead-cat').addEventListener('change', function () { f.category = this.value; render(ctx); });
     ctx.main().querySelector('#lead-emp').addEventListener('change', function () { f.employee = this.value; render(ctx); });
-    ctx.main().querySelector('#lead-remind').addEventListener('click', function () { sendReminders(ctx, this); });
+    var remindAll = ctx.main().querySelector('#lead-remind-all');
+    if (remindAll) remindAll.addEventListener('click', function () { sendReminders(ctx, this, null); });
+    ctx.main().querySelectorAll('[data-remind-emp]').forEach(function (b) {
+      b.addEventListener('click', function () { sendReminders(ctx, b, b.getAttribute('data-remind-emp')); });
+    });
     // Date navigation
     ctx.main().querySelector('#lead-prev').addEventListener('click', function () { f.selectedDate = U.addDays(sel, -1); render(ctx); });
     ctx.main().querySelector('#lead-next').addEventListener('click', function () { f.selectedDate = U.addDays(sel, 1); render(ctx); });
@@ -217,18 +236,30 @@
       var newDate = document.getElementById('ul-date').value || '';
       var newAdmin = document.getElementById('ul-admin').value.trim();
 
-      var body = { phone: U.normPhone(phone) };
-      if (newCat !== cur) body.status = newCat;
-      if (newDate !== curDate) body.follow_up_date = newDate;
+      // Match the row on the phone EXACTLY as stored in the sheet (Mobile is
+      // plain 10-digit); also send digits-only as a fallback match key.
+      var body = { phone: String(c.phone || phone), phone_digits: U.normPhone(phone) };
+      // Status is written as the human-readable label the sheet uses (e.g. "Deal Closed").
+      if (newCat !== cur) body.status = U.statusLabel(newCat);
+      if (newDate !== curDate) body.follow_up_date = newDate ? U.toSheetDate(newDate) : '';
       if (newAdmin !== String(c.admin_remark || '').trim()) body.admin_remark = newAdmin;
 
-      var changed = Object.keys(body).filter(function (k) { return k !== 'phone'; });
+      var changed = Object.keys(body).filter(function (k) { return k !== 'phone' && k !== 'phone_digits'; });
       if (!changed.length) { ctx.toast('No changes to save', ''); ctx.closeModal(); return; }
 
       ctx.setBusy(this, true, 'Saving…');
       var res = await API.triggerWorkflow('update_lead', body);
       ctx.setBusy(this, false);
       if (res.ok) {
+        // n8n may return 200 even when no sheet row matched — detect that so we
+        // don't show a false "updated" that reverts on the next refresh.
+        var d = res.data || {};
+        var noMatch = d.rowUpdated === 0 || d.rowUpdated === '0' || d.rowsUpdated === 0 ||
+          d.matched === false || d.updated === false || d.found === false;
+        if (noMatch) {
+          ctx.toast('No matching row found in the sheet — not saved. Check the phone/number.', 'err');
+          return;
+        }
         if (body.status != null) c.status = body.status;
         if (body.follow_up_date != null) c.follow_up_date = body.follow_up_date;
         if (body.admin_remark != null) c.admin_remark = body.admin_remark;
@@ -242,14 +273,17 @@
     });
   }
 
-  async function sendReminders(ctx, btn) {
+  async function sendReminders(ctx, btn, employee) {
     ctx.setBusy(btn, true, 'Sending…');
-    var res = await API.triggerWorkflow('trigger_followup', { date: (ctx.state.leads && ctx.state.leads.selectedDate) || U.todayKey() });
+    var body = { date: (ctx.state.leads && ctx.state.leads.selectedDate) || U.todayKey() };
+    if (employee) body.employee = employee; // per-employee reminder (omit → all)
+    var res = await API.triggerWorkflow('trigger_followup', body);
     ctx.setBusy(btn, false);
     if (res.ok) {
       var n = res.data && (res.data.remindersSent != null ? res.data.remindersSent : res.data.reminders);
-      U.logActivity({ icon: '⏰', tone: 'amber', text: 'Sent follow-up reminders' + (n != null ? ' (' + n + ')' : '') });
-      ctx.toast('Reminders sent' + (n != null ? ': ' + n : ''), 'ok');
+      var who = employee ? ' to ' + employee : '';
+      U.logActivity({ icon: '⏰', tone: 'amber', text: 'Sent follow-up reminders' + who + (n != null ? ' (' + n + ')' : '') });
+      ctx.toast('Reminders sent' + who + (n != null ? ': ' + n : ''), 'ok');
     } else { ctx.webhookMiss(res, 'Send reminders'); }
   }
 

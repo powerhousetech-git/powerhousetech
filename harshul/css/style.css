@@ -233,6 +233,10 @@ details.fu-section > summary::-webkit-details-marker { display: none; }
 .leads-all > summary::-webkit-details-marker { display: none; }
 .leads-all > summary::before { content: '▸'; display: inline-block; transition: transform .15s; }
 .leads-all[open] > summary::before { transform: rotate(90deg); }
+.remind-list { display: flex; flex-direction: column; gap: 6px; }
+.remind-row { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: #fafafa; }
+.remind-emp { font-weight: 600; flex: 1; }
+.remind-count { color: var(--muted); font-size: 12.5px; }
 
 /* ── Modal ── */
 #modal-root.open { position: fixed; inset: 0; z-index: 60; }
