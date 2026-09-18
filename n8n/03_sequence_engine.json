@@ -1,0 +1,448 @@
+{
+  "name": "03 Sequence Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "n1",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "outreach-mail",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "n2",
+      "name": "Webhook - outreach-mail",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        440
+      ],
+      "webhookId": "2ca613e1-0012-44a8-8b7c-0ed805afa2b4"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const item = $input.first().json;\nconst bodyTrack = item.body && item.body.track ? String(item.body.track).trim().toUpperCase() : '';\nconst track = ['A', 'B'].includes(bodyTrack) ? bodyTrack : '';\nreturn [{ json: { track } }];"
+      },
+      "id": "n3",
+      "name": "Get Track Filter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        350
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://msratyvmnuvozuthgkmi.supabase.co/functions/v1/outreach-api/api/contacts/sequence-ready{{ $json.track ? ('?track=' + $json.track) : '' }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 2e5559ab3d6c6c520534ad11841227924392e7a6d97f9bfb"
+            }
+          ]
+        }
+      },
+      "id": "n4",
+      "name": "Fetch Ready Contacts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        350
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const MAX_PER_RUN = 150;\nconst resp = $input.first().json;\nconst groups = resp.groups || [];\nconst items = [];\nfor (const g of groups) {\n  for (const c of (g.contacts || [])) {\n    items.push({\n      json: {\n        id: c.id,\n        followUpNum: g.followUpNum,\n        dayInSequence: g.dayInSequence,\n        name: c.name,\n        firstName: c.firstName,\n        lastName: c.lastName,\n        email: c.email,\n        company: c.company,\n        title: c.title,\n        country: c.country,\n        track: c.track,\n        industryId: c.industryId,\n        templateSubject: c.templateSubject || '',\n        templateBody: c.templateBody || '',\n        templateType: c.templateType || null,\n      },\n    });\n  }\n}\nconst out = items.slice(0, MAX_PER_RUN);\nreturn out.length ? out : [{ json: { _empty: true } }];"
+      },
+      "id": "sr2",
+      "name": "Flatten to Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        350
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json._empty === true }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n5",
+      "name": "Filter Empty",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        1180,
+        350
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const c = $json;\nlet claudePrompt = '';\nlet finalBody = '';\n\nif (c.templateBody && c.templateType === 'static') {\n  finalBody = c.templateBody;\n} else if (c.templateBody && c.templateType === 'ai') {\n  claudePrompt = c.templateBody;\n} else {\n  claudePrompt = `Write a concise, friendly cold outreach email (under 120 words, no subject line) `\n    + `for follow-up #${c.followUpNum} to ${c.firstName || c.name}, who works as `\n    + `${c.title || 'a decision maker'} at ${c.company || 'their company'} in `\n    + `${c.country || 'their region'}. Keep the tone professional and end with a soft call to action.`;\n}\n\nreturn [{\n  json: {\n    ...c,\n    claudePrompt,\n    finalBody,\n  },\n}];"
+      },
+      "id": "n6",
+      "name": "Build Claude Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1420,
+        350
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.finalBody }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n7",
+      "name": "Route by Template Type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1660,
+        350
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "none",
+        "sendHeaders": true,
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "REPLACE_ANTHROPIC_API_KEY"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"model\": \"claude-3-5-sonnet-20241022\",\n    \"max_tokens\": 400,\n    \"messages\": [\n      { \"role\": \"user\", \"content\": $json.claudePrompt }\n    ]\n  }\n}}"
+      },
+      "id": "n8",
+      "name": "Claude Generate Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1900,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const routed = $('Build Claude Prompt').item.json;\nlet emailBody;\n\nif (routed.finalBody) {\n  emailBody = routed.finalBody;\n} else {\n  const resp = $json;\n  const content = resp.content && resp.content[0] && resp.content[0].text ? resp.content[0].text : '';\n  emailBody = content.trim();\n}\n\nreturn [{\n  json: {\n    ...routed,\n    emailBody,\n    subject: routed.templateSubject || `Quick question, ${routed.firstName || routed.name}`,\n  },\n}];"
+      },
+      "id": "n9",
+      "name": "Extract Email Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2140,
+        350
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.emailBody }}",
+        "options": {}
+      },
+      "id": "n10",
+      "name": "Send via Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2380,
+        350
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const c = $('Extract Email Content').item.json;\nreturn [{\n  json: {\n    id: c.id,\n    followUpNum: c.followUpNum,\n    status: `Follow${c.followUpNum} Sent`,\n    sentAt: new Date().toISOString(),\n    industryId: c.industryId || null,\n  },\n}];"
+      },
+      "id": "n11",
+      "name": "Prep Portal Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2620,
+        350
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://msratyvmnuvozuthgkmi.supabase.co/functions/v1/outreach-api/api/contacts/{{ $json.id }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 2e5559ab3d6c6c520534ad11841227924392e7a6d97f9bfb"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"followUpNum\": $json.followUpNum,\n    \"sentAt\": $json.sentAt,\n    \"status\": $json.status,\n    \"industryId\": $json.industryId\n  }\n}}"
+      },
+      "id": "n12",
+      "name": "Update Portal Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2860,
+        350
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Track Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - outreach-mail": {
+      "main": [
+        [
+          {
+            "node": "Get Track Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Track Filter": {
+      "main": [
+        [
+          {
+            "node": "Fetch Ready Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Ready Contacts": {
+      "main": [
+        [
+          {
+            "node": "Flatten to Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten to Items": {
+      "main": [
+        [
+          {
+            "node": "Filter Empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Empty": {
+      "main": [
+        [
+          {
+            "node": "Build Claude Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Claude Prompt": {
+      "main": [
+        [
+          {
+            "node": "Route by Template Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Template Type": {
+      "main": [
+        [
+          {
+            "node": "Extract Email Content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Claude Generate Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Generate Email": {
+      "main": [
+        [
+          {
+            "node": "Extract Email Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Email Content": {
+      "main": [
+        [
+          {
+            "node": "Send via Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send via Gmail": {
+      "main": [
+        [
+          {
+            "node": "Prep Portal Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Portal Update": {
+      "main": [
+        [
+          {
+            "node": "Update Portal Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  },
+  "meta": {
+    "instanceId": "powerhousetech-outreach-bcf3aab9230b"
+  },
+  "pinData": {},
+  "versionId": "58ce672a-3f7c-49a1-86bb-86d6c8671e58",
+  "id": "2cddfff3-5df6-47ee-a7a8-8c22fb3b5e7e",
+  "tags": []
+}

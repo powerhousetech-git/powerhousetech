@@ -556,6 +556,11 @@ router.post(
 router.post(
   '/:id/contacts/apollo-search',
   asyncHandler(async (req, res) => {
+    const config = await prisma.outreachConfig.findFirst();
+    if (!config?.systemEnabled) {
+      return res.status(503).json({ error: 'System paused' });
+    }
+
     const industry = await findIndustry(req.params.id);
     if (!industry) return jsonError(res, 404, 'Industry not found');
 
