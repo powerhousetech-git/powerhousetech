@@ -227,6 +227,12 @@ details.fu-section > summary::-webkit-details-marker { display: none; }
 .lead-side { flex: none; }
 .leads-section .fu-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .leads-section .fu-head h3 { margin: 0; }
+#lead-pick { margin-left: auto; }
+.leads-all { margin-top: 4px; }
+.leads-all > summary { cursor: pointer; list-style: none; font-weight: 700; color: var(--brand); padding: 10px 4px; display: flex; align-items: center; gap: 8px; }
+.leads-all > summary::-webkit-details-marker { display: none; }
+.leads-all > summary::before { content: '▸'; display: inline-block; transition: transform .15s; }
+.leads-all[open] > summary::before { transform: rotate(90deg); }
 
 /* ── Modal ── */
 #modal-root.open { position: fixed; inset: 0; z-index: 60; }
