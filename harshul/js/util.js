@@ -196,6 +196,14 @@
     return '+' + d;
   }
 
+  // YYYY-MM-DD → DD/MM/YYYY (the format the master sheet uses).
+  function toSheetDate(key) {
+    var k = parseDateKey(key);
+    if (!k) return '';
+    var p = k.split('-');
+    return p[2] + '/' + p[1] + '/' + p[0];
+  }
+
   // ── Activity log (local, HRS-scoped) ────────────────────────
   var LOG_KEY = 'hrs_activity_log';
   function logActivity(entry) {
@@ -214,7 +222,7 @@
     normStatus: normStatus, isDone: isDone, isClosedStage: isClosedStage, statusLabel: statusLabel, statusBadge: statusBadge, STATUS_LABELS: STATUS_LABELS,
     istKey: istKey, todayKey: todayKey, parseDateKey: parseDateKey, dayDiff: dayDiff, addDays: addDays,
     followUpBucket: followUpBucket, isOverdue: isOverdue, overdueTone: overdueTone, overdueDot: overdueDot,
-    fmtDate: fmtDate, fmtDayShort: fmtDayShort, dateNavLabel: dateNavLabel, fmtDateTime: fmtDateTime, fmtTimeShort: fmtTimeShort, relTime: relTime,
+    fmtDate: fmtDate, fmtDayShort: fmtDayShort, dateNavLabel: dateNavLabel, fmtDateTime: fmtDateTime, fmtTimeShort: fmtTimeShort, relTime: relTime, toSheetDate: toSheetDate,
     normPhone: normPhone, fmtPhone: fmtPhone,
     logActivity: logActivity, getLocalActivity: getLocalActivity,
   };
