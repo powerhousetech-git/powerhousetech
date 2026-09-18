@@ -10,12 +10,13 @@
   var CFG = global.HRS, U = global.HRSUtil, API = global.HRSApi;
   var _qTimer = null;
 
-  function overdueInfo(c) {
-    // Only non-terminal leads can be overdue.
+  function overdueInfo(c, refKey) {
+    // Only non-terminal leads can be overdue. Overdue is measured against
+    // refKey (default = today), so the date navigator can view any date.
     if (U.isClosedStage(c.status)) return null;
     var k = U.parseDateKey(c.follow_up_date);
     if (!k) return null;
-    var days = U.dayDiff(U.todayKey(), k); // today - due; +ve = overdue
+    var days = U.dayDiff(refKey || U.todayKey(), k); // ref - due; +ve = overdue
     if (days <= 0) return null;
     return { days: days, dot: U.overdueDot(days), tone: U.overdueTone(days) };
   }
@@ -30,8 +31,8 @@
     return true;
   }
 
-  function leadCard(c, esc) {
-    var od = overdueInfo(c);
+  function leadCard(c, esc, refKey) {
+    var od = overdueInfo(c, refKey);
     var toneCls = od ? ' lead-' + od.tone : '';
 
     var dueKey = U.parseDateKey(c.follow_up_date);
@@ -70,28 +71,32 @@
       '</h3><span class="count-pill count-' + tone + '">' + count + '</span></div>' + cards + '</div>';
   }
 
+  function kpi(label, val, tone) {
+    return '<div class="kpi kpi-' + tone + '"><div class="kpi-label">' + label +
+      '</div><div class="kpi-value">' + val + '</div></div>';
+  }
+
   function render(ctx) {
     var esc = ctx.esc, st = ctx.state, f = st.leads;
+    if (!f.selectedDate) f.selectedDate = U.todayKey();
+    var sel = f.selectedDate, today = U.todayKey();
 
     var list = st.clients.filter(function (c) { return matches(c, f); });
 
-    // Overdue first (non-terminal, past-due), then remaining grouped by stage.
-    var overdue = [], rest = [];
-    list.forEach(function (c) { (overdueInfo(c) ? overdue : rest).push(c); });
-    overdue.sort(function (a, b) {
-      return (overdueInfo(b).days) - (overdueInfo(a).days);
+    // Date-driven follow-up buckets (non-terminal), relative to the selected date.
+    var overdueSel = [], dueSel = [];
+    list.forEach(function (c) {
+      if (U.isClosedStage(c.status)) return;
+      var k = U.parseDateKey(c.follow_up_date); if (!k) return;
+      var d = U.dayDiff(sel, k); // sel - due; +ve = overdue as of sel
+      if (d > 0) overdueSel.push(c);
+      else if (d === 0) dueSel.push(c);
     });
-
-    var overdueHtml = section('🔴 Overdue Follow-Ups', 'red',
-      overdue.map(function (c) { return leadCard(c, esc); }).join(''), overdue.length);
-
-    var stageSections = CFG.STAGES.map(function (stage) {
-      var group = rest.filter(function (c) { return U.normStatus(c.status) === stage; });
-      if (!group.length) return '';
-      var tone = stage === 'deal_closed' ? 'green' : (stage === 'not_interested' ? 'red' : 'today');
-      return section(U.statusLabel(stage), tone,
-        group.map(function (c) { return leadCard(c, esc); }).join(''), group.length);
-    }).join('');
+    overdueSel.sort(function (a, b) {
+      return U.dayDiff(sel, U.parseDateKey(b.follow_up_date)) - U.dayDiff(sel, U.parseDateKey(a.follow_up_date));
+    });
+    var activeCount = list.filter(function (c) { return !U.isClosedStage(c.status); }).length;
+    var dayLabel = sel === today ? 'Today' : U.fmtDayShort(sel);
 
     // Filters
     var catOpts = ['<option value="all">All categories</option>'].concat(CFG.STAGES.map(function (s) {
@@ -103,17 +108,53 @@
       return '<option value="' + esc(e) + '"' + (f.employee === e ? ' selected' : '') + '>' + esc(e) + '</option>';
     })).join('');
 
-    var body = (overdueHtml + stageSections) || '<p class="muted center">No leads match.</p>';
+    // Date navigator (Yesterday / label / Tomorrow + pick a date).
+    var nav =
+      '<div class="date-nav">' +
+      '<button class="btn btn-ghost btn-sm" id="lead-prev">◀ Yesterday</button>' +
+      '<div class="date-label">' + esc(U.dateNavLabel(sel)) +
+      (sel !== today ? ' <button class="btn btn-sm btn-ghost" id="lead-today">Today</button>' : '') + '</div>' +
+      '<button class="btn btn-ghost btn-sm" id="lead-next">Tomorrow ▶</button>' +
+      '<input type="date" id="lead-pick" class="input" value="' + esc(sel) + '">' +
+      '</div>';
+
+    var stats = '<div class="kpi-row kpi-3">' +
+      kpi('Due ' + esc(dayLabel), dueSel.length, 'amber') +
+      kpi('Overdue as of ' + esc(dayLabel), overdueSel.length, overdueSel.length ? 'red' : 'green') +
+      kpi('Active leads', activeCount, 'brand') +
+      '</div>';
+
+    var overdueHtml = section('🔴 Overdue — as of ' + esc(dayLabel), 'red',
+      overdueSel.map(function (c) { return leadCard(c, esc, sel); }).join(''), overdueSel.length);
+    var dueHtml = section('🟡 Due ' + esc(dayLabel), 'today',
+      dueSel.map(function (c) { return leadCard(c, esc, sel); }).join(''), dueSel.length);
+    var followBody = (overdueHtml + dueHtml) ||
+      '<div class="card"><p class="muted center">No pending follow-ups ' +
+      (sel === today ? 'due today or overdue' : 'for ' + esc(dayLabel)) + '. 🎉</p></div>';
+
+    // Full lead browser grouped by category (collapsible), relative to today.
+    var stageSections = CFG.STAGES.map(function (stage) {
+      var group = list.filter(function (c) { return U.normStatus(c.status) === stage; });
+      if (!group.length) return '';
+      var tone = stage === 'deal_closed' ? 'green' : (stage === 'not_interested' ? 'red' : 'today');
+      return section(U.statusLabel(stage), tone,
+        group.map(function (c) { return leadCard(c, esc); }).join(''), group.length);
+    }).join('');
+    var allHtml = stageSections ?
+      '<details class="leads-all"><summary class="leads-all-sum">All leads by category ' +
+      '<span class="count-pill count-brand">' + list.length + '</span></summary>' + stageSections + '</details>' : '';
 
     ctx.main().innerHTML =
       ctx.pageHead('Leads', 'Walk-in lead master · ' + st.clients.length + ' leads',
         '<button class="btn btn-amber" id="lead-remind">🔔 Send All Reminders</button>') +
-      '<div class="card"><div class="toolbar">' +
+      '<div class="card">' +
+      '<div class="toolbar">' +
       '<input type="search" id="lead-q" class="input" placeholder="Search name or phone" value="' + esc(f.q || '') + '">' +
       '<select id="lead-cat" class="input">' + catOpts + '</select>' +
       '<select id="lead-emp" class="input">' + empOpts + '</select>' +
-      '</div></div>' +
-      body;
+      '</div>' + nav +
+      '</div>' +
+      stats + followBody + allHtml;
 
     var q = ctx.main().querySelector('#lead-q');
     q.addEventListener('input', function () {
@@ -124,6 +165,11 @@
     ctx.main().querySelector('#lead-cat').addEventListener('change', function () { f.category = this.value; render(ctx); });
     ctx.main().querySelector('#lead-emp').addEventListener('change', function () { f.employee = this.value; render(ctx); });
     ctx.main().querySelector('#lead-remind').addEventListener('click', function () { sendReminders(ctx, this); });
+    // Date navigation
+    ctx.main().querySelector('#lead-prev').addEventListener('click', function () { f.selectedDate = U.addDays(sel, -1); render(ctx); });
+    ctx.main().querySelector('#lead-next').addEventListener('click', function () { f.selectedDate = U.addDays(sel, 1); render(ctx); });
+    var tbtn = ctx.main().querySelector('#lead-today'); if (tbtn) tbtn.addEventListener('click', function () { f.selectedDate = today; render(ctx); });
+    ctx.main().querySelector('#lead-pick').addEventListener('change', function () { if (this.value) { f.selectedDate = this.value; render(ctx); } });
     bindUpdate(ctx);
   }
 
@@ -198,7 +244,7 @@
 
   async function sendReminders(ctx, btn) {
     ctx.setBusy(btn, true, 'Sending…');
-    var res = await API.triggerWorkflow('trigger_followup', { date: U.todayKey() });
+    var res = await API.triggerWorkflow('trigger_followup', { date: (ctx.state.leads && ctx.state.leads.selectedDate) || U.todayKey() });
     ctx.setBusy(btn, false);
     if (res.ok) {
       var n = res.data && (res.data.remindersSent != null ? res.data.remindersSent : res.data.reminders);
