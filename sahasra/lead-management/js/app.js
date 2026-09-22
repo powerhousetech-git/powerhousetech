@@ -2110,7 +2110,7 @@
       { key: 'new', label: 'New' },
       { key: 'mail_1_sent', label: 'Mail 1' },
       { key: 'follow_up', label: 'Follow-up' },
-      { key: 'meeting_scheduled', label: 'Meeting Scheduled' },
+      { key: 'meeting_scheduled', label: 'Meeting' },
     ];
 
     main.innerHTML =
