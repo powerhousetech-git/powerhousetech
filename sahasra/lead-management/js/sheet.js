@@ -39,8 +39,8 @@
 
   function isRealFollowUp(lead) {
     var st = normStatus(lead && lead.status);
-    // Booked / converted / discarded are their own stages — not Follow-up
-    if (st === 'meeting_scheduled' || st === 'converted' || st === 'discarded') return false;
+    // Booked / takeover / converted / discarded are their own stages — not Follow-up
+    if (st === 'meeting_scheduled' || st === 'human_takeover' || st === 'converted' || st === 'discarded') return false;
     if (FOLLOW_UP_STATUSES.indexOf(st) >= 0) return true;
     // Count ≥ 2 means at least one follow-up after Mail 1
     return followUpTouchCount(lead) >= 2;
@@ -49,6 +49,7 @@
   function followUpLabel(lead) {
     var st = normStatus(lead && lead.status);
     if (st === 'meeting_scheduled') return 'Meeting scheduled';
+    if (st === 'human_takeover') return 'Human takeover';
     if (st === 'converted' || st === 'discarded') return '';
     var m = st.match(/^follow_up_(\d+)$/);
     if (m) return 'Follow-up ' + m[1] + '/5';
@@ -63,8 +64,7 @@
   function mail1CardTone(lead) {
     var st = normStatus(lead && lead.status);
     if (st === 'discarded') return 'neg';
-    if (st === 'meeting_proposed' || st === 'human_takeover' ||
-        st === 'responded' || st === 'converted') {
+    if (st === 'meeting_proposed' || st === 'responded' || st === 'converted') {
       return 'pos';
     }
     return 'none';
@@ -76,8 +76,8 @@
 
     if (status === 'new' || !status) return 'new';
     if (status === 'converted') return 'converted';
-    // Calendly-confirmed booking — own column (distinct from Meeting Proposed)
-    if (status === 'meeting_scheduled') return 'meeting_scheduled';
+    // Calendly booked OR human takeover after meeting interest → Meeting column
+    if (status === 'meeting_scheduled' || status === 'human_takeover') return 'meeting_scheduled';
     // Real follow-ups only (status follow_up_* OR Follow Up Count ≥ 2)
     if (isRealFollowUp(lead || { status: status })) return 'follow_up';
     // Mail 1 cohort: first-touch emailed leads (incl. positive/negative replies,
@@ -89,17 +89,9 @@
     leads = leads || [];
     var total = leads.length;
     var mail1 = 0, fus = 0, responded = 0, meetings = 0, meetingProposed = 0, humanTakeover = 0, converted = 0, discarded = 0, contacted = 0;
-    // Response Rate / Meeting Conversion denominator — reply outcomes (not discarded)
+    // Positive/neutral replies only (exclude discarded negatives)
     var repliedForRate = 0;
-    var RESPONSE_STATUSES = {
-      responded: true,
-      meeting_proposed: true,
-      meeting_scheduled: true,
-      human_takeover: true,
-      converted: true,
-      discarded: true,
-    };
-    var REPLY_FOR_RATE = {
+    var REPLY_POSITIVE = {
       responded: true,
       meeting_proposed: true,
       meeting_scheduled: true,
@@ -110,49 +102,42 @@
       var st = normStatus(l.status);
       if (st === 'mail_1_sent' || FOLLOW_UP_STATUSES.indexOf(st) >= 0 || st === 'responded' ||
           st === 'meeting_proposed' || st === 'meeting_scheduled' || st === 'human_takeover' || st === 'converted' || st === 'discarded') contacted++;
-      // Count every lead past "new" — they all received at least Mail 1
       if (st !== 'new') mail1++;
-      // Follow-ups KPI: real follow-ups only (not Mail 1). Count includes Mail 1 as 1.
       if (isRealFollowUp(l)) fus++;
-      // Any reply outcome (positive, neutral, or negative) counts as a response
-      if (RESPONSE_STATUSES[st]) responded++;
-      if (REPLY_FOR_RATE[st]) repliedForRate++;
+      if (REPLY_POSITIVE[st]) {
+        responded++;
+        repliedForRate++;
+      }
       if (st === 'meeting_proposed') meetingProposed++;
       if (st === 'meeting_scheduled') meetings++;
       if (st === 'human_takeover') humanTakeover++;
       if (st === 'converted') converted++;
       if (st === 'discarded') discarded++;
     });
-    // Meetings (All) = proposed + scheduled ONLY (no human_takeover)
-    var meetingsAll = meetingProposed + meetings;
-    // Meeting conversion = meetingsAll / repliedForRate (TPM: of leads who responded)
+    // Meetings = proposed + scheduled + human takeover (active meeting path)
+    var meetingsAll = meetingProposed + meetings + humanTakeover;
     var rate = repliedForRate
       ? Math.round((meetingsAll / repliedForRate) * 1000) / 10
       : null;
-    // Response rate = replies / emailed
     var responseRate = contacted
       ? Math.round((repliedForRate / contacted) * 1000) / 10
       : null;
     var newCount = leads.filter(function (l) { return pipelineBucket(l) === 'new'; }).length;
-    // Funnel includes Meeting Proposed + Meeting Scheduled as separate stages
     var funnel = [
       { key: 'new', label: 'New', count: newCount },
       { key: 'mail_1_sent', label: 'Emailed', count: mail1 },
       { key: 'follow_up', label: 'Follow-up Emails Sent', count: fus },
       { key: 'responded', label: 'Responses', count: responded },
-      { key: 'meeting_proposed', label: 'Meeting Proposed', count: meetingProposed },
-      { key: 'meeting_scheduled', label: 'Meeting Scheduled', count: meetings },
+      { key: 'meeting', label: 'Meetings', count: meetingsAll },
       { key: 'converted', label: 'Converted', count: converted },
       { key: 'discarded', label: 'Discarded', count: discarded },
     ];
-    // Drop-off stages (ordered) — exclude Discarded from chain
     var funnelDrop = [
       { key: 'new', label: 'New', count: newCount },
       { key: 'mail_1_sent', label: 'Mail Sent', count: mail1 },
       { key: 'follow_up', label: 'Follow Up', count: fus },
       { key: 'responded', label: 'Replied', count: responded },
-      { key: 'meeting_proposed', label: 'Meeting Proposed', count: meetingProposed },
-      { key: 'meeting_scheduled', label: 'Meeting Scheduled', count: meetings },
+      { key: 'meeting', label: 'Meetings', count: meetingsAll },
       { key: 'converted', label: 'Converted', count: converted },
     ];
     return {

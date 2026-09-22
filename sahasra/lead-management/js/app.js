@@ -540,8 +540,13 @@
     var funnelDrop = s.funnel_drop || s.funnel || [];
     var maxFunnel = Math.max(1, ...funnelDrop.map(function(f){ return f.count; }));
 
-    var meetingsCount = s.meetings_all != null ? s.meetings_all : ((s.meetings_proposed || 0) + (s.meetings_scheduled || 0));
+    var meetingsCount = s.meetings_all != null ? s.meetings_all : ((s.meetings_proposed || 0) + (s.meetings_scheduled || 0) + (s.human_takeover || 0));
     var rate = s.meeting_conversion_rate == null ? '—' : (s.meeting_conversion_rate + '%');
+    var meetHintParts = [];
+    if (s.meetings_proposed) meetHintParts.push(s.meetings_proposed + ' proposed');
+    if (s.meetings_scheduled) meetHintParts.push(s.meetings_scheduled + ' scheduled');
+    if (s.human_takeover) meetHintParts.push(s.human_takeover + ' takeover');
+    var meetHint = meetHintParts.length ? meetHintParts.join(' · ') : 'Proposed + scheduled + takeover';
     var rateHint = (s.replied_for_rate || 0) === 0
       ? 'No replies yet'
       : (meetingsCount + ' of ' + (s.replied_for_rate || 0) + ' replies');
@@ -580,12 +585,10 @@
         kpi('Total Leads', s.total_leads || 0, '') +
         kpi('Emailed', s.mail_1_sent || 0, 'blue') +
         kpi('Follow-up Emails Sent', s.follow_ups_sent || 0, '', 'After Mail 1') +
-        kpi('Responses', s.responses || 0, 'green') +
+        kpi('Responses', s.responses || 0, 'green', 'Excludes discarded') +
         kpi('Response Rate', responseRate, 'green', responseHint) +
-        kpi('Meetings (All)', meetingsCount, 'purple', 'Proposed + scheduled') +
+        kpi('Meetings', meetingsCount, 'blue', meetHint) +
         kpi('Meeting conversion', rate, 'gold', rateHint) +
-        kpi('Meeting Proposed', s.meetings_proposed || 0, 'purple') +
-        kpi('Meeting Scheduled', s.meetings_scheduled || 0, 'green') +
         kpi('Converted', s.converted_leads || 0, 'gold') +
         kpi('Discarded', s.discarded_leads || 0, '') +
       '</div>' +
@@ -597,7 +600,7 @@
           '<div style="padding:18px"><div class="funnel">' +
           funnelDrop.map(function(f, i){
             var w = Math.round((f.count / maxFunnel) * 100);
-            var colors = { new:'#94a3b8', mail_1_sent:'#3b82f6', follow_up:'#0ea5e9', responded:'#22c55e', meeting:'#a855f7', meeting_proposed:'#c084fc', meeting_scheduled:'#22c55e', human_takeover:'#f97316', converted:'#eab308', discarded:'#ef4444' };
+            var colors = { new:'#64748b', mail_1_sent:'#1b4d6e', follow_up:'#2a6f8f', responded:'#2d8a5e', meeting:'#1b4d6e', meeting_proposed:'#3d6b8a', meeting_scheduled:'#2d8a5e', human_takeover:'#c47a2c', converted:'#9a7b4f', discarded:'#b54a4a' };
             var barColor = colors[f.key] || 'var(--primary)';
             var dropHtml = '';
             if (i > 0) {
@@ -1943,7 +1946,7 @@
       { key: 'new', label: 'NEW' },
       { key: 'mail_1_sent', label: 'MAIL 1 SENT' },
       { key: 'follow_up', label: 'FOLLOW-UP' },
-      { key: 'meeting_scheduled', label: 'MEETING SCHEDULED' },
+      { key: 'meeting_scheduled', label: 'MEETING' },
       { key: 'converted', label: 'CONVERTED' },
     ];
 
