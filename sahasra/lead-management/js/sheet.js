@@ -15,6 +15,9 @@
     var aliases = {
       'mail1_sent': 'mail_1_sent',
       'mail_1': 'mail_1_sent',
+      'mail_2_sent': 'follow_up_1',
+      'mail_3_sent': 'follow_up_2',
+      'replied': 'responded',
       'meeting': 'meeting_scheduled',
       'meeting_booked': 'meeting_scheduled',
       'fu_1': 'follow_up_1', 'fu_2': 'follow_up_2', 'fu_3': 'follow_up_3',
@@ -86,6 +89,8 @@
     leads = leads || [];
     var total = leads.length;
     var mail1 = 0, fus = 0, responded = 0, meetings = 0, meetingProposed = 0, humanTakeover = 0, converted = 0, discarded = 0, contacted = 0;
+    // Response Rate / Meeting Conversion denominator — reply outcomes (not discarded)
+    var repliedForRate = 0;
     var RESPONSE_STATUSES = {
       responded: true,
       meeting_proposed: true,
@@ -93,6 +98,13 @@
       human_takeover: true,
       converted: true,
       discarded: true,
+    };
+    var REPLY_FOR_RATE = {
+      responded: true,
+      meeting_proposed: true,
+      meeting_scheduled: true,
+      human_takeover: true,
+      converted: true,
     };
     leads.forEach(function (l) {
       var st = normStatus(l.status);
@@ -104,27 +116,44 @@
       if (isRealFollowUp(l)) fus++;
       // Any reply outcome (positive, neutral, or negative) counts as a response
       if (RESPONSE_STATUSES[st]) responded++;
+      if (REPLY_FOR_RATE[st]) repliedForRate++;
       if (st === 'meeting_proposed') meetingProposed++;
       if (st === 'meeting_scheduled') meetings++;
       if (st === 'human_takeover') humanTakeover++;
       if (st === 'converted') converted++;
       if (st === 'discarded') discarded++;
     });
-    // Meeting interest = proposed + booked (+ human takeover after Calendly)
-    var meetingsTotal = meetingProposed + meetings + humanTakeover;
-    // Meeting conversion = share of contacted leads that reached meeting proposed/finalized
-    var rate = contacted ? Math.round((meetingsTotal / contacted) * 1000) / 10 : 0;
+    // Meetings (All) = proposed + scheduled ONLY (no human_takeover)
+    var meetingsAll = meetingProposed + meetings;
+    // Meeting conversion = meetingsAll / repliedForRate (TPM: of leads who responded)
+    var rate = repliedForRate
+      ? Math.round((meetingsAll / repliedForRate) * 1000) / 10
+      : null;
+    // Response rate = replies / emailed
+    var responseRate = contacted
+      ? Math.round((repliedForRate / contacted) * 1000) / 10
+      : null;
     var newCount = leads.filter(function (l) { return pipelineBucket(l) === 'new'; }).length;
     // Funnel includes Meeting Proposed + Meeting Scheduled as separate stages
     var funnel = [
       { key: 'new', label: 'New', count: newCount },
       { key: 'mail_1_sent', label: 'Emailed', count: mail1 },
-      { key: 'follow_up', label: 'Follow-ups', count: fus },
+      { key: 'follow_up', label: 'Follow-up Emails Sent', count: fus },
       { key: 'responded', label: 'Responses', count: responded },
       { key: 'meeting_proposed', label: 'Meeting Proposed', count: meetingProposed },
       { key: 'meeting_scheduled', label: 'Meeting Scheduled', count: meetings },
       { key: 'converted', label: 'Converted', count: converted },
       { key: 'discarded', label: 'Discarded', count: discarded },
+    ];
+    // Drop-off stages (ordered) — exclude Discarded from chain
+    var funnelDrop = [
+      { key: 'new', label: 'New', count: newCount },
+      { key: 'mail_1_sent', label: 'Mail Sent', count: mail1 },
+      { key: 'follow_up', label: 'Follow Up', count: fus },
+      { key: 'responded', label: 'Replied', count: responded },
+      { key: 'meeting_proposed', label: 'Meeting Proposed', count: meetingProposed },
+      { key: 'meeting_scheduled', label: 'Meeting Scheduled', count: meetings },
+      { key: 'converted', label: 'Converted', count: converted },
     ];
     return {
       total_leads: total,
@@ -132,16 +161,20 @@
       follow_ups_sent: fus,
       responses: responded,
       responded_leads: responded,
+      replied_for_rate: repliedForRate,
       meetings_proposed: meetingProposed,
       meetings_scheduled: meetings,
-      meetings: meetingsTotal,
+      meetings: meetingsAll,
+      meetings_all: meetingsAll,
       human_takeover: humanTakeover,
       converted_leads: converted,
       discarded_leads: discarded,
       contacted_leads: contacted,
       conversion_rate: rate,
       meeting_conversion_rate: rate,
+      response_rate: responseRate,
       funnel: funnel,
+      funnel_drop: funnelDrop,
     };
   }
 

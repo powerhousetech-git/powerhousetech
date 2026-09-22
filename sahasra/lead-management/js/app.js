@@ -21,7 +21,9 @@
     ocrExtractedLeads: [],
     uploadRegion: 'IN',
     dashboardBatchFilter: '',
+    dashboardDateRange: 'all', // all | 7d | month
     leadTrackerBatch: '',
+    leadTrackerAttention: '', // '' | hot_replies | overdue
   };
 
   /** Tab-switch lag fix: reuse sheet data for 2 minutes unless Refresh / write. */
@@ -469,64 +471,146 @@
     // Use cache on tab switch — Refresh button / refreshAllData forces reload
     var [leadsAll, emailLog] = await Promise.all([loadSheetLeads(false), loadEmailLog(false)]);
     var batchFilter = state.dashboardBatchFilter || '';
+    var dateRange = state.dashboardDateRange || 'all';
     var batchOptions = getUniqueBatches(leadsAll);
-    var leads = batchFilter
-      ? leadsAll.filter(function(l){ return (l.Batch || l.batch || '') === batchFilter; })
-      : leadsAll;
+
+    function leadCreatedMs(l) {
+      var raw = l.created_at || l['Created At'] || l['Start Date'] || l['Date Added'] || '';
+      var t = raw ? new Date(raw).getTime() : NaN;
+      return isNaN(t) ? 0 : t;
+    }
+    function inDateRange(l) {
+      if (dateRange === 'all') return true;
+      var t = leadCreatedMs(l);
+      if (!t) return true; // keep undated leads visible rather than hide
+      var now = Date.now();
+      if (dateRange === '7d') return (now - t) <= 7 * 86400000;
+      if (dateRange === 'month') {
+        var d = new Date();
+        var start = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+        return t >= start;
+      }
+      return true;
+    }
+
+    var leads = leadsAll.filter(function (l) {
+      if (batchFilter && (l.Batch || l.batch || '') !== batchFilter) return false;
+      return inDateRange(l);
+    });
+
+    // Activity also filtered by lead created / event time when date range active
+    function activityInRange(ts) {
+      if (dateRange === 'all' || !ts) return true;
+      var t = new Date(ts).getTime();
+      if (isNaN(t)) return true;
+      var now = Date.now();
+      if (dateRange === '7d') return (now - t) <= 7 * 86400000;
+      if (dateRange === 'month') {
+        var d = new Date();
+        return t >= new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+      }
+      return true;
+    }
+
+    var leadByEmail = {};
+    leadsAll.forEach(function (l) {
+      if (l.email) leadByEmail[String(l.email).toLowerCase()] = l;
+    });
+
     var s = PS2Sheet.computeKpis(leads);
     var activity = (emailLog || [])
       .slice()
+      .filter(function (e) {
+        return activityInRange(e.timestamp || e.sent_at || e.received_at || e.created_at);
+      })
       .sort(function(a, b) { return new Date(b.timestamp || b.sent_at || b.received_at || b.created_at || 0) - new Date(a.timestamp || a.sent_at || a.received_at || a.created_at || 0); })
       .slice(0, 20)
       .map(function(e) {
+        var em = String(e.lead_email || e.to_email || e.from_email || '').toLowerCase();
+        var lead = leadByEmail[em];
+        var who = lead
+          ? ((lead.full_name || lead.name || 'Lead') + (lead.company ? ' · ' + lead.company : ''))
+          : (em || 'Unknown');
         return {
-          summary: (e.direction === 'outbound' ? 'Sent' : 'Received') + ' email: ' + (e.subject || '(no subject)') + ' → ' + (e.lead_email || e.to_email || e.from_email || ''),
+          summary: (e.direction === 'outbound' ? 'Sent' : 'Received') + ' email: ' + (e.subject || '(no subject)') + ' → ' + who,
           created_at: e.timestamp || e.sent_at || e.received_at || e.created_at,
         };
       });
-    var funnel = s.funnel || [];
-    var maxFunnel = Math.max(1, ...funnel.map(function(f){ return f.count; }));
 
-    var rate = s.meeting_conversion_rate != null ? s.meeting_conversion_rate + '%'
-      : (s.conversion_rate != null ? s.conversion_rate + '%' : '—');
-    var meetingsCount = s.meetings != null ? s.meetings : ((s.meetings_proposed || 0) + (s.meetings_scheduled || 0) + (s.human_takeover || 0));
-    var rateHint = meetingsCount + ' of ' + (s.contacted_leads || 0) + ' emailed';
+    var funnelDrop = s.funnel_drop || s.funnel || [];
+    var maxFunnel = Math.max(1, ...funnelDrop.map(function(f){ return f.count; }));
+
+    var meetingsCount = s.meetings_all != null ? s.meetings_all : ((s.meetings_proposed || 0) + (s.meetings_scheduled || 0));
+    var rate = s.meeting_conversion_rate == null ? '—' : (s.meeting_conversion_rate + '%');
+    var rateHint = (s.replied_for_rate || 0) === 0
+      ? 'No replies yet'
+      : (meetingsCount + ' of ' + (s.replied_for_rate || 0) + ' replies');
+    var responseRate = s.response_rate == null ? '—' : (s.response_rate + '%');
+    var responseHint = (s.replied_for_rate || 0) + ' replies from ' + (s.contacted_leads || 0) + ' emailed';
+
+    var dateLabel = dateRange === '7d' ? 'Last 7 days' : dateRange === 'month' ? 'This month' : '';
+    var filterNote = dateLabel
+      ? '<span class="filter-active-note">Filtered to: ' + esc(dateLabel) + '</span>'
+      : '';
+
+    var attention = buildNeedsAttention(leads, emailLog);
+
     main.innerHTML =
       syncBarHtml() +
+      (filterNote ? '<div class="dash-filter-note">' + filterNote + '</div>' : '') +
       '<div class="page-head"><div><h1 class="page-title">Dashboard</h1><p class="page-sub">KPIs from master Google Sheet · Pipeline funnel · outreach actions</p></div>' +
-        '<select id="dashboard-batch-filter" class="form-select" style="min-width:180px">' +
-          '<option value="">All Batches</option>' +
-          batchOptions.map(function(b){
-            return '<option value="' + esc(b.batch) + '"' + (batchFilter === b.batch ? ' selected' : '') + '>' +
-              esc(b.batch) + ' (' + b.count + ')</option>';
-          }).join('') +
-        '</select></div>' +
+        '<div class="dash-filters">' +
+          '<div class="date-range-pills" role="group" aria-label="Date range">' +
+            datePill('7d', 'Last 7 days', dateRange) +
+            datePill('month', 'This month', dateRange) +
+            datePill('all', 'All time', dateRange) +
+          '</div>' +
+          '<div class="campaign-filter-wrap">' +
+            '<select id="dashboard-batch-filter" class="form-select" style="min-width:180px">' +
+              '<option value="">All Campaigns</option>' +
+              batchOptions.map(function(b){
+                return '<option value="' + esc(b.batch) + '"' + (batchFilter === b.batch ? ' selected' : '') + '>' +
+                  esc(b.batch) + ' (' + b.count + ')</option>';
+              }).join('') +
+            '</select>' +
+            '<span class="campaign-filter-hint">(filter by send group)</span>' +
+          '</div>' +
+        '</div></div>' +
       '<div class="kpi-row">' +
         kpi('Total Leads', s.total_leads || 0, '') +
         kpi('Emailed', s.mail_1_sent || 0, 'blue') +
-        kpi('Follow-ups', s.follow_ups_sent || 0, '') +
+        kpi('Follow-up Emails Sent', s.follow_ups_sent || 0, '', 'After Mail 1') +
         kpi('Responses', s.responses || 0, 'green') +
-      '</div>' +
-      '<div class="kpi-row">' +
+        kpi('Response Rate', responseRate, 'green', responseHint) +
+        kpi('Meetings (All)', meetingsCount, 'purple', 'Proposed + scheduled') +
         kpi('Meeting conversion', rate, 'gold', rateHint) +
         kpi('Meeting Proposed', s.meetings_proposed || 0, 'purple') +
         kpi('Meeting Scheduled', s.meetings_scheduled || 0, 'green') +
         kpi('Converted', s.converted_leads || 0, 'gold') +
-      '</div>' +
-      '<div class="kpi-row">' +
         kpi('Discarded', s.discarded_leads || 0, '') +
-        kpi('Meetings (all)', meetingsCount, 'purple', 'Proposed + scheduled + takeover') +
       '</div>' +
+      attentionHtml(attention) +
       (state.user && state.user.role !== 'pt_admin' ? emailAutomationsPanel() : '') +
       '<div style="display:grid;grid-template-columns:1fr 340px;gap:18px">' +
         '<div class="panel">' +
-          '<div class="panel-head"><h2>Pipeline Funnel</h2><span style="font-size:12px;color:var(--muted)">Same counts as KPI cards</span></div>' +
+          '<div class="panel-head"><h2>Pipeline Funnel</h2><span style="font-size:12px;color:var(--muted)">Drop-off % between stages</span></div>' +
           '<div style="padding:18px"><div class="funnel">' +
-          funnel.map(function(f){
+          funnelDrop.map(function(f, i){
             var w = Math.round((f.count / maxFunnel) * 100);
             var colors = { new:'#94a3b8', mail_1_sent:'#3b82f6', follow_up:'#0ea5e9', responded:'#22c55e', meeting:'#a855f7', meeting_proposed:'#c084fc', meeting_scheduled:'#22c55e', human_takeover:'#f97316', converted:'#eab308', discarded:'#ef4444' };
             var barColor = colors[f.key] || 'var(--primary)';
-            return '<div class="funnel-row"><span class="funnel-label">' + esc(f.label) + '</span>' +
+            var dropHtml = '';
+            if (i > 0) {
+              var prev = funnelDrop[i - 1].count;
+              if (prev > 0 && f.count < prev) {
+                var pct = Math.round(((prev - f.count) / prev) * 1000) / 10;
+                dropHtml = '<div class="funnel-drop">↓ ' + pct + '% drop</div>';
+              } else if (prev > 0 && f.count >= prev) {
+                dropHtml = '<div class="funnel-drop funnel-drop-flat">→</div>';
+              }
+            }
+            return dropHtml +
+              '<div class="funnel-row"><span class="funnel-label">' + esc(f.label) + '</span>' +
               '<div class="funnel-bar-wrap"><div class="funnel-bar" style="width:' + w + '%;background:' + barColor + '"></div></div>' +
               '<span class="funnel-count">' + f.count + '</span></div>';
           }).join('') +
@@ -535,11 +619,12 @@
           '<div class="panel-head"><h2>Recent Activity</h2></div>' +
           '<ul class="activity-list">' +
           activity.slice(0,15).map(function(a){
-            return '<li class="activity-item"><div class="activity-dot"></div><div><div class="activity-summary">' + esc(a.summary) + '</div><div class="activity-time">' + relTime(a.created_at) + '</div></div></li>';
+            return '<li class="activity-item"><div class="activity-dot"></div><div><div class="activity-summary">' + esc(a.summary) + '</div><div class="activity-time">' + esc(fmtIstActivity(a.created_at)) + '</div></div></li>';
           }).join('') +
           (activity.length === 0 ? '<li class="activity-item"><div class="activity-dot"></div><div style="color:var(--muted)">No activity yet</div></li>' : '') +
           '</ul></div>' +
       '</div>';
+
     var batchSel = $('dashboard-batch-filter');
     if (batchSel) {
       batchSel.addEventListener('change', function(){
@@ -547,6 +632,93 @@
         renderDashboard();
       });
     }
+    document.querySelectorAll('[data-date-range]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        state.dashboardDateRange = btn.getAttribute('data-date-range') || 'all';
+        renderDashboard();
+      });
+    });
+  }
+
+  function datePill(key, label, active) {
+    return '<button type="button" class="date-pill' + (active === key ? ' active' : '') + '" data-date-range="' + key + '">' + esc(label) + '</button>';
+  }
+
+  function fmtIstActivity(ts) {
+    if (!ts) return '—';
+    try {
+      return new Date(ts).toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+      }) + ' IST';
+    } catch (_) { return String(ts); }
+  }
+
+  function buildNeedsAttention(leads, emailLog) {
+    var now = Date.now();
+    var day = 86400000;
+    var draftsByEmail = {};
+    (emailLog || []).forEach(function (e) {
+      var pending = e.status === 'pending_review' || e.is_ai_draft === true || e.is_ai_draft === 'TRUE';
+      if (!pending) return;
+      if (e.status && e.status !== 'pending_review' && e.status !== 'draft') return;
+      var em = String(e.lead_email || e.to_email || '').toLowerCase();
+      if (!em) return;
+      var t = new Date(e.created_at || e.received_at || e.sent_at || 0).getTime();
+      if (!draftsByEmail[em] || t > draftsByEmail[em]) draftsByEmail[em] = t || now;
+    });
+
+    var hot = (leads || []).filter(function (l) {
+      var em = String(l.email || '').toLowerCase();
+      if (!draftsByEmail[em]) return false;
+      var st = PS2Sheet.normStatus(l.status);
+      // Draft ready; still in a reply/takeover state (not converted/discarded/meeting booked)
+      return st === 'responded' || st === 'human_takeover' || st === 'meeting_proposed' || !!draftsByEmail[em];
+    });
+
+    var overdue = (leads || []).filter(function (l) {
+      var st = PS2Sheet.normStatus(l.status);
+      if (st !== 'mail_1_sent' && !/^follow_up_/.test(st)) return false;
+      var last = l.last_email_sent ? new Date(l.last_email_sent).getTime() : 0;
+      if (!last) return false;
+      return (now - last) >= 3 * day;
+    });
+
+    return { hot: hot, overdue: overdue };
+  }
+
+  function attentionHtml(att) {
+    att = att || { hot: [], overdue: [] };
+    var items = [];
+    if (att.hot && att.hot.length) {
+      items.push({
+        key: 'hot_replies',
+        text: att.hot.length + ' lead(s) replied — draft ready for review',
+      });
+    }
+    if (att.overdue && att.overdue.length) {
+      items.push({
+        key: 'overdue',
+        text: att.overdue.length + ' lead(s) have not responded in 3+ days',
+      });
+    }
+    if (!items.length) return '';
+    return '<div class="needs-attention panel">' +
+      '<div class="panel-head"><h2>⚠ Needs Attention</h2></div>' +
+      '<ul class="needs-attention-list">' +
+      items.map(function (it) {
+        return '<li><span>' + esc(it.text) + '</span>' +
+          '<button type="button" class="btn btn-sm" onclick="window.PS2App.viewAttention(\'' + it.key + '\')">View</button></li>';
+      }).join('') +
+      '</ul></div>';
+  }
+
+  function viewAttention(kind) {
+    state.leadTrackerAttention = kind || '';
+    state.leadTrackerStatus = '';
+    location.hash = 'lead-tracker';
+    setView('lead-tracker');
   }
 
   function kpi(label, val, colorClass, hint) {
@@ -555,17 +727,23 @@
   }
 
   function emailAutomationsPanel() {
-    return '<div class="panel" style="margin-bottom:18px"><div class="panel-head"><h2>Email automations</h2></div>' +
-      '<div style="padding:14px 18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">' +
-        '<button class="btn btn-primary btn-sm" id="auto-btn-send_email" onclick="window.PS2App.openBatchRunModal()">Run email sequence</button>' +
-        '<button class="btn btn-sm" id="auto-btn-process_replies" onclick="window.PS2App.triggerAutomation(\'process_replies\')">Re-run reply ingest</button>' +
-        '<span id="auto-run-status" style="font-size:12px;color:var(--muted)"></span>' +
+    return '<div class="panel automation-panel" style="margin-bottom:18px">' +
+      '<div class="panel-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
+        '<h2 style="margin:0">Email automations</h2>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+          '<button class="btn btn-primary btn-sm" id="auto-btn-send_email" onclick="window.PS2App.openBatchRunModal()">Run email sequence</button>' +
+          '<button class="btn btn-sm" id="auto-btn-process_replies" onclick="window.PS2App.triggerAutomation(\'process_replies\')">Re-run reply ingest</button>' +
+          '<span id="auto-run-status" style="font-size:12px;color:var(--muted)"></span>' +
+        '</div>' +
       '</div>' +
-      '<div style="padding:0 18px 14px;font-size:12px;color:var(--muted);line-height:1.55">' +
-        '<p style="margin:0 0 6px"><strong style="color:var(--text)">Adding a lead does not send mail by itself.</strong> Outbound runs on the daily schedule or when you click <em>Run email sequence</em>.</p>' +
-        '<p style="margin:0 0 6px"><strong style="color:var(--text)">Run email sequence</strong> requires batch selection. Choose which batches to process — day offsets are calculated from each batch\'s first trigger time. No emails are sent on weekends (Saturday/Sunday). US-region leads are processed at ~10 AM EST daily; India leads at 9 AM IST. Skips: responded / meeting proposed / meeting scheduled / human takeover / converted / discarded.</p>' +
-        '<p style="margin:0"><strong style="color:var(--text)">Re-run reply ingest</strong> also fires immediately — pulls inbox replies now and updates matching leads. Website enrichment still runs when a lead with a website is saved.</p>' +
-      '</div></div>';
+      '<details class="automation-config">' +
+        '<summary>Email Automation Config <span class="info-icon" title="How automations work">?</span></summary>' +
+        '<div class="automation-config-body">' +
+          '<p><strong style="color:var(--text)">Adding a lead does not send mail by itself.</strong> Outbound runs on the daily schedule or when you click <em>Run email sequence</em>.</p>' +
+          '<p><strong style="color:var(--text)">Run email sequence</strong> requires campaign selection. Day offsets are calculated from each campaign\'s first trigger time. No emails on weekends. US leads ~10 AM EST; India ~9 AM IST. Skips: responded / meeting proposed / meeting scheduled / human takeover / converted / discarded.</p>' +
+          '<p><strong style="color:var(--text)">Re-run reply ingest</strong> pulls inbox replies now and updates matching leads. Website enrichment still runs when a lead with a website is saved.</p>' +
+        '</div>' +
+      '</details></div>';
   }
 
   function closeBatchModal() {
@@ -1871,10 +2049,17 @@
   async function renderLeadTracker() {
     var main = $('main-content');
     main.innerHTML = '<p style="color:var(--muted);padding:20px">Loading leads…</p>';
-    var leads = await loadSheetLeads(false);
+    var [leads, emailLog] = await Promise.all([loadSheetLeads(false), loadEmailLog(false)]);
     var pre = (leads || []).filter(function(l){
       return PS2Sheet.normStatus(l.status) !== 'converted';
     });
+    // Prefetch hot-reply emails for attention filter
+    if (state.leadTrackerAttention === 'hot_replies') {
+      var att = buildNeedsAttention(pre, emailLog);
+      var map = {};
+      (att.hot || []).forEach(function (l) { map[String(l.email || '').toLowerCase()] = true; });
+      state._attentionEmailsHot = map;
+    }
     state.leadTrackerFilter = state.leadTrackerFilter || '';
     state.leadTrackerStatus = state.leadTrackerStatus || '';
     state.leadTrackerList = pre;
@@ -1897,6 +2082,16 @@
       // Same buckets as Pipeline: New / Mail 1 / Follow-up / Meeting Scheduled
       if (stFilter && PS2Sheet.pipelineBucket(l) !== stFilter) return false;
       if (batchFilter && (l.Batch || l.batch || '') !== batchFilter) return false;
+      // Needs Attention deep-link from dashboard
+      if (state.leadTrackerAttention === 'hot_replies') {
+        var attHot = (state._attentionEmailsHot || {});
+        if (!attHot[String(l.email || '').toLowerCase()]) return false;
+      } else if (state.leadTrackerAttention === 'overdue') {
+        var stAtt = PS2Sheet.normStatus(l.status);
+        if (stAtt !== 'mail_1_sent' && !/^follow_up_/.test(stAtt)) return false;
+        var last = l.last_email_sent ? new Date(l.last_email_sent).getTime() : 0;
+        if (!last || (Date.now() - last) < 3 * 86400000) return false;
+      }
       if (!q) return true;
       var blob = [l.full_name, l.email, l.company, l.phone, l.designation, l.source, l.Batch || l.batch, l.region].join(' ').toLowerCase();
       return blob.indexOf(q) >= 0;
@@ -1928,13 +2123,19 @@
           }).join('') +
         '</select>' +
         '<select id="lt-batch">' +
-          '<option value="">All batches</option>' +
+          '<option value="">All Campaigns</option>' +
           batchOptions.map(function(b){
             return '<option value="' + esc(b.batch) + '"' + (batchFilter === b.batch ? ' selected' : '') + '>' +
               esc(b.batch) + ' (' + b.count + ')</option>';
           }).join('') +
         '</select>' +
-        '<span class="filter-note" style="font-size:13px;color:var(--muted)">' + rows.length + ' of ' + all.length + ' leads</span>' +
+        (state.leadTrackerAttention
+          ? '<button type="button" class="btn btn-sm" onclick="window.PS2App.clearAttentionFilter()">Clear attention filter</button>'
+          : '') +
+        '<span class="filter-note" style="font-size:13px;color:var(--muted)">' + rows.length + ' of ' + all.length + ' leads' +
+          (state.leadTrackerAttention === 'hot_replies' ? ' · drafts pending review' : '') +
+          (state.leadTrackerAttention === 'overdue' ? ' · no response 3+ days' : '') +
+        '</span>' +
       '</div>' +
       '<div class="panel lead-tracker-panel"><table class="data-table"><thead><tr>' +
         '<th>Name</th><th>Company</th><th>Email</th><th>Status</th><th>Batch</th><th>Region</th><th title="Follow Up Count includes Mail 1 (1 = Mail 1; 2+ = follow-ups)">FU Count</th><th>Last email</th><th>Source</th>' +
@@ -2936,6 +3137,12 @@
     renderPipeline: renderPipeline, renderLeads: renderLeads,
     refreshAllData: refreshAllData,
     renderAdmin: renderAdmin, markOAuthRenewed: markOAuthRenewed,
+    viewAttention: viewAttention,
+    clearAttentionFilter: function () {
+      state.leadTrackerAttention = '';
+      state._attentionEmailsHot = null;
+      paintLeadTracker();
+    },
     openLeadUpload: openLeadUpload, submitLeadUpload: submitLeadUpload,
     editLeadWebsite: editLeadWebsite, saveLeadWebsite: saveLeadWebsite,
     openLead: openLead, renderLeadTracker: renderLeadTracker, openProject: openProject, advanceStage: advanceStage,
