@@ -532,7 +532,7 @@
           ? ((lead.full_name || lead.name || 'Lead') + (lead.company ? ' · ' + lead.company : ''))
           : (em || 'Unknown');
         return {
-          summary: (e.direction === 'outbound' ? 'Sent' : 'Received') + ' email: ' + (e.subject || '(no subject)') + ' → ' + who,
+          summary: (e.direction === 'outbound' ? 'Sent' : 'Received') + ' email: ' + (e.subject || '(no subject)') + ' — ' + who,
           created_at: e.timestamp || e.sent_at || e.received_at || e.created_at,
         };
       });
@@ -600,16 +600,27 @@
           '<div style="padding:18px"><div class="funnel">' +
           funnelDrop.map(function(f, i){
             var w = Math.round((f.count / maxFunnel) * 100);
-            var colors = { new:'#64748b', mail_1_sent:'#1b4d6e', follow_up:'#2a6f8f', responded:'#2d8a5e', meeting:'#1b4d6e', meeting_proposed:'#3d6b8a', meeting_scheduled:'#2d8a5e', human_takeover:'#c47a2c', converted:'#9a7b4f', discarded:'#b54a4a' };
+            var colors = {
+              new: 'var(--muted)',
+              mail_1_sent: 'var(--primary)',
+              follow_up: 'var(--accent)',
+              responded: 'var(--green)',
+              meeting: 'var(--accent)',
+              meeting_proposed: 'var(--accent)',
+              meeting_scheduled: 'var(--green)',
+              human_takeover: 'var(--orange)',
+              converted: 'var(--gold)',
+              discarded: 'var(--red)',
+            };
             var barColor = colors[f.key] || 'var(--primary)';
             var dropHtml = '';
             if (i > 0) {
               var prev = funnelDrop[i - 1].count;
               if (prev > 0 && f.count < prev) {
                 var pct = Math.round(((prev - f.count) / prev) * 1000) / 10;
-                dropHtml = '<div class="funnel-drop">↓ ' + pct + '% drop</div>';
+                dropHtml = '<div class="funnel-drop">' + pct + '% drop</div>';
               } else if (prev > 0 && f.count >= prev) {
-                dropHtml = '<div class="funnel-drop funnel-drop-flat">→</div>';
+                dropHtml = '<div class="funnel-drop funnel-drop-flat">no drop</div>';
               }
             }
             return dropHtml +
@@ -708,7 +719,7 @@
     }
     if (!items.length) return '';
     return '<div class="needs-attention panel">' +
-      '<div class="panel-head"><h2>⚠ Needs Attention</h2></div>' +
+      '<div class="panel-head"><h2>Needs Attention</h2></div>' +
       '<ul class="needs-attention-list">' +
       items.map(function (it) {
         return '<li><span>' + esc(it.text) + '</span>' +
@@ -939,7 +950,7 @@
               '</select></label>' +
           '</div>' +
           '<div class="drop-zone" id="pdf-drop">' +
-            '<div class="drop-zone-icon">📇</div>' +
+            '<div class="drop-zone-icon" aria-hidden="true"></div>' +
             '<p><strong>Drop a business card photo or PDF</strong></p>' +
             '<p>AI extracts contacts and saves them to the master sheet automatically</p>' +
             '<input type="file" id="pdf-file" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.heic,.heif,application/pdf,image/*" multiple hidden />' +
@@ -991,7 +1002,7 @@
               '</select></label>' +
           '</div>' +
           '<div class="drop-zone" id="xlsx-drop">' +
-            '<div class="drop-zone-icon">📊</div>' +
+            '<div class="drop-zone-icon" aria-hidden="true"></div>' +
             '<p><strong>Drop a spreadsheet</strong></p>' +
             '<p>.xlsx, .xls, or .csv — columns are auto-mapped and imported into the master DB</p>' +
             '<input type="file" id="xlsx-file" accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />' +
@@ -1546,7 +1557,7 @@
       state.excelImportStatus = dupMsg;
       if (status) {
         status.textContent = dupMsg;
-        status.style.color = 'var(--danger, #f87171)';
+        status.style.color = 'var(--red)';
       }
       if (btn) btn.disabled = false;
     } else if (noEmail || skippedValidation) {
@@ -1665,11 +1676,11 @@
   }
 
   var AUDIT_EVENT_META = {
-    email_sent: { label: 'Email sent', cls: 'audit-email', icon: '✉' },
-    reply_received: { label: 'Reply received', cls: 'audit-reply-pos', icon: '📥' },
-    reply_received_negative: { label: 'Negative reply', cls: 'audit-reply-neg', icon: '📥' },
-    meeting_booked: { label: 'Meeting booked', cls: 'audit-meeting', icon: '📅' },
-    status_changed: { label: 'Status changed', cls: 'audit-status', icon: '→' },
+    email_sent: { label: 'Email sent', cls: 'audit-email', mark: 'E' },
+    reply_received: { label: 'Reply received', cls: 'audit-reply-pos', mark: 'R' },
+    reply_received_negative: { label: 'Negative reply', cls: 'audit-reply-neg', mark: 'N' },
+    meeting_booked: { label: 'Meeting booked', cls: 'audit-meeting', mark: 'M' },
+    status_changed: { label: 'Status changed', cls: 'audit-status', mark: 'S' },
   };
 
   function auditTimelineHtml(events) {
@@ -1680,10 +1691,10 @@
       var meta = AUDIT_EVENT_META[ev.event_type] || AUDIT_EVENT_META.status_changed;
       var detail = ev.details || '';
       if (!detail && (ev.old_status || ev.new_status)) {
-        detail = (ev.old_status || '—') + ' → ' + (ev.new_status || '—');
+        detail = (ev.old_status || '—') + ' to ' + (ev.new_status || '—');
       }
       return '<li class="audit-item ' + meta.cls + '">' +
-        '<div class="audit-icon" aria-hidden="true">' + meta.icon + '</div>' +
+        '<div class="audit-icon" aria-hidden="true">' + esc(meta.mark || '·') + '</div>' +
         '<div class="audit-body">' +
           '<div class="audit-top">' +
             '<span class="audit-title">' + esc(meta.label) + '</span>' +
@@ -1721,7 +1732,7 @@
             esc(lead.company || '') + ' · ' + statusBadge(st) +
             (fu ? ' · ' + esc(fu) : '') +
           '</p></div>' +
-          '<button type="button" class="btn btn-sm btn-ghost" id="btn-close-detail">✕ Close</button>' +
+          '<button type="button" class="btn btn-sm btn-ghost" id="btn-close-detail">Close</button>' +
         '</div>' +
         meetingLine +
         (pendingDraft ? draftCard(pendingDraft, lead, sortedEmails) : '') +
@@ -1769,7 +1780,7 @@
           '<h3 style="font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Email detail</h3>' +
           (sortedEmails.length === 0 ? '<p style="color:var(--muted);font-size:13px">No emails logged for this lead yet.</p>' : '') +
           sortedEmails.map(function(e){
-            var dir = e.direction === 'inbound' ? '← Reply' : '→ Outbound';
+            var dir = e.direction === 'inbound' ? 'Reply' : 'Outbound';
             var dirColor = e.direction === 'inbound' ? 'var(--green)' : 'var(--gold)';
             return '<div class="email-item"><div class="email-meta">' +
               '<span style="color:' + dirColor + ';font-weight:600">' + dir + '</span>' +
@@ -1903,7 +1914,7 @@
     return '<div class="inbound-snippet">' +
       '<div class="inbound-snippet-label">Original inbound email</div>' +
       '<div class="email-meta" style="margin-bottom:6px">' +
-        '<span style="color:var(--green);font-weight:600">← Reply</span>' +
+        '<span style="color:var(--green);font-weight:600">Reply</span>' +
         sentimentBadge(inbound.sentiment) +
         '<span>' + fmtDateTime(inbound.received_at || inbound.created_at) + '</span>' +
       '</div>' +
@@ -1958,9 +1969,16 @@
     var kpiFunnel = kpis.funnel || [];
     var maxKpiFunnel = Math.max(1, ...kpiFunnel.map(function(f){ return f.count; }));
     var barColors = {
-      new:'#94a3b8', mail_1_sent:'#3b82f6', follow_up:'#0ea5e9',
-      responded:'#22c55e', meeting:'#a855f7', meeting_proposed:'#c084fc', meeting_scheduled:'#22c55e',
-      human_takeover:'#f97316', converted:'#eab308', discarded:'#ef4444',
+      new: 'var(--muted)',
+      mail_1_sent: 'var(--primary)',
+      follow_up: 'var(--accent)',
+      responded: 'var(--green)',
+      meeting: 'var(--accent)',
+      meeting_proposed: 'var(--accent)',
+      meeting_scheduled: 'var(--green)',
+      human_takeover: 'var(--orange)',
+      converted: 'var(--gold)',
+      discarded: 'var(--red)',
     };
 
     main.innerHTML =
@@ -2230,7 +2248,7 @@
             '<td>' + fmtMoney(p.order_value) + '</td>' +
             '<td>' + stageBadge(p.stage) + '</td>' +
             '<td>' + fmtDate(p.target_date) + '</td>' +
-            '<td><button class="btn-icon">→</button></td></tr>';
+            '<td><button class="btn-icon" aria-label="Open">Open</button></td></tr>';
         }).join('') +
       '</tbody></table></div></div>';
   }
@@ -2438,7 +2456,7 @@
   }
 
   function healthRow(label, ok) {
-    return '<div class="health-row"><span>' + label + '</span><span class="' + (ok?'health-ok':'health-miss') + '">' + (ok?'✓ Configured':'✗ Missing') + '</span></div>';
+    return '<div class="health-row"><span>' + label + '</span><span class="' + (ok?'health-ok':'health-miss') + '">' + (ok?'Configured':'Missing') + '</span></div>';
   }
   function webhookField(label, id, val) {
     return '<div style="margin-bottom:12px"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">' + label + '</label>' +
@@ -2470,7 +2488,7 @@
           return '<tr><td>' + esc(u.username) + '</td><td>' + esc(u.full_name||'') + '</td><td>' + esc(u.role) + '</td>' +
             '<td>' + esc(u.outlook_account||'—') + '</td>' +
             '<td>' + (u.is_active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-gray">Inactive</span>') + '</td>' +
-            '<td><button class="btn-icon" onclick="window.PS2App.deactivateUser(\'' + u.id + '\')">🗑</button></td></tr>';
+            '<td><button class="btn-icon btn-danger" onclick="window.PS2App.deactivateUser(\'' + u.id + '\')">Remove</button></td></tr>';
         }).join('') +
       '</tbody></table></div>';
   }
@@ -2797,7 +2815,7 @@
     if (!res.ok) { toast((res.data && res.data.error) || 'Failed to save', true); return; }
     toast('Settings saved');
     var msg = $('settings-msg');
-    if (msg) { msg.textContent = 'Saved ✓ ' + new Date().toLocaleTimeString(); }
+    if (msg) { msg.textContent = 'Saved ' + new Date().toLocaleTimeString(); }
   }
 
 
@@ -3002,7 +3020,7 @@
 
     var stepperHtml = '<div class="stage-stepper">';
     stages.forEach(function(s, i){
-      stepperHtml += '<div class="stage-step-wrap"><div class="stage-step ' + (i < currentIdx ? 'done' : i === currentIdx ? 'current' : '') + '"><div class="stage-dot">' + (i < currentIdx ? '✓' : i+1) + '</div></div><div class="stage-name" style="max-width:62px;font-size:10px;color:var(--muted);text-align:center">' + esc(STAGE_LABELS[s]||s) + '</div></div>';
+      stepperHtml += '<div class="stage-step-wrap"><div class="stage-step ' + (i < currentIdx ? 'done' : i === currentIdx ? 'current' : '') + '"><div class="stage-dot">' + (i < currentIdx ? 'OK' : i+1) + '</div></div><div class="stage-name" style="max-width:62px;font-size:10px;color:var(--muted);text-align:center">' + esc(STAGE_LABELS[s]||s) + '</div></div>';
       if (i < stages.length - 1) stepperHtml += '<div class="stage-line' + (i < currentIdx ? ' done' : '') + '"></div>';
     });
     stepperHtml += '</div>';
@@ -3015,18 +3033,18 @@
         '<div class="detail-header">' +
           '<div><h2>' + esc(p.project_name) + '</h2>' +
             '<p style="margin:2px 0;color:var(--muted);font-size:13px">' + esc(p.client_name) + ' · ' + stageBadge(p.stage) + (p.order_value ? ' · ' + fmtMoney(p.order_value) : '') + '</p></div>' +
-          '<button type="button" class="btn btn-sm btn-ghost" id="btn-close-detail">✕ Close</button>' +
+          '<button type="button" class="btn btn-sm btn-ghost" id="btn-close-detail">Close</button>' +
         '</div>' +
         stepperHtml +
         (nextStages.length ? '<div style="margin-bottom:16px"><select id="next-stage" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font:inherit;margin-right:8px">' +
           nextStages.map(function(s){ return '<option value="'+s+'">'+esc(STAGE_LABELS[s]||s)+'</option>'; }).join('') +
         '</select><input id="advance-notes" placeholder="Notes (optional)" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font:inherit;width:200px;margin-right:8px" />' +
-        '<button class="btn btn-gold btn-sm" onclick="window.PS2App.advanceStage(\'' + p.id + '\')">Advance Stage →</button></div>' : '') +
+        '<button class="btn btn-gold btn-sm" onclick="window.PS2App.advanceStage(\'' + p.id + '\')">Advance Stage</button></div>' : '') +
         '<h3 style="font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Stage History</h3>' +
         (transitions.length === 0 ? '<p style="color:var(--muted);font-size:13px">No transitions yet — project just created.</p>' : '') +
         transitions.map(function(t){
           return '<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:13px">' +
-            '<div style="font-weight:600">' + esc(STAGE_LABELS[t.from_stage]||t.from_stage||'Created') + ' → ' + esc(STAGE_LABELS[t.to_stage]||t.to_stage) + '</div>' +
+            '<div style="font-weight:600">' + esc(STAGE_LABELS[t.from_stage]||t.from_stage||'Created') + ' to ' + esc(STAGE_LABELS[t.to_stage]||t.to_stage) + '</div>' +
             (t.notes ? '<div style="color:var(--muted);margin-top:2px">' + esc(t.notes) + '</div>' : '') +
             '<div style="font-size:11px;color:var(--muted);margin-top:3px">' + fmtDate(t.created_at) + '</div>' +
           '</div>';

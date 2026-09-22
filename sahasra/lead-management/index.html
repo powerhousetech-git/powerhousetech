@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/sahasra/lead-management/css/ps2.css?v=7y">
+  <link rel="stylesheet" href="/sahasra/lead-management/css/ps2.css?v=7z">
 </head>
 <body>
 
@@ -31,7 +31,7 @@
             <button type="button" class="btn btn-sm btn-ghost" onclick="window.PS2App.togglePassword('login-password', this)">Show</button>
           </span>
         </label>
-        <p id="login-error" style="display:none;margin:0;font-size:13px;color:#f87171"></p>
+        <p id="login-error" style="display:none;margin:0;font-size:13px;color:var(--red)"></p>
         <button type="submit" class="btn btn-primary btn-block" id="btn-login">Sign in</button>
       </form>
       <details class="demo-creds">
@@ -58,7 +58,7 @@
           <div class="nav-label">Overview</div>
           <a href="#dashboard" class="nav-link" data-view="dashboard"
              data-role="sahasra_admin,sahasra_employee">
-            <span class="icon">📊</span> Dashboard
+            <span class="nav-dot" aria-hidden="true"></span> Dashboard
           </a>
         </div>
 
@@ -66,27 +66,27 @@
           <div class="nav-label">Segment 1 — Leads</div>
           <a href="#capture" class="nav-link" data-view="capture"
              data-role="sahasra_admin,sahasra_employee">
-            <span class="icon">📥</span> Capture
+            <span class="nav-dot" aria-hidden="true"></span> Capture
           </a>
           <a href="#leads" class="nav-link" data-view="leads"
              data-role="sahasra_admin,sahasra_employee">
-            <span class="icon">👥</span> Leads Database
+            <span class="nav-dot" aria-hidden="true"></span> Leads Database
           </a>
           <a href="#lead-tracker" class="nav-link" data-view="lead-tracker"
              data-role="sahasra_admin,sahasra_employee">
-            <span class="icon">🗂️</span> Lead Tracker
+            <span class="nav-dot" aria-hidden="true"></span> Lead Tracker
           </a>
           <a href="#pipeline" class="nav-link" data-view="pipeline"
              data-role="sahasra_admin,sahasra_employee">
-            <span class="icon">📬</span> Pipeline
+            <span class="nav-dot" aria-hidden="true"></span> Pipeline
           </a>
           <a href="#review-drafts" class="nav-link" data-view="review-drafts"
              data-role="sahasra_admin,sahasra_employee">
-            <span class="icon">✉️</span> Review AI Replies
+            <span class="nav-dot" aria-hidden="true"></span> Review AI Replies
           </a>
           <a href="#mail-config" class="nav-link" data-view="mail-config"
              data-role="sahasra_admin">
-            <span class="icon">⚙️</span> Mail Config
+            <span class="nav-dot" aria-hidden="true"></span> Mail Config
           </a>
         </div>
 
@@ -95,11 +95,11 @@
           <div class="nav-label">Settings</div>
           <a href="#admin" class="nav-link" data-view="admin"
              data-role="sahasra_admin,pt_admin">
-            <span class="icon">🔑</span> Token Health
+            <span class="nav-dot" aria-hidden="true"></span> Token Health
           </a>
           <a href="#settings" class="nav-link" data-view="settings"
              data-role="sahasra_admin,pt_admin">
-            <span class="icon">🔧</span> System Settings
+            <span class="nav-dot" aria-hidden="true"></span> System Settings
           </a>
         </div>
       </nav>
@@ -121,9 +121,9 @@
 
   <div id="toast" class="toast"></div>
 
-  <script src="/sahasra/lead-management/js/config.js?v=7y"></script>
-  <script src="/sahasra/lead-management/js/api.js?v=7y"></script>
-  <script src="/sahasra/lead-management/js/sheet.js?v=7y"></script>
-  <script src="/sahasra/lead-management/js/app.js?v=7y"></script>
+  <script src="/sahasra/lead-management/js/config.js?v=7z"></script>
+  <script src="/sahasra/lead-management/js/api.js?v=7z"></script>
+  <script src="/sahasra/lead-management/js/sheet.js?v=7z"></script>
+  <script src="/sahasra/lead-management/js/app.js?v=7z"></script>
 </body>
 </html>
