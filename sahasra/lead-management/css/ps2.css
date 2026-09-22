@@ -667,3 +667,119 @@ body {
   .campaign-filter-wrap { align-items: stretch; }
   .funnel-drop { margin-left: 0; }
 }
+
+/* ── Motion (restrained) ──────────────────────────────── */
+@keyframes ps2-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes ps2-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes ps2-slide-in {
+  from { opacity: 0; transform: translateX(18px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.gate-card {
+  animation: ps2-fade-up .42s cubic-bezier(.22,.61,.36,1) both;
+}
+
+#main-content.is-entering > .page-head {
+  animation: ps2-fade-up .32s cubic-bezier(.22,.61,.36,1) both;
+}
+#main-content.is-entering > .kpi-row > .kpi {
+  animation: ps2-fade-up .36s cubic-bezier(.22,.61,.36,1) both;
+}
+#main-content.is-entering > .kpi-row > .kpi:nth-child(1) { animation-delay: .03s; }
+#main-content.is-entering > .kpi-row > .kpi:nth-child(2) { animation-delay: .06s; }
+#main-content.is-entering > .kpi-row > .kpi:nth-child(3) { animation-delay: .09s; }
+#main-content.is-entering > .kpi-row > .kpi:nth-child(4) { animation-delay: .12s; }
+#main-content.is-entering > .kpi-row > .kpi:nth-child(5) { animation-delay: .15s; }
+#main-content.is-entering > .kpi-row > .kpi:nth-child(6) { animation-delay: .18s; }
+#main-content.is-entering .panel,
+#main-content.is-entering .settings-card,
+#main-content.is-entering .needs-attention,
+#main-content.is-entering .kanban-board,
+#main-content.is-entering .filter-bar,
+#main-content.is-entering .tabs,
+#main-content.is-entering .pipeline-legend,
+#main-content.is-entering .sync-bar,
+#main-content.is-entering .sheet-embed-wrap,
+#main-content.is-entering .review-card {
+  animation: ps2-fade-in .34s ease-out both;
+  animation-delay: .05s;
+}
+
+.funnel-bar {
+  transition: width .55s cubic-bezier(.22,.61,.36,1);
+}
+.kanban-card {
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease;
+}
+.kanban-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 28, 46, 0.08);
+}
+.detail-backdrop {
+  animation: ps2-fade-in .2s ease-out both;
+}
+.detail-panel {
+  animation: ps2-slide-in .28s cubic-bezier(.22,.61,.36,1) both;
+}
+.toast {
+  transform: translateY(8px);
+  transition: opacity .22s ease, transform .22s ease;
+}
+.toast.show {
+  transform: translateY(0);
+}
+.nav-link {
+  transition: background .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.btn {
+  transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .12s ease;
+}
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.date-pill {
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.tab {
+  transition: background .15s ease, color .15s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gate-card,
+  #main-content.is-entering > .page-head,
+  #main-content.is-entering > .kpi-row > .kpi,
+  #main-content.is-entering .panel,
+  #main-content.is-entering .settings-card,
+  #main-content.is-entering .needs-attention,
+  #main-content.is-entering .kanban-board,
+  #main-content.is-entering .filter-bar,
+  #main-content.is-entering .tabs,
+  #main-content.is-entering .pipeline-legend,
+  #main-content.is-entering .sync-bar,
+  #main-content.is-entering .sheet-embed-wrap,
+  #main-content.is-entering .review-card,
+  .detail-backdrop,
+  .detail-panel {
+    animation: none !important;
+  }
+  .funnel-bar,
+  .kanban-card,
+  .toast,
+  .btn,
+  .nav-link,
+  .date-pill,
+  .tab {
+    transition: none !important;
+  }
+  .kanban-card:hover,
+  .btn:active:not(:disabled) {
+    transform: none;
+  }
+}

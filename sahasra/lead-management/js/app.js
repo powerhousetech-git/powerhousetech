@@ -245,6 +245,19 @@
     toast._t = setTimeout(function(){ el.className = 'toast'; }, ms || (err ? 4500 : 3200));
   }
 
+  /** Soft page-enter once per view paint (not on tracker filter re-paints). */
+  function markViewEnter(root) {
+    root = root || $('main-content');
+    if (!root) return;
+    root.classList.remove('is-entering');
+    void root.offsetWidth;
+    root.classList.add('is-entering');
+    if (markViewEnter._timer) clearTimeout(markViewEnter._timer);
+    markViewEnter._timer = setTimeout(function () {
+      root.classList.remove('is-entering');
+    }, 480);
+  }
+
   /* ─ Status / badge helpers ───────────────────────────────────────────────── */
   var STATUS_LABELS = {
     new: 'New', mail_1_sent: 'Mail 1 Sent', follow_up: 'Follow-up',
@@ -690,6 +703,7 @@
         renderDashboard();
       });
     });
+    markViewEnter(main);
   }
 
   function datePill(key, label, active) {
@@ -973,6 +987,7 @@
     if (tab === 'excel') renderExcelCapture(body);
     else if (tab === 'sheets') renderSheetsCapture(body);
     else renderPdfCapture(body);
+    markViewEnter(main);
   }
 
   function renderPdfCapture(el) {
@@ -1640,7 +1655,7 @@
       '<div class="sheet-embed-wrap">' +
         '<iframe id="sheet-embed" class="sheet-embed" title="Master leads Google Sheet" src="' + esc(src) + '"></iframe>' +
       '</div>';
-
+    markViewEnter(main);
   }
 
   function refreshSheetEmbed() {
@@ -2060,6 +2075,7 @@
           return '<div class="funnel-row"><span class="funnel-label">' + esc(f.label) + '</span><div class="funnel-bar-wrap"><div class="funnel-bar" style="width:' + w + '%;background:' + (barColors[f.key]||'var(--primary)') + '"></div></div><span class="funnel-count">' + f.count + '</span></div>';
         }).join('') +
       '</div></div></div></div>';
+    markViewEnter(main);
   }
 
   /* ─────────────────────────────────────────────────────────────────────────
@@ -2096,6 +2112,7 @@
             '<button class="btn btn-sm btn-danger" onclick="window.PS2App.rejectDraft(\'' + draft.id + '\',\'' + lead.id + '\')">Reject</button>' +
           '</div></div>';
       }).join('');
+    markViewEnter(main);
   }
 
   /* ─────────────────────────────────────────────────────────────────────────
@@ -2122,10 +2139,10 @@
     state.leadTrackerFilter = state.leadTrackerFilter || '';
     state.leadTrackerStatus = state.leadTrackerStatus || '';
     state.leadTrackerList = pre;
-    paintLeadTracker();
+    paintLeadTracker(true);
   }
 
-  function paintLeadTracker() {
+  function paintLeadTracker(enter) {
     var main = $('main-content');
     var all = state.leadTrackerList || [];
     var q = String(state.leadTrackerFilter || '').trim().toLowerCase();
@@ -2241,12 +2258,14 @@
         paintLeadTracker();
       });
     }
+    if (enter) markViewEnter(main);
   }
 
   async function renderTracker() {
     var main = $('main-content');
     main.innerHTML = '<div class="page-head"><div><h1 class="page-title">Client Tracker</h1>' +
       '<p class="page-sub">Project tracker moved off the previous database. Rebuild on a Google Sheet tab if needed.</p></div></div>';
+    markViewEnter(main);
     return;
 
     var main = $('main-content');
@@ -2327,6 +2346,7 @@
       '</tbody></table>' +
       (isAdmin ? '<div style="padding:14px"><button class="btn btn-primary" onclick="window.PS2App.saveMailConfig()">Save Changes</button></div>' : '') +
       '</div>';
+    markViewEnter(main);
   }
 
   /* ─────────────────────────────────────────────────────────────────────────
@@ -2371,6 +2391,7 @@
         '<button class="btn btn-primary" onclick="window.PS2App.saveSettings()">Save prompts</button>' +
         '<div id="settings-msg" style="margin-top:10px;font-size:13px;color:var(--green)"></div>' +
       '</div>';
+    markViewEnter(main);
   }
 
   /* ─────────────────────────────────────────────────────────────────────────
@@ -2474,6 +2495,7 @@
         }).join('') +
       '</div>' +
       '<p style="font-size:12px;color:var(--muted)">Renew opens the n8n credential page in a new tab. After you finish re-auth, click <strong>Mark as Renewed</strong> to save the timestamp (localStorage + Settings sheet).</p>';
+    markViewEnter(main);
   }
 
   async function markOAuthRenewed(id) {
@@ -2511,6 +2533,7 @@
     var main = $('main-content');
     main.innerHTML = '<div class="page-head"><div><h1 class="page-title">Users</h1>' +
       '<p class="page-sub">User management retired with Supabase. Portal uses a local admin session.</p></div></div>';
+    markViewEnter(main);
     return;
 
     if (!state.user || state.user.role !== 'sahasra_admin') return;
@@ -2534,6 +2557,7 @@
     var main = $('main-content');
     main.innerHTML = '<div class="page-head"><div><h1 class="page-title">Outlook</h1>' +
       '<p class="page-sub">Mailbox connection is managed by your PowerhouseTech admin.</p></div></div>';
+    markViewEnter(main);
     return;
 
     var main = $('main-content');
