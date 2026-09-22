@@ -88,23 +88,51 @@
       out.batch_triggered_at = triggered;
       out['Batch Triggered At'] = triggered;
     }
+    if (lead.meeting_time || lead['Meeting Time']) {
+      out.meeting_time = lead.meeting_time || lead['Meeting Time'];
+      out['Meeting Time'] = out.meeting_time;
+    }
     if (extra) Object.keys(extra).forEach(function (k) { out[k] = extra[k]; });
     Object.keys(out).forEach(function (k) { if (out[k] === undefined) delete out[k]; });
     return out;
   }
 
-  /** Read from n8n Portal Data API — replaces all Supabase reads */
-  async function portalData(op) {
+  function looksLikeAck(data) {
+    return !!(data && data.message && /workflow was started/i.test(String(data.message)));
+  }
+
+  /**
+   * Read from n8n Portal Data API.
+   * Supports both ?op= and ?resource= (n8n brief uses resource=).
+   * Extra query params: email, etc.
+   */
+  async function portalData(op, query) {
     var path = (N8N_WEBHOOKS.portal_data || '/webhook/ps2-portal-data');
     var headers = {
       'Content-Type': 'application/json',
       'x-api-key': N8N_API_KEY,
       'Shreyas09': N8N_API_KEY,
     };
+    query = query || {};
+
+    function buildQs(method) {
+      var parts = [];
+      // Dual keys for compatibility with existing + new n8n WF
+      parts.push('op=' + encodeURIComponent(op));
+      parts.push('resource=' + encodeURIComponent(op));
+      Object.keys(query).forEach(function (k) {
+        if (query[k] == null || query[k] === '') return;
+        parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(query[k]));
+      });
+      return parts.join('&');
+    }
+
     async function call(method) {
-      var url = N8N_BASE + path + (method === 'GET' ? ('?op=' + encodeURIComponent(op)) : '');
+      var url = N8N_BASE + path + (method === 'GET' ? ('?' + buildQs()) : '');
       var opts = { method: method, headers: headers };
-      if (method === 'POST') opts.body = JSON.stringify({ op: op, event: 'portal.data' });
+      if (method === 'POST') {
+        opts.body = JSON.stringify(Object.assign({ op: op, resource: op, event: 'portal.data' }, query));
+      }
       var res;
       try { res = await fetch(url, opts); }
       catch (err) { return { ok: false, status: 0, data: { error: 'Network error' } }; }
@@ -112,18 +140,30 @@
       try { data = await res.json(); } catch (_) { data = []; }
       return { ok: res.ok, status: res.status, data: data };
     }
+
     var result = await call('GET');
-    // Some n8n webhooks are POST-only or "respond immediately" on GET — retry POST
     var d = result.data;
-    if (!result.ok || (d && d.message && /workflow was started/i.test(String(d.message))) || (d && d.error)) {
+    if (!result.ok || looksLikeAck(d) || (d && d.error)) {
       var post = await call('POST');
-      if (post.ok && !(post.data && post.data.message && /workflow was started/i.test(String(post.data.message)))) {
+      if (post.ok && !looksLikeAck(post.data)) return post;
+      if (Array.isArray(post.data) || (post.data && (Array.isArray(post.data.leads) || Array.isArray(post.data.rows) || Array.isArray(post.data.audit_log)))) {
         return post;
       }
-      // Prefer POST body if GET only returned ack
-      if (Array.isArray(post.data) || (post.data && Array.isArray(post.data.leads))) return post;
     }
     return result;
+  }
+
+  /** Normalize audit_log / leads / settings payloads into an array when possible. */
+  function asRows(data) {
+    if (Array.isArray(data)) return data;
+    if (!data || typeof data !== 'object') return [];
+    if (Array.isArray(data.audit_log)) return data.audit_log;
+    if (Array.isArray(data.rows)) return data.rows;
+    if (Array.isArray(data.leads)) return data.leads;
+    if (Array.isArray(data.data)) return data.data;
+    if (data.data && Array.isArray(data.data.leads)) return data.data.leads;
+    if (data.data && Array.isArray(data.data.audit_log)) return data.data.audit_log;
+    return [];
   }
 
   global.PS2Api = {
@@ -133,6 +173,7 @@
     n8nWebhook: n8nWebhook,
     toSheetPayload: toSheetPayload,
     portalData: portalData,
+    asRows: asRows,
 
     // ─── READS (n8n Portal Data API) ───
     sheetLeads: function () { return portalData('leads'); },
@@ -140,6 +181,10 @@
     getSettings: function () { return portalData('settings'); },
     listEmails: function () { return portalData('email-log'); },
     portalSettings: function () { return portalData('settings'); },
+    /** Lazy-loaded per lead — do not call on page load / tab switch */
+    auditLog: function (email) {
+      return portalData('audit_log', { email: String(email || '').trim().toLowerCase() });
+    },
 
     // ─── CARD OCR (n8n Claude vision) ───
     /** POST one page/image as { image_base64 } to /webhook/ps2-card-ocr */

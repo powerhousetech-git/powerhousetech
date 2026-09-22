@@ -491,3 +491,67 @@ body {
 .filter-note { align-self: center; }
 .data-table tr.clickable { cursor: pointer; }
 .data-table tr.clickable:hover { background: rgba(212,175,55,.06); }
+
+/* ── Sync bar (cache TTL indicator) ───────────────────── */
+.sync-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin: 0 0 12px; padding: 8px 12px;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+  font-size: 12px; color: var(--muted);
+}
+.sync-bar-label { flex: 1; }
+
+/* ── Meeting time banner in lead detail ───────────────── */
+.meeting-time-banner {
+  margin: 0 0 14px; padding: 10px 14px;
+  background: color-mix(in srgb, #22c55e 14%, var(--surface2));
+  border: 1px solid color-mix(in srgb, #22c55e 40%, var(--border));
+  border-radius: 10px; font-size: 13px; font-weight: 600; color: #86efac;
+}
+
+/* ── Audit activity timeline ──────────────────────────── */
+.audit-section { margin-top: 18px; }
+.audit-timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; }
+.audit-item {
+  display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: start;
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+}
+.audit-item:last-child { border-bottom: none; }
+.audit-icon {
+  width: 28px; height: 28px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; background: var(--surface2); border: 1px solid var(--border);
+}
+.audit-email .audit-icon { border-color: #3b82f6; color: #93c5fd; background: rgba(59,130,246,.12); }
+.audit-reply-pos .audit-icon { border-color: #22c55e; color: #86efac; background: rgba(34,197,94,.12); }
+.audit-reply-neg .audit-icon { border-color: #ef4444; color: #fca5a5; background: rgba(239,68,68,.12); }
+.audit-meeting .audit-icon { border-color: #a855f7; color: #d8b4fe; background: rgba(168,85,247,.12); }
+.audit-status .audit-icon { border-color: #94a3b8; color: #cbd5e1; }
+.audit-top { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; }
+.audit-title { font-size: 13px; font-weight: 600; }
+.audit-time { font-size: 12px; color: var(--muted); }
+.audit-detail { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.45; }
+.audit-tag {
+  font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  padding: 3px 7px; border-radius: 6px; height: fit-content;
+  background: var(--surface2); border: 1px solid var(--border); color: var(--muted); white-space: nowrap;
+}
+.audit-empty code { font-size: 11px; }
+
+/* ── OAuth token health admin ─────────────────────────── */
+.oauth-warn {
+  margin: 0 0 12px; padding: 12px 14px; border-radius: 10px;
+  background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.45);
+  color: #fca5a5; font-size: 13px;
+}
+.oauth-row {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 0; border-bottom: 1px solid var(--border);
+}
+.oauth-row:last-child { border-bottom: none; }
+.oauth-meta { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.oauth-meta span { color: var(--muted); font-size: 12px; }
+.oauth-ago { font-weight: 600; }
+.oauth-ok .oauth-ago { color: var(--green); }
+.oauth-stale .oauth-ago { color: #f87171; }
+.oauth-actions { display: flex; gap: 8px; flex-wrap: wrap; }

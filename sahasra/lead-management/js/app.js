@@ -16,11 +16,16 @@
     excel: { headers: [], rows: [], mapping: {}, filename: '' },
     excelImportStatus: '',
     sheetFetchedAt: null,
+    emailLog: [],
+    emailLogFetchedAt: null,
     ocrExtractedLeads: [],
     uploadRegion: 'IN',
     dashboardBatchFilter: '',
     leadTrackerBatch: '',
   };
+
+  /** Tab-switch lag fix: reuse sheet data for 2 minutes unless Refresh / write. */
+  var CACHE_TTL_MS = 2 * 60 * 1000;
 
   var REGION_LABELS = { IN: 'India', US: 'US' };
   var REGION_BADGE = { IN: 'badge-gray', US: 'badge-blue' };
@@ -101,11 +106,28 @@
       'Batch Triggered At': row['Batch Triggered At'] || row.batch_triggered_at || '',
       region: normalizeRegion(row.Region || row.region || 'IN'),
       Region: normalizeRegion(row.Region || row.region || 'IN'),
+      // Internal Gmail thread fields — mapped, not shown in UI tables
+      thread_id: row['Thread ID'] || row.thread_id || '',
+      last_message_id: row['Last Message ID'] || row.last_message_id || '',
+      // Display in lead detail when set (Calendly / WF-E)
+      meeting_time: row['Meeting Time'] || row.meeting_time || '',
+      meeting_scheduled_at: row['Meeting Time'] || row.meeting_time || row.meeting_scheduled_at || '',
+    };
+  }
+
+  function debounce(fn, ms) {
+    var t;
+    return function () {
+      var ctx = this;
+      var args = arguments;
+      clearTimeout(t);
+      t = setTimeout(function () { fn.apply(ctx, args); }, ms || 300);
     };
   }
 
   async function loadSheetLeads(force) {
-    if (!force && state.leads && state.leads.length && state.sheetFetchedAt && (Date.now() - state.sheetFetchedAt) < 5000) {
+    if (!force && state.leads && state.leads.length && state.sheetFetchedAt &&
+        (Date.now() - state.sheetFetchedAt) < CACHE_TTL_MS) {
       return state.leads;
     }
     var res = await PS2Api.sheetLeads();
@@ -117,22 +139,94 @@
       toast('Could not load lead data — please try again or contact support', true);
       return state.leads || [];
     }
-    var raw = Array.isArray(res.data) ? res.data
+    var raw = PS2Api.asRows ? PS2Api.asRows(res.data) : (Array.isArray(res.data) ? res.data
       : (res.data && Array.isArray(res.data.leads) ? res.data.leads
         : (res.data && res.data.data && Array.isArray(res.data.data.leads) ? res.data.data.leads
-          : (res.data && Array.isArray(res.data.data) ? res.data.data : [])));
+          : (res.data && Array.isArray(res.data.data) ? res.data.data : []))));
     var leads = raw.map(normalizeSheetLead).filter(function(l){ return l.email || l.full_name || l.company; });
     state.leads = leads;
     state.leadsTotal = leads.length;
     state.sheetFetchedAt = Date.now();
+    updateSyncBar();
     return leads;
+  }
+
+  async function loadEmailLog(force) {
+    if (!force && state.emailLog && state.emailLogFetchedAt &&
+        (Date.now() - state.emailLogFetchedAt) < CACHE_TTL_MS) {
+      return state.emailLog;
+    }
+    var res = await PS2Api.listEmails();
+    var list = [];
+    if (res.ok) {
+      list = PS2Api.asRows ? PS2Api.asRows(res.data) : (Array.isArray(res.data) ? res.data
+        : (res.data && Array.isArray(res.data.data) ? res.data.data : []));
+    }
+    state.emailLog = list;
+    state.emailLogFetchedAt = Date.now();
+    return list;
+  }
+
+  /** Lazy: only when opening a lead detail — never on tab switch / page load. */
+  async function loadAuditLogForLead(email) {
+    email = String(email || '').trim().toLowerCase();
+    if (!email) return [];
+    try {
+      var res = await PS2Api.auditLog(email);
+      if (!res.ok) return [];
+      var rows = PS2Api.asRows(res.data);
+      // Guard: until n8n adds audit_log resource, API may return Sheet1 leads
+      if (!PS2Sheet.looksLikeAuditRows(rows)) return [];
+      return rows
+        .map(PS2Sheet.normalizeAuditEvent)
+        .filter(function (e) {
+          return !e.lead_email || e.lead_email === email;
+        })
+        .sort(function (a, b) {
+          return new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime();
+        });
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function syncBarHtml() {
+    var label = 'Not synced yet';
+    if (state.sheetFetchedAt) {
+      var mins = Math.max(0, Math.round((Date.now() - state.sheetFetchedAt) / 60000));
+      label = mins === 0 ? 'Last synced just now' : ('Last synced ' + mins + ' min ago');
+    }
+    return '<div class="sync-bar" role="status">' +
+      '<span class="sync-bar-label">' + esc(label) + '</span>' +
+      '<button type="button" class="btn btn-sm" onclick="window.PS2App.refreshAllData()">Refresh</button>' +
+    '</div>';
+  }
+
+  function updateSyncBar() {
+    var el = document.querySelector('.sync-bar-label');
+    if (!el || !state.sheetFetchedAt) return;
+    var mins = Math.max(0, Math.round((Date.now() - state.sheetFetchedAt) / 60000));
+    el.textContent = mins === 0 ? 'Last synced just now' : ('Last synced ' + mins + ' min ago');
+  }
+
+  async function refreshAllData() {
+    state.sheetFetchedAt = null;
+    state.emailLogFetchedAt = null;
+    toast('Refreshing…');
+    await loadSheetLeads(true);
+    await loadEmailLog(true);
+    toast('Data refreshed');
+    renderView(state.view);
   }
 
   function refreshAfterSheetWrite() {
     state.sheetFetchedAt = null;
+    state.emailLogFetchedAt = null;
     if (state.view === 'pipeline') return renderPipeline();
     if (state.view === 'leads') return renderLeads();
     if (state.view === 'dashboard') return renderDashboard();
+    if (state.view === 'lead-tracker') return renderLeadTracker();
+    if (state.view === 'admin') return renderAdmin();
     if (state.view === 'capture' || state.view === 'sheets') return renderCapture();
   }
 
@@ -154,14 +248,15 @@
     new: 'New', mail_1_sent: 'Mail 1 Sent',
     follow_up_1:'FU 1',follow_up_2:'FU 2',follow_up_3:'FU 3',follow_up_4:'FU 4',follow_up_5:'FU 5',
     follow_up_6:'FU 6',follow_up_7:'FU 7',follow_up_8:'FU 8',follow_up_9:'FU 9',follow_up_10:'FU 10',
-    responded:'Responded', meeting_proposed:'Meeting Proposed', meeting_scheduled:'Meeting', human_takeover:'Human Takeover', converted:'Converted', discarded:'Discarded',
+    responded:'Responded', meeting_proposed:'Meeting Proposed', meeting_scheduled:'Meeting Scheduled',
+    human_takeover:'Human Takeover', converted:'Converted', discarded:'Discarded',
   };
   var STATUS_BADGE = {
     new:'badge-gray', mail_1_sent:'badge-blue',
     follow_up_1:'badge-blue',follow_up_2:'badge-blue',follow_up_3:'badge-blue',
     follow_up_4:'badge-blue',follow_up_5:'badge-blue',follow_up_6:'badge-blue',
     follow_up_7:'badge-blue',follow_up_8:'badge-blue',follow_up_9:'badge-blue',follow_up_10:'badge-blue',
-    responded:'badge-green', meeting_proposed:'badge-purple', meeting_scheduled:'badge-purple',
+    responded:'badge-green', meeting_proposed:'badge-purple', meeting_scheduled:'badge-emerald',
     human_takeover:'badge-orange', converted:'badge-emerald', discarded:'badge-red',
   };
   var STAGE_LABELS = {
@@ -306,8 +401,10 @@
       var roles = el.dataset.role.split(',');
       el.classList.toggle('hidden', !roles.includes(user.role));
     });
-    // pt_admin only sees settings
-    if (user.role === 'pt_admin') { setView('settings'); return; }
+    // Prefetch sheet once — tab switches re-render from 2-min cache
+    try { await loadSheetLeads(true); } catch (_) {}
+    // pt_admin only sees settings / token health
+    if (user.role === 'pt_admin') { setView('admin'); return; }
     var hash = location.hash.replace(/^#\/?/, '') || 'dashboard';
     setView(hash);
   }
@@ -353,6 +450,7 @@
     else if (v === 'tracker') renderTracker();
     else if (v === 'mail-config') renderMailConfig();
     else if (v === 'settings') renderSettings();
+    else if (v === 'admin') renderAdmin();
     else if (v === 'users') renderUsers();
     else if (v === 'outlook') renderOutlook();
     else if (v === 'sheets') {
@@ -368,16 +466,15 @@
   ──────────────────────────────────────────────────────────────────────────── */
   async function renderDashboard() {
     var main = $('main-content');
-    var [leadsAll, emailLogRes] = await Promise.all([loadSheetLeads(true), PS2Api.listEmails()]);
+    // Use cache on tab switch — Refresh button / refreshAllData forces reload
+    var [leadsAll, emailLog] = await Promise.all([loadSheetLeads(false), loadEmailLog(false)]);
     var batchFilter = state.dashboardBatchFilter || '';
     var batchOptions = getUniqueBatches(leadsAll);
     var leads = batchFilter
       ? leadsAll.filter(function(l){ return (l.Batch || l.batch || '') === batchFilter; })
       : leadsAll;
     var s = PS2Sheet.computeKpis(leads);
-    var emailLog = Array.isArray(emailLogRes.data) ? emailLogRes.data
-      : (emailLogRes.data && Array.isArray(emailLogRes.data.data) ? emailLogRes.data.data : []);
-    var activity = emailLog
+    var activity = (emailLog || [])
       .slice()
       .sort(function(a, b) { return new Date(b.timestamp || b.sent_at || b.received_at || b.created_at || 0) - new Date(a.timestamp || a.sent_at || a.received_at || a.created_at || 0); })
       .slice(0, 20)
@@ -395,6 +492,7 @@
     var meetingsCount = s.meetings != null ? s.meetings : ((s.meetings_proposed || 0) + (s.meetings_scheduled || 0) + (s.human_takeover || 0));
     var rateHint = meetingsCount + ' of ' + (s.contacted_leads || 0) + ' emailed';
     main.innerHTML =
+      syncBarHtml() +
       '<div class="page-head"><div><h1 class="page-title">Dashboard</h1><p class="page-sub">KPIs from master Google Sheet · Pipeline funnel · outreach actions</p></div>' +
         '<select id="dashboard-batch-filter" class="form-select" style="min-width:180px">' +
           '<option value="">All Batches</option>' +
@@ -411,9 +509,13 @@
       '</div>' +
       '<div class="kpi-row">' +
         kpi('Meeting conversion', rate, 'gold', rateHint) +
-        kpi('Meetings', meetingsCount, 'purple') +
+        kpi('Meeting Proposed', s.meetings_proposed || 0, 'purple') +
+        kpi('Meeting Scheduled', s.meetings_scheduled || 0, 'green') +
         kpi('Converted', s.converted_leads || 0, 'gold') +
+      '</div>' +
+      '<div class="kpi-row">' +
         kpi('Discarded', s.discarded_leads || 0, '') +
+        kpi('Meetings (all)', meetingsCount, 'purple', 'Proposed + scheduled + takeover') +
       '</div>' +
       (state.user && state.user.role !== 'pt_admin' ? emailAutomationsPanel() : '') +
       '<div style="display:grid;grid-template-columns:1fr 340px;gap:18px">' +
@@ -422,7 +524,7 @@
           '<div style="padding:18px"><div class="funnel">' +
           funnel.map(function(f){
             var w = Math.round((f.count / maxFunnel) * 100);
-            var colors = { new:'#94a3b8', mail_1_sent:'#3b82f6', follow_up:'#0ea5e9', responded:'#22c55e', meeting:'#a855f7', meeting_proposed:'#c084fc', meeting_scheduled:'#a855f7', human_takeover:'#f97316', converted:'#eab308', discarded:'#ef4444' };
+            var colors = { new:'#94a3b8', mail_1_sent:'#3b82f6', follow_up:'#0ea5e9', responded:'#22c55e', meeting:'#a855f7', meeting_proposed:'#c084fc', meeting_scheduled:'#22c55e', human_takeover:'#f97316', converted:'#eab308', discarded:'#ef4444' };
             var barColor = colors[f.key] || 'var(--primary)';
             return '<div class="funnel-row"><span class="funnel-label">' + esc(f.label) + '</span>' +
               '<div class="funnel-bar-wrap"><div class="funnel-bar" style="width:' + w + '%;background:' + barColor + '"></div></div>' +
@@ -1325,7 +1427,6 @@
     var leads = await loadSheetLeads(false);
     var lead = PS2Sheet.findLeadByEmail(leads, key);
     if (!lead) {
-      // try id match (email used as id)
       lead = leads.find(function(l){ return l.id === key || l.email === key; });
     }
     if (!lead) {
@@ -1335,21 +1436,18 @@
     if (!lead) { toast('Lead not found in master sheet', true); return; }
     lead.status = PS2Sheet.normStatus(lead.status);
     state.selectedLead = lead;
-    // Emails may still live in Supabase keyed by legacy UUID — try by email filter if supported
     var emails = [];
     try {
-      var emailsRes = await PS2Api.listEmails();
-      if (emailsRes.ok) {
-        var all = Array.isArray(emailsRes.data) ? emailsRes.data
-          : (emailsRes.data && Array.isArray(emailsRes.data.data) ? emailsRes.data.data : []);
-        var em = String(lead.email || '').toLowerCase();
-        emails = all.filter(function(e){
-          var to = String(e.lead_email || e.to_email || e.from_email || '').toLowerCase();
-          return em && (to === em || (e.lead_id && e.lead_id === lead.id));
-        });
-      }
+      var all = await loadEmailLog(false);
+      var em = String(lead.email || '').toLowerCase();
+      emails = (all || []).filter(function(e){
+        var to = String(e.lead_email || e.to_email || e.from_email || '').toLowerCase();
+        return em && (to === em || (e.lead_id && e.lead_id === lead.id));
+      });
     } catch (_) {}
-    showLeadPanel(lead, emails);
+    // Lazy-load audit log only when opening detail (Change 2C)
+    var auditEvents = await loadAuditLogForLead(lead.email);
+    showLeadPanel(lead, emails, auditEvents);
   }
 
   function closeDetail() {
@@ -1360,7 +1458,64 @@
     return encodeURIComponent(lead.email || lead.id || '');
   }
 
-  function showLeadPanel(lead, emails) {
+  /** Format Meeting Time as IST for lead detail. */
+  function fmtMeetingIst(iso) {
+    if (!iso) return '';
+    try {
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return String(iso);
+      return d.toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: 'numeric', month: 'short', year: 'numeric',
+        hour: 'numeric', minute: '2-digit', hour12: true,
+      }) + ' IST';
+    } catch (_) { return String(iso); }
+  }
+
+  function fmtIstTimeline(ts) {
+    if (!ts) return '—';
+    try {
+      return new Date(ts).toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: 'numeric', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+      });
+    } catch (_) { return fmtDateTime(ts); }
+  }
+
+  var AUDIT_EVENT_META = {
+    email_sent: { label: 'Email sent', cls: 'audit-email', icon: '✉' },
+    reply_received: { label: 'Reply received', cls: 'audit-reply-pos', icon: '📥' },
+    reply_received_negative: { label: 'Negative reply', cls: 'audit-reply-neg', icon: '📥' },
+    meeting_booked: { label: 'Meeting booked', cls: 'audit-meeting', icon: '📅' },
+    status_changed: { label: 'Status changed', cls: 'audit-status', icon: '→' },
+  };
+
+  function auditTimelineHtml(events) {
+    if (!events || !events.length) {
+      return '<p class="audit-empty" style="color:var(--muted);font-size:13px;margin:0">No audit events yet for this lead. Timeline will fill once the Audit Log sheet is wired in Portal Data API (<code>resource=audit_log</code>).</p>';
+    }
+    return '<ul class="audit-timeline">' + events.map(function (ev) {
+      var meta = AUDIT_EVENT_META[ev.event_type] || AUDIT_EVENT_META.status_changed;
+      var detail = ev.details || '';
+      if (!detail && (ev.old_status || ev.new_status)) {
+        detail = (ev.old_status || '—') + ' → ' + (ev.new_status || '—');
+      }
+      return '<li class="audit-item ' + meta.cls + '">' +
+        '<div class="audit-icon" aria-hidden="true">' + meta.icon + '</div>' +
+        '<div class="audit-body">' +
+          '<div class="audit-top">' +
+            '<span class="audit-title">' + esc(meta.label) + '</span>' +
+            '<span class="audit-time">' + esc(fmtIstTimeline(ev.timestamp)) + '</span>' +
+          '</div>' +
+          (detail ? '<div class="audit-detail">' + esc(detail) + '</div>' : '') +
+        '</div>' +
+        (ev.triggered_by ? '<span class="audit-tag">' + esc(ev.triggered_by) + '</span>' : '') +
+      '</li>';
+    }).join('') + '</ul>';
+  }
+
+  function showLeadPanel(lead, emails, auditEvents) {
     closeDetail();
     var locked = state.user && state.user.role === 'pt_admin';
     var sortedEmails = (emails || []).slice().sort(function(a, b){
@@ -1373,6 +1528,9 @@
     var key = leadKey(lead);
     var fu = PS2Sheet.followUpLabel(lead);
     var st = PS2Sheet.normStatus(lead.status);
+    var meetingLine = lead.meeting_time
+      ? '<div class="meeting-time-banner">Meeting: ' + esc(fmtMeetingIst(lead.meeting_time)) + '</div>'
+      : '';
 
     var html =
       '<div class="detail-backdrop" id="detail-backdrop"></div>' +
@@ -1384,6 +1542,7 @@
           '</p></div>' +
           '<button type="button" class="btn btn-sm btn-ghost" id="btn-close-detail">✕ Close</button>' +
         '</div>' +
+        meetingLine +
         (pendingDraft ? draftCard(pendingDraft, lead, sortedEmails) : '') +
         (st === 'meeting_scheduled' ? meetingOutcomeCard(lead) : '') +
         '<div class="detail-cols">' +
@@ -1398,9 +1557,15 @@
           detailField('Last email sent', lead.last_email_sent ? fmtDateTime(lead.last_email_sent) : '—') +
           detailField('Batch triggered', (lead['Batch Triggered At'] || lead.batch_triggered_at) ? fmtDateTime(lead['Batch Triggered At'] || lead.batch_triggered_at) : '—') +
           detailField('Created', lead.created_at || '—') +
+          (lead.meeting_time ? detailField('Meeting', fmtMeetingIst(lead.meeting_time)) : '') +
         '</div>' +
         (lead.notes ? '<div style="margin-top:14px"><label style="font-size:11px;color:var(--muted);text-transform:uppercase">Notes</label><p style="font-size:13px;margin:4px 0">' + esc(lead.notes) + '</p></div>' : '') +
         (lead.website_summary ? '<div style="margin-top:10px"><label style="font-size:11px;color:var(--muted);text-transform:uppercase">Website summary (AI)</label><p style="font-size:13px;margin:4px 0;color:var(--muted)">' + esc(lead.website_summary) + '</p></div>' : '') +
+
+        '<div class="pipeline-history audit-section">' +
+          '<h3>Activity timeline</h3>' +
+          auditTimelineHtml(auditEvents) +
+        '</div>' +
 
         '<div class="pipeline-history">' +
           '<h3>Outreach pipeline</h3>' +
@@ -1588,17 +1753,19 @@
   ──────────────────────────────────────────────────────────────────────────── */
   async function renderPipeline() {
     var main = $('main-content');
-    var leads = await loadSheetLeads(true);
+    var leads = await loadSheetLeads(false);
     if (state.leadsStatus) {
       leads = leads.filter(function(l){
         return PS2Sheet.normStatus(l.status) === state.leadsStatus || PS2Sheet.pipelineBucket(l) === state.leadsStatus;
       });
     }
 
+    // Keep Mail 1 colour system; add Meeting Scheduled as its own stage (Calendly / WF-E)
     var columns = [
       { key: 'new', label: 'NEW' },
       { key: 'mail_1_sent', label: 'MAIL 1 SENT' },
       { key: 'follow_up', label: 'FOLLOW-UP' },
+      { key: 'meeting_scheduled', label: 'MEETING SCHEDULED' },
       { key: 'converted', label: 'CONVERTED' },
     ];
 
@@ -1611,18 +1778,19 @@
     var maxKpiFunnel = Math.max(1, ...kpiFunnel.map(function(f){ return f.count; }));
     var barColors = {
       new:'#94a3b8', mail_1_sent:'#3b82f6', follow_up:'#0ea5e9',
-      responded:'#22c55e', meeting:'#a855f7', meeting_proposed:'#c084fc', meeting_scheduled:'#a855f7',
+      responded:'#22c55e', meeting:'#a855f7', meeting_proposed:'#c084fc', meeting_scheduled:'#22c55e',
       human_takeover:'#f97316', converted:'#eab308', discarded:'#ef4444',
     };
 
     main.innerHTML =
+      syncBarHtml() +
       '<div class="page-head"><div><h1 class="page-title">Pipeline</h1><p class="page-sub">From master Google Sheet · click a card for actions</p></div>' +
-        '<button class="btn btn-sm" onclick="window.PS2App.renderPipeline()">Refresh</button></div>' +
+        '<button class="btn btn-sm" onclick="window.PS2App.refreshAllData()">Refresh</button></div>' +
       '<div class="pipeline-legend" aria-label="Mail 1 card colours">' +
         '<span class="pipeline-legend-item"><i class="tone-swatch tone-pos"></i> Positive reply</span>' +
         '<span class="pipeline-legend-item"><i class="tone-swatch tone-neg"></i> Negative reply</span>' +
         '<span class="pipeline-legend-item"><i class="tone-swatch tone-none"></i> No response</span>' +
-        '<span class="pipeline-legend-note">Follow Up Count includes Mail 1 (1 = Mail 1; 2+ = follow-ups)</span>' +
+        '<span class="pipeline-legend-note">Follow Up Count includes Mail 1 (1 = Mail 1; 2+ = follow-ups). Meeting Proposed stays in Mail 1 (green); Meeting Scheduled is its own column.</span>' +
       '</div>' +
       '<div class="tabs"><button class="tab active" onclick="this.parentElement.querySelectorAll(\'.tab\').forEach(t=>t.classList.remove(\'active\')); this.classList.add(\'active\'); document.getElementById(\'pipeline-kanban\').classList.remove(\'hidden\'); document.getElementById(\'pipeline-funnel\').classList.add(\'hidden\')">Kanban</button>' +
       '<button class="tab" onclick="this.parentElement.querySelectorAll(\'.tab\').forEach(t=>t.classList.remove(\'active\')); this.classList.add(\'active\'); document.getElementById(\'pipeline-kanban\').classList.add(\'hidden\'); document.getElementById(\'pipeline-funnel\').classList.remove(\'hidden\')">Funnel</button></div>' +
@@ -1637,10 +1805,12 @@
                 var key = encodeURIComponent(l.email || l.id);
                 var tone = col.key === 'mail_1_sent' ? PS2Sheet.mail1CardTone(l) : '';
                 var toneClass = tone ? ' tone-' + tone : '';
+                if (col.key === 'meeting_scheduled') toneClass = ' tone-pos';
                 return '<div class="kanban-card' + toneClass + '" role="button" tabindex="0" onclick="window.PS2App.openLead(decodeURIComponent(\'' + key + '\'))">' +
                   '<div class="card-name">' + esc(l.full_name || '—') + '</div>' +
                   '<div class="card-company">' + esc(l.company || '') + '</div>' +
                   (fu ? '<div class="card-val">' + esc(fu) + '</div>' : '') +
+                  (l.meeting_time ? '<div class="card-val" style="color:var(--green)">' + esc(fmtMeetingIst(l.meeting_time)) + '</div>' : '') +
                   '</div>';
               }).join('') +
               (colLeads.length === 0 ? '<p style="color:var(--muted);font-size:12px;text-align:center;margin:8px 0">Empty</p>' : '') +
@@ -1701,7 +1871,7 @@
   async function renderLeadTracker() {
     var main = $('main-content');
     main.innerHTML = '<p style="color:var(--muted);padding:20px">Loading leads…</p>';
-    var leads = await loadSheetLeads(true);
+    var leads = await loadSheetLeads(false);
     var pre = (leads || []).filter(function(l){
       return PS2Sheet.normStatus(l.status) !== 'converted';
     });
@@ -1718,14 +1888,13 @@
     var stFilter = state.leadTrackerStatus || '';
     var batchFilter = state.leadTrackerBatch || '';
     var batchOptions = getUniqueBatches(all);
-    // Drop legacy status keys (responded / meeting / discarded) — pipeline buckets only
-    if (stFilter && stFilter !== 'new' && stFilter !== 'mail_1_sent' && stFilter !== 'follow_up') {
+    // Drop legacy status keys — pipeline buckets + meeting_scheduled
+    if (stFilter && stFilter !== 'new' && stFilter !== 'mail_1_sent' && stFilter !== 'follow_up' && stFilter !== 'meeting_scheduled') {
       stFilter = '';
       state.leadTrackerStatus = '';
     }
     var rows = all.filter(function(l){
-      // Same buckets as Pipeline: New / Mail 1 / Follow-up
-      // Mail 1 includes positive/negative replies (meeting_*, discarded, responded)
+      // Same buckets as Pipeline: New / Mail 1 / Follow-up / Meeting Scheduled
       if (stFilter && PS2Sheet.pipelineBucket(l) !== stFilter) return false;
       if (batchFilter && (l.Batch || l.batch || '') !== batchFilter) return false;
       if (!q) return true;
@@ -1743,12 +1912,14 @@
       { key: 'new', label: 'New' },
       { key: 'mail_1_sent', label: 'Mail 1' },
       { key: 'follow_up', label: 'Follow-up' },
+      { key: 'meeting_scheduled', label: 'Meeting Scheduled' },
     ];
 
     main.innerHTML =
+      syncBarHtml() +
       '<div class="page-head"><div><h1 class="page-title">Lead Tracker</h1>' +
         '<p class="page-sub">Pre-conversion clients · click a row for full history, replies, and actions</p></div>' +
-        '<button class="btn btn-sm" type="button" onclick="window.PS2App.renderLeadTracker()">Refresh</button></div>' +
+        '<button class="btn btn-sm" type="button" onclick="window.PS2App.refreshAllData()">Refresh</button></div>' +
       '<div class="filter-bar">' +
         '<input id="lt-search" placeholder="Search name, email, company…" value="' + esc(state.leadTrackerFilter || '') + '" />' +
         '<select id="lt-status">' +
@@ -1786,18 +1957,18 @@
         '</tr>';
       }).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:28px">No pre-conversion leads match this filter</td></tr>') +
       '</tbody></table></div>' +
-      '<p style="font-size:12px;color:var(--muted);margin-top:10px">Mail 1 filter includes replies (positive/negative). FU Count: 1 = Mail 1; 2+ = follow-ups. Converted clients move to <a href="#tracker">Client Tracker</a>.</p>';
+      '<p style="font-size:12px;color:var(--muted);margin-top:10px">Mail 1 filter includes replies (positive/negative). Meeting Scheduled is Calendly-confirmed. FU Count: 1 = Mail 1; 2+ = follow-ups. Converted clients move to <a href="#tracker">Client Tracker</a>.</p>';
 
     var search = $('lt-search');
     var sel = $('lt-status');
     var batchSel = $('lt-batch');
     if (search) {
-      search.addEventListener('input', function(){
+      search.addEventListener('input', debounce(function(){
         state.leadTrackerFilter = this.value;
         paintLeadTracker();
         var el = $('lt-search');
         if (el) { el.focus(); var n = el.value.length; el.setSelectionRange(n, n); }
-      });
+      }, 300));
     }
     if (sel) {
       sel.addEventListener('change', function(){
@@ -1941,6 +2112,125 @@
         '<button class="btn btn-primary" onclick="window.PS2App.saveSettings()">Save prompts</button>' +
         '<div id="settings-msg" style="margin-top:10px;font-size:13px;color:var(--green)"></div>' +
       '</div>';
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     ADMIN — OAuth token renewal health (Change 4)
+  ──────────────────────────────────────────────────────────────────────────── */
+  var OAUTH_CREDS = {
+    sheets: {
+      label: 'Google Sheets OAuth',
+      localKey: 'ps2_sheets_renewed',
+      settingsKey: 'last_sheets_renewal',
+      url: 'https://shreyas-sinha.app.n8n.cloud/credentials/mT4lTWzELZGoit9c',
+    },
+    gmail: {
+      label: 'Gmail OAuth',
+      localKey: 'ps2_gmail_renewed',
+      settingsKey: 'last_gmail_renewal',
+      url: 'https://shreyas-sinha.app.n8n.cloud/credentials/X55VTutzb5YNfCDC',
+    },
+  };
+  var OAUTH_WARN_DAYS = 55;
+
+  function readLocalRenewal(key) {
+    try { return localStorage.getItem(key) || ''; } catch (_) { return ''; }
+  }
+  function writeLocalRenewal(key, iso) {
+    try { localStorage.setItem(key, iso); } catch (_) {}
+  }
+
+  function daysSince(iso) {
+    if (!iso) return null;
+    var t = new Date(iso).getTime();
+    if (isNaN(t)) return null;
+    return Math.floor((Date.now() - t) / 86400000);
+  }
+
+  async function loadSettingsMap() {
+    var res = await PS2Api.getSettings();
+    var raw = PS2Api.asRows ? PS2Api.asRows(res.data) : (Array.isArray(res.data) ? res.data
+      : (res.data && Array.isArray(res.data.data) ? res.data.data : []));
+    var s = {};
+    if (raw.length) {
+      raw.forEach(function (row) {
+        if (row.key) s[row.key] = row.value != null ? row.value : '';
+      });
+    } else if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+      s = res.data.data || res.data || {};
+    }
+    return s;
+  }
+
+  async function renderAdmin() {
+    var main = $('main-content');
+    main.innerHTML = syncBarHtml() + '<p style="color:var(--muted);padding:20px">Loading token health…</p>';
+    var settings = {};
+    try { settings = await loadSettingsMap(); } catch (_) {}
+
+    var rows = ['sheets', 'gmail'].map(function (id) {
+      var c = OAUTH_CREDS[id];
+      var iso = readLocalRenewal(c.localKey) || settings[c.settingsKey] || '';
+      var days = daysSince(iso);
+      var warn = days != null && days >= OAUTH_WARN_DAYS;
+      var stale = !iso || warn;
+      return {
+        id: id,
+        label: c.label,
+        url: c.url,
+        iso: iso,
+        days: days,
+        warn: warn,
+        stale: stale,
+      };
+    });
+
+    var banners = rows.filter(function (r) { return r.warn || !r.iso; }).map(function (r) {
+      var msg = !r.iso
+        ? (r.label + ' has no renewal date on record. Renew now to avoid workflow failures.')
+        : (r.label + ' token may be expired (' + r.days + ' days ago). Renew now to avoid workflow failures.');
+      return '<div class="oauth-warn">' + esc(msg) + '</div>';
+    }).join('');
+
+    main.innerHTML =
+      syncBarHtml() +
+      '<div class="page-head"><div><h1 class="page-title">Token Health</h1>' +
+        '<p class="page-sub">Renew n8n OAuth credentials every ~2 months without opening the full n8n editor</p></div></div>' +
+      banners +
+      '<div class="settings-card"><h3>OAuth credentials</h3>' +
+        rows.map(function (r) {
+          var ago = r.days == null ? 'never' : (r.days + ' day' + (r.days === 1 ? '' : 's') + ' ago');
+          var when = r.iso ? fmtDateTime(r.iso) : '—';
+          var statusCls = r.warn || !r.iso ? 'oauth-stale' : 'oauth-ok';
+          return '<div class="oauth-row ' + statusCls + '">' +
+            '<div class="oauth-meta">' +
+              '<strong>' + esc(r.label) + '</strong>' +
+              '<span>Last renewed: ' + esc(when) + '</span>' +
+              '<span class="oauth-ago">' + esc(ago) + '</span>' +
+            '</div>' +
+            '<div class="oauth-actions">' +
+              '<a class="btn btn-sm btn-primary" href="' + esc(r.url) + '" target="_blank" rel="noopener">Renew</a>' +
+              '<button type="button" class="btn btn-sm" onclick="window.PS2App.markOAuthRenewed(\'' + r.id + '\')">Mark as Renewed</button>' +
+            '</div></div>';
+        }).join('') +
+      '</div>' +
+      '<p style="font-size:12px;color:var(--muted)">Renew opens the n8n credential page in a new tab. After you finish re-auth, click <strong>Mark as Renewed</strong> to save the timestamp (localStorage + Settings sheet).</p>';
+  }
+
+  async function markOAuthRenewed(id) {
+    var c = OAUTH_CREDS[id];
+    if (!c) return;
+    var iso = new Date().toISOString();
+    writeLocalRenewal(c.localKey, iso);
+    try {
+      var body = { op: 'settings-update' };
+      body[c.settingsKey] = iso;
+      body.key = c.settingsKey;
+      body.value = iso;
+      await PS2Api.patchPortalSettings(body);
+    } catch (_) {}
+    toast(c.label + ' marked as renewed');
+    renderAdmin();
   }
 
   function healthRow(label, ok) {
@@ -2644,6 +2934,8 @@
     closeDetail: closeDetail,
     refreshSheetEmbed: refreshSheetEmbed,
     renderPipeline: renderPipeline, renderLeads: renderLeads,
+    refreshAllData: refreshAllData,
+    renderAdmin: renderAdmin, markOAuthRenewed: markOAuthRenewed,
     openLeadUpload: openLeadUpload, submitLeadUpload: submitLeadUpload,
     editLeadWebsite: editLeadWebsite, saveLeadWebsite: saveLeadWebsite,
     openLead: openLead, renderLeadTracker: renderLeadTracker, openProject: openProject, advanceStage: advanceStage,

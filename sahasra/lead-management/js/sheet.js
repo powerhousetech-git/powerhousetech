@@ -36,6 +36,8 @@
 
   function isRealFollowUp(lead) {
     var st = normStatus(lead && lead.status);
+    // Booked / converted / discarded are their own stages — not Follow-up
+    if (st === 'meeting_scheduled' || st === 'converted' || st === 'discarded') return false;
     if (FOLLOW_UP_STATUSES.indexOf(st) >= 0) return true;
     // Count ≥ 2 means at least one follow-up after Mail 1
     return followUpTouchCount(lead) >= 2;
@@ -43,6 +45,8 @@
 
   function followUpLabel(lead) {
     var st = normStatus(lead && lead.status);
+    if (st === 'meeting_scheduled') return 'Meeting scheduled';
+    if (st === 'converted' || st === 'discarded') return '';
     var m = st.match(/^follow_up_(\d+)$/);
     if (m) return 'Follow-up ' + m[1] + '/5';
     var n = followUpTouchCount(lead);
@@ -56,7 +60,7 @@
   function mail1CardTone(lead) {
     var st = normStatus(lead && lead.status);
     if (st === 'discarded') return 'neg';
-    if (st === 'meeting_proposed' || st === 'meeting_scheduled' || st === 'human_takeover' ||
+    if (st === 'meeting_proposed' || st === 'human_takeover' ||
         st === 'responded' || st === 'converted') {
       return 'pos';
     }
@@ -69,10 +73,12 @@
 
     if (status === 'new' || !status) return 'new';
     if (status === 'converted') return 'converted';
+    // Calendly-confirmed booking — own column (distinct from Meeting Proposed)
+    if (status === 'meeting_scheduled') return 'meeting_scheduled';
     // Real follow-ups only (status follow_up_* OR Follow Up Count ≥ 2)
     if (isRealFollowUp(lead || { status: status })) return 'follow_up';
-    // Mail 1 cohort: first-touch emailed leads (incl. positive/negative replies)
-    // Status may be mail_1_sent, responded, meeting_*, discarded, etc.
+    // Mail 1 cohort: first-touch emailed leads (incl. positive/negative replies,
+    // meeting_proposed). Colour-coded on the board.
     return 'mail_1_sent';
   }
 
@@ -109,13 +115,14 @@
     // Meeting conversion = share of contacted leads that reached meeting proposed/finalized
     var rate = contacted ? Math.round((meetingsTotal / contacted) * 1000) / 10 : 0;
     var newCount = leads.filter(function (l) { return pipelineBucket(l) === 'new'; }).length;
-    // Funnel bars use the SAME definitions as dashboard KPI cards (not exclusive pipeline buckets)
+    // Funnel includes Meeting Proposed + Meeting Scheduled as separate stages
     var funnel = [
       { key: 'new', label: 'New', count: newCount },
       { key: 'mail_1_sent', label: 'Emailed', count: mail1 },
       { key: 'follow_up', label: 'Follow-ups', count: fus },
       { key: 'responded', label: 'Responses', count: responded },
-      { key: 'meeting', label: 'Meetings', count: meetingsTotal },
+      { key: 'meeting_proposed', label: 'Meeting Proposed', count: meetingProposed },
+      { key: 'meeting_scheduled', label: 'Meeting Scheduled', count: meetings },
       { key: 'converted', label: 'Converted', count: converted },
       { key: 'discarded', label: 'Discarded', count: discarded },
     ];
@@ -147,6 +154,29 @@
     return null;
   }
 
+  /** Detect whether a portal-data payload looks like Audit Log rows (not Sheet1 leads). */
+  function looksLikeAuditRows(rows) {
+    if (!rows || !rows.length) return false;
+    var r = rows[0] || {};
+    return !!(r.event_type || r['event_type'] || r.Event || r['Event Type'] ||
+      r.old_status || r['Old Status'] || r.new_status || r['New Status'] ||
+      r.triggered_by || r['Triggered By'] || r.lead_email || r['Lead Email']);
+  }
+
+  function normalizeAuditEvent(row) {
+    row = row || {};
+    return {
+      timestamp: row.timestamp || row.Timestamp || row['Created At'] || '',
+      lead_email: String(row.lead_email || row['Lead Email'] || row.Email || '').toLowerCase().trim(),
+      lead_name: row.lead_name || row['Lead Name'] || row.Name || '',
+      event_type: String(row.event_type || row['Event Type'] || row.Event || 'status_changed').toLowerCase().trim().replace(/\s+/g, '_'),
+      old_status: row.old_status || row['Old Status'] || '',
+      new_status: row.new_status || row['New Status'] || '',
+      details: row.details || row.Details || row.detail || '',
+      triggered_by: row.triggered_by || row['Triggered By'] || row.Source || '',
+    };
+  }
+
   global.PS2Sheet = {
     FOLLOW_UP_STATUSES: FOLLOW_UP_STATUSES,
     normStatus: normStatus,
@@ -157,5 +187,7 @@
     pipelineBucket: pipelineBucket,
     computeKpis: computeKpis,
     findLeadByEmail: findLeadByEmail,
+    looksLikeAuditRows: looksLikeAuditRows,
+    normalizeAuditEvent: normalizeAuditEvent,
   };
 })(window);
