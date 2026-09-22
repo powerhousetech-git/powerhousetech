@@ -30,7 +30,7 @@
   var CACHE_TTL_MS = 2 * 60 * 1000;
 
   var REGION_LABELS = { IN: 'India', US: 'US' };
-  var REGION_BADGE = { IN: 'badge-gray', US: 'badge-blue' };
+  var REGION_BADGE = { IN: 'badge-navy', US: 'badge-sky' };
 
   function generateBatchNumber() {
     var now = new Date();
@@ -48,7 +48,7 @@
 
   function regionBadge(r) {
     r = normalizeRegion(r);
-    return '<span class="badge ' + (REGION_BADGE[r] || 'badge-gray') + '">' + esc(REGION_LABELS[r] || r) + '</span>';
+    return '<span class="badge ' + (REGION_BADGE[r] || 'badge-slate') + '">' + esc(REGION_LABELS[r] || r) + '</span>';
   }
 
   function getUniqueBatches(leads) {
@@ -247,19 +247,28 @@
 
   /* ─ Status / badge helpers ───────────────────────────────────────────────── */
   var STATUS_LABELS = {
-    new: 'New', mail_1_sent: 'Mail 1 Sent',
+    new: 'New', mail_1_sent: 'Mail 1 Sent', follow_up: 'Follow-up',
     follow_up_1:'FU 1',follow_up_2:'FU 2',follow_up_3:'FU 3',follow_up_4:'FU 4',follow_up_5:'FU 5',
     follow_up_6:'FU 6',follow_up_7:'FU 7',follow_up_8:'FU 8',follow_up_9:'FU 9',follow_up_10:'FU 10',
-    responded:'Responded', meeting_proposed:'Meeting Proposed', meeting_scheduled:'Meeting Scheduled',
+    responded:'Responded', meeting_proposed:'Meeting Proposed', meeting:'Meeting',
+    meeting_scheduled:'Meeting Scheduled',
     human_takeover:'Human Takeover', converted:'Converted', discarded:'Discarded',
   };
+  /* Distinct colours per stage — every tracker/pipeline tag is tinted (never bare text). */
   var STATUS_BADGE = {
-    new:'badge-gray', mail_1_sent:'badge-blue',
-    follow_up_1:'badge-blue',follow_up_2:'badge-blue',follow_up_3:'badge-blue',
-    follow_up_4:'badge-blue',follow_up_5:'badge-blue',follow_up_6:'badge-blue',
-    follow_up_7:'badge-blue',follow_up_8:'badge-blue',follow_up_9:'badge-blue',follow_up_10:'badge-blue',
-    responded:'badge-green', meeting_proposed:'badge-purple', meeting_scheduled:'badge-emerald',
-    human_takeover:'badge-orange', converted:'badge-emerald', discarded:'badge-red',
+    new: 'badge-slate',
+    mail_1_sent: 'badge-blue',
+    follow_up: 'badge-sky',
+    follow_up_1: 'badge-sky', follow_up_2: 'badge-sky', follow_up_3: 'badge-sky',
+    follow_up_4: 'badge-sky', follow_up_5: 'badge-sky', follow_up_6: 'badge-sky',
+    follow_up_7: 'badge-sky', follow_up_8: 'badge-sky', follow_up_9: 'badge-sky', follow_up_10: 'badge-sky',
+    responded: 'badge-green',
+    meeting_proposed: 'badge-purple',
+    meeting: 'badge-emerald',
+    meeting_scheduled: 'badge-emerald',
+    human_takeover: 'badge-orange',
+    converted: 'badge-gold',
+    discarded: 'badge-red',
   };
   var STAGE_LABELS = {
     enquiry_received:'Enquiry', bid_submitted:'Bid Submitted', order_won:'Order Won',
@@ -270,10 +279,39 @@
   var SENT_STATUSES = ['mail_1_sent','follow_up_1','follow_up_2','follow_up_3','follow_up_4','follow_up_5','follow_up_6','follow_up_7','follow_up_8','follow_up_9','follow_up_10'];
 
   function statusBadge(s) {
-    return '<span class="badge ' + (STATUS_BADGE[s] || 'badge-gray') + '">' + esc(STATUS_LABELS[s] || s) + '</span>';
+    var st = (typeof PS2Sheet !== 'undefined' && PS2Sheet.normStatus) ? PS2Sheet.normStatus(s) : String(s || 'new');
+    var cls = STATUS_BADGE[st];
+    if (!cls && /^follow_up_/.test(st)) cls = 'badge-sky';
+    if (!cls && typeof PS2Sheet !== 'undefined' && PS2Sheet.pipelineBucket) {
+      cls = STATUS_BADGE[PS2Sheet.pipelineBucket({ status: st })] || 'badge-blue';
+    }
+    if (!cls) cls = 'badge-blue';
+    var label = STATUS_LABELS[st] || String(st || 'new').replace(/_/g, ' ');
+    return '<span class="badge ' + cls + '">' + esc(label) + '</span>';
+  }
+  function fuCountBadge(lead) {
+    var n = Number(lead && lead.follow_up_count);
+    if (isNaN(n) || n <= 0) {
+      var lab = (typeof PS2Sheet !== 'undefined' && PS2Sheet.followUpLabel) ? PS2Sheet.followUpLabel(lead) : '';
+      if (!lab) return '<span class="badge badge-slate">—</span>';
+      if (/^Mail 1/i.test(lab)) return '<span class="badge badge-blue">' + esc(lab) + '</span>';
+      if (/Follow-up|FU/i.test(lab)) return '<span class="badge badge-sky">' + esc(lab) + '</span>';
+      if (/Meeting/i.test(lab)) return '<span class="badge badge-emerald">' + esc(lab) + '</span>';
+      if (/Human/i.test(lab)) return '<span class="badge badge-orange">' + esc(lab) + '</span>';
+      return '<span class="badge badge-slate">' + esc(lab) + '</span>';
+    }
+    if (n === 1) return '<span class="badge badge-blue">1 · Mail 1</span>';
+    return '<span class="badge badge-sky">' + n + ' · FU</span>';
   }
   function stageBadge(s) {
-    var cls = s === 'completed' ? 'badge-emerald' : s === 'on_hold' ? 'badge-red' : s === 'production' ? 'badge-gold' : 'badge-blue';
+    var cls = s === 'completed' ? 'badge-emerald'
+      : s === 'on_hold' ? 'badge-red'
+      : s === 'production' ? 'badge-gold'
+      : s === 'quality_check' ? 'badge-purple'
+      : s === 'delivery' ? 'badge-sky'
+      : s === 'order_won' ? 'badge-green'
+      : s === 'bid_submitted' ? 'badge-blue'
+      : 'badge-slate';
     return '<span class="badge ' + cls + '">' + esc(STAGE_LABELS[s] || s) + '</span>';
   }
   function sentimentBadge(s) {
@@ -603,10 +641,10 @@
             var colors = {
               new: 'var(--muted)',
               mail_1_sent: 'var(--primary)',
-              follow_up: 'var(--accent)',
+              follow_up: 'var(--sky)',
               responded: 'var(--green)',
               meeting: 'var(--accent)',
-              meeting_proposed: 'var(--accent)',
+              meeting_proposed: 'var(--purple)',
               meeting_scheduled: 'var(--green)',
               human_takeover: 'var(--orange)',
               converted: 'var(--gold)',
@@ -1786,7 +1824,7 @@
               '<span style="color:' + dirColor + ';font-weight:600">' + dir + '</span>' +
               (e.sequence_step != null && e.sequence_step !== '' ? '<span>' + esc(sequenceLabel(e.sequence_step)) + '</span>' : '') +
               sentimentBadge(e.sentiment) +
-              '<span class="badge ' + (e.status==='sent'?'badge-green':e.status==='pending_review'?'badge-gold':'badge-gray') + '">' + e.status + '</span>' +
+              '<span class="badge ' + (e.status==='sent'?'badge-green':e.status==='pending_review'?'badge-gold':e.status==='failed'?'badge-red':'badge-slate') + '">' + esc(e.status || 'unknown') + '</span>' +
               '<span>' + fmtDateTime(e.sent_at || e.received_at || e.created_at) + '</span></div>' +
               '<div class="email-subject">' + esc(e.subject || '(no subject)') + '</div>' +
               '<div class="email-body">' + esc((e.body||'').slice(0,240)) + ((e.body||'').length>240?'…':'') + '</div></div>';
@@ -1971,10 +2009,10 @@
     var barColors = {
       new: 'var(--muted)',
       mail_1_sent: 'var(--primary)',
-      follow_up: 'var(--accent)',
+      follow_up: 'var(--sky)',
       responded: 'var(--green)',
       meeting: 'var(--accent)',
-      meeting_proposed: 'var(--accent)',
+      meeting_proposed: 'var(--purple)',
       meeting_scheduled: 'var(--green)',
       human_takeover: 'var(--orange)',
       converted: 'var(--gold)',
@@ -2164,7 +2202,6 @@
       (rows.length ? rows.map(function(l){
         var st = PS2Sheet.normStatus(l.status);
         var key = encodeURIComponent(l.email || l.id || '');
-        var fu = l.follow_up_count != null ? l.follow_up_count : (PS2Sheet.followUpLabel(l) || '—');
         return '<tr class="clickable" onclick="window.PS2App.openLead(decodeURIComponent(\'' + key + '\'))">' +
           '<td><strong>' + esc(l.full_name || '—') + '</strong>' +
             (l.designation ? '<div style="font-size:11px;color:var(--muted)">' + esc(l.designation) + '</div>' : '') + '</td>' +
@@ -2173,7 +2210,7 @@
           '<td>' + statusBadge(st) + '</td>' +
           '<td style="font-size:12px;font-family:ui-monospace,monospace">' + esc(l.Batch || l.batch || '—') + '</td>' +
           '<td>' + regionBadge(l.region || l.Region) + '</td>' +
-          '<td>' + esc(String(fu)) + '</td>' +
+          '<td>' + fuCountBadge(l) + '</td>' +
           '<td style="font-size:12px;color:var(--muted)">' + esc(l.last_email_sent ? fmtDateTime(l.last_email_sent) : '—') + '</td>' +
           '<td style="font-size:12px">' + esc(l.source || '—') + '</td>' +
         '</tr>';
@@ -2487,7 +2524,7 @@
         users.map(function(u){
           return '<tr><td>' + esc(u.username) + '</td><td>' + esc(u.full_name||'') + '</td><td>' + esc(u.role) + '</td>' +
             '<td>' + esc(u.outlook_account||'—') + '</td>' +
-            '<td>' + (u.is_active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-gray">Inactive</span>') + '</td>' +
+            '<td>' + (u.is_active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-slate">Inactive</span>') + '</td>' +
             '<td><button class="btn-icon btn-danger" onclick="window.PS2App.deactivateUser(\'' + u.id + '\')">Remove</button></td></tr>';
         }).join('') +
       '</tbody></table></div>';
@@ -2507,7 +2544,7 @@
       '<div class="panel"><table class="data-table"><thead><tr><th>User</th><th>Email</th><th>Status</th></tr></thead><tbody>' +
         accounts.map(function(a){
           return '<tr><td>' + esc(a.display_name||'') + '</td><td>' + esc(a.email||'') + '</td>' +
-            '<td><span class="badge ' + (a.is_connected?'badge-green':'badge-gray') + '">' + (a.is_connected?'Connected':'Disconnected') + '</span></td></tr>';
+            '<td><span class="badge ' + (a.is_connected?'badge-green':'badge-slate') + '">' + (a.is_connected?'Connected':'Disconnected') + '</span></td></tr>';
         }).join('') +
       (accounts.length===0?'<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:24px">No accounts configured</td></tr>':'') +
       '</tbody></table></div>' +
