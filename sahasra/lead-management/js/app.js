@@ -1764,7 +1764,7 @@
     closeDetail();
     var locked = state.user && state.user.role === 'pt_admin';
     var sortedEmails = (emails || []).slice().sort(function(a, b){
-      return new Date(a.sent_at || a.received_at || a.created_at) - new Date(b.sent_at || b.received_at || b.created_at);
+      return new Date(emailTimestamp(a) || 0) - new Date(emailTimestamp(b) || 0);
     });
     var pendingDraft = sortedEmails.find(function(e){ return e.is_ai_draft && e.status === 'pending_review' && e.direction === 'outbound'; });
     var websiteHtml = lead.website
@@ -1837,10 +1837,10 @@
             var dirColor = e.direction === 'inbound' ? 'var(--green)' : 'var(--gold)';
             return '<div class="email-item"><div class="email-meta">' +
               '<span style="color:' + dirColor + ';font-weight:600">' + dir + '</span>' +
-              (e.sequence_step != null && e.sequence_step !== '' ? '<span>' + esc(sequenceLabel(e.sequence_step)) + '</span>' : '') +
+              (e.sequence_step != null && e.sequence_step !== '' ? '<span>' + esc(sequenceLabel(emailSequenceStep(e))) + '</span>' : '') +
               sentimentBadge(e.sentiment) +
               '<span class="badge ' + (e.status==='sent'?'badge-green':e.status==='pending_review'?'badge-gold':e.status==='failed'?'badge-red':'badge-slate') + '">' + esc(e.status || 'unknown') + '</span>' +
-              '<span>' + fmtDateTime(e.sent_at || e.received_at || e.created_at) + '</span></div>' +
+              '<span>' + fmtDateTime(emailTimestamp(e)) + '</span></div>' +
               '<div class="email-subject">' + esc(e.subject || '(no subject)') + '</div>' +
               '<div class="email-body">' + esc((e.body||'').slice(0,240)) + ((e.body||'').length>240?'…':'') + '</div></div>';
           }).join('') +
@@ -1862,67 +1862,134 @@
   function fmtDateTime(ts) {
     if (!ts) return '—';
     try {
-      return new Date(ts).toLocaleString('en-IN', {
+      var d = new Date(ts);
+      if (isNaN(d.getTime())) return String(ts);
+      return d.toLocaleString('en-IN', {
         day: '2-digit', month: 'short', year: 'numeric',
-        hour: '2-digit', minute: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: true,
       });
     } catch (_) { return String(ts); }
   }
 
+  /** Best-effort timestamp from email-log / sheet-shaped rows. */
+  function emailTimestamp(e) {
+    if (!e || typeof e !== 'object') return '';
+    return e.timestamp || e.Timestamp || e.sent_at || e['Sent At'] || e.sentAt ||
+      e.received_at || e['Received At'] || e.created_at || e['Created At'] ||
+      e.date || e.Date || e.time || e.Time || '';
+  }
+
+  function emailSequenceStep(e) {
+    var raw = e && (e.sequence_step != null && e.sequence_step !== ''
+      ? e.sequence_step
+      : (e['Sequence Step'] != null ? e['Sequence Step'] : e.step));
+    var n = Number(raw);
+    return isNaN(n) || n < 1 ? 1 : n;
+  }
+
   function isOutboundSent(e) {
-    if (!e || e.direction !== 'outbound') return false;
-    if (e.status === 'sent') return true;
-    if (e.sent_at && e.status !== 'rejected' && e.status !== 'pending_review' && e.status !== 'draft') return true;
+    if (!e) return false;
+    var dir = String(e.direction || e.Direction || '').toLowerCase();
+    if (dir && dir !== 'outbound' && dir !== 'out') return false;
+    if (!dir && String(e.status || '').toLowerCase() === 'pending_review') return false;
+    var st = String(e.status || e.Status || '').toLowerCase();
+    if (st === 'rejected' || st === 'pending_review' || st === 'draft' || st === 'failed') return false;
+    if (st === 'sent') return true;
+    if (emailTimestamp(e) && (dir === 'outbound' || dir === 'out' || !dir)) return true;
     return false;
   }
 
   function pipelineHistoryHtml(lead, emails) {
     var events = [];
     events.push({
-      t: lead.created_at,
+      t: lead.created_at || lead['Created At'] || '',
       title: 'Lead created',
       detail: 'Source: ' + (lead.source || '—'),
       kind: 'created',
     });
 
-    (emails || []).filter(isOutboundSent).forEach(function(e){
+    var seenSteps = {};
+    var sheetCount = Number(lead.follow_up_count);
+    if (isNaN(sheetCount) || sheetCount < 0) sheetCount = 0;
+    var lastSent = lead.last_email_sent || lead['Last Email Sent'] || '';
+    var triggered = lead.batch_triggered_at || lead['Batch Triggered At'] || '';
+
+    (emails || []).filter(isOutboundSent).forEach(function (e) {
+      var step = emailSequenceStep(e);
+      var t = emailTimestamp(e);
+      // Backfill from sheet when the log row has subject/status but no clock time
+      if (!t && step === sheetCount && lastSent) t = lastSent;
+      if (!t && step === 1 && triggered) t = triggered;
+      seenSteps[step] = true;
       events.push({
-        t: e.sent_at || e.created_at,
-        title: sequenceLabel(e.sequence_step != null ? e.sequence_step : 1) + ' sent',
-        detail: e.subject || '',
+        t: t,
+        title: sequenceLabel(step) + ' sent',
+        detail: e.subject || e.Subject || '',
         kind: 'sent',
       });
     });
 
-    (emails || []).filter(function(e){ return e.direction === 'inbound'; })
-      .forEach(function(e){
+    // Ensure every Mail 1 / follow-up implied by Follow Up Count appears with a time
+    if (sheetCount > 0) {
+      for (var step = 1; step <= sheetCount; step++) {
+        if (seenSteps[step]) continue;
+        var t = '';
+        if (step === 1 && triggered) t = triggered;
+        if (step === sheetCount && lastSent) t = lastSent;
         events.push({
-          t: e.received_at || e.created_at,
-          title: 'Reply received',
-          detail: (e.sentiment ? 'Sentiment: ' + e.sentiment + '. ' : '') + (e.subject || ''),
-          kind: 'reply',
+          t: t,
+          title: sequenceLabel(step) + ' sent',
+          detail: t ? '' : 'Recorded on master sheet',
+          kind: 'sent',
         });
-      });
+        seenSteps[step] = true;
+      }
+    }
 
-    if (lead.meeting_scheduled_at) {
+    (emails || []).filter(function (e) {
+      var dir = String(e.direction || e.Direction || '').toLowerCase();
+      return dir === 'inbound' || dir === 'in';
+    }).forEach(function (e) {
       events.push({
-        t: lead.meeting_scheduled_at,
+        t: emailTimestamp(e),
+        title: 'Reply received',
+        detail: (e.sentiment ? 'Sentiment: ' + e.sentiment + '. ' : '') + (e.subject || e.Subject || ''),
+        kind: 'reply',
+      });
+    });
+
+    if (lead.meeting_scheduled_at || lead.meeting_time) {
+      events.push({
+        t: lead.meeting_scheduled_at || lead.meeting_time,
         title: 'Meeting scheduled',
-        detail: fmtDateTime(lead.meeting_scheduled_at),
+        detail: lead.meeting_time ? fmtMeetingIst(lead.meeting_time) : fmtDateTime(lead.meeting_scheduled_at),
         kind: 'meeting',
       });
     }
-    if (lead.status === 'converted') {
-      events.push({ t: lead.updated_at || lead.last_activity_at, title: 'Converted', detail: 'Moved to client tracker', kind: 'converted' });
+    if (lead.status === 'converted' || PS2Sheet.normStatus(lead.status) === 'converted') {
+      events.push({
+        t: lead.updated_at || lead.last_activity_at || lastSent,
+        title: 'Converted',
+        detail: 'Moved to client tracker',
+        kind: 'converted',
+      });
     }
-    if (lead.status === 'discarded') {
-      events.push({ t: lead.updated_at || lead.last_activity_at, title: 'Discarded', detail: '', kind: 'discarded' });
+    if (lead.status === 'discarded' || PS2Sheet.normStatus(lead.status) === 'discarded') {
+      events.push({
+        t: lead.updated_at || lead.last_activity_at || lastSent,
+        title: 'Discarded',
+        detail: '',
+        kind: 'discarded',
+      });
     }
 
-    events.sort(function(a, b){
-      var ta = a.t ? new Date(a.t).getTime() : 0;
-      var tb = b.t ? new Date(b.t).getTime() : 0;
-      return ta - tb;
+    events.sort(function (a, b) {
+      var ta = a.t ? new Date(a.t).getTime() : NaN;
+      var tb = b.t ? new Date(b.t).getTime() : NaN;
+      if (isNaN(ta) && isNaN(tb)) return 0;
+      if (isNaN(ta)) return 1;  // undated after dated
+      if (isNaN(tb)) return -1;
+      return ta - tb; // oldest → newest (pipeline order)
     });
 
     return '<ul class="pipe-list">' + events.map(pipeItem).join('') + '</ul>';
@@ -1933,7 +2000,7 @@
       '<div class="pipe-dot"></div>' +
       '<div><div class="pipe-title">' + esc(ev.title) + '</div>' +
       (ev.detail ? '<div class="pipe-detail">' + esc(ev.detail) + '</div>' : '') +
-      '<div class="pipe-time">' + fmtDateTime(ev.t) + '</div></div></li>';
+      '<div class="pipe-time">' + esc(fmtDateTime(ev.t)) + '</div></div></li>';
   }
 
   function meetingOutcomeCard(lead) {
