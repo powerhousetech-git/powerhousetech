@@ -537,7 +537,24 @@ body {
 }
 
 /* Lead Tracker (pre-conversion) */
-.lead-tracker-panel { overflow: auto; }
+.lead-tracker-panel {
+  overflow: hidden; /* clip to rounded panel; scroll lives on inner wrapper */
+}
+.lead-tracker-scroll {
+  overflow: auto;
+  max-height: min(70vh, calc(100vh - 220px));
+  -webkit-overflow-scrolling: touch;
+}
+.lead-tracker-scroll .data-table {
+  min-width: 920px;
+}
+.lead-tracker-scroll .data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface);
+  box-shadow: 0 1px 0 var(--border);
+}
 .lead-tracker-panel .data-table td { vertical-align: top; }
 .filter-note { align-self: center; }
 .data-table tr.clickable { cursor: pointer; }

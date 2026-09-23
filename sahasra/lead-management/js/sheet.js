@@ -76,6 +76,7 @@
 
     if (status === 'new' || !status) return 'new';
     if (status === 'converted') return 'converted';
+    if (status === 'discarded') return 'discarded';
     // Calendly booked OR human takeover after meeting interest → Meeting column
     if (status === 'meeting_scheduled' || status === 'human_takeover') return 'meeting_scheduled';
     // Real follow-ups only (status follow_up_* OR Follow Up Count ≥ 2)
@@ -85,10 +86,25 @@
     return 'mail_1_sent';
   }
 
+  /** True if lead is on / went through the meeting path (counts toward Meetings KPI). */
+  function wentThroughMeeting(lead) {
+    var st = normStatus(lead && lead.status);
+    if (st === 'meeting_proposed' || st === 'meeting_scheduled' || st === 'human_takeover') return true;
+    // Converted after a meeting still counts as a meeting outcome
+    if (st === 'converted') {
+      var mt = (lead && (lead.meeting_time || lead['Meeting Time'] || lead.meeting_scheduled_at)) || '';
+      if (mt) return true;
+      // Sahasra funnel: convert follows meeting interest — count all converted
+      return true;
+    }
+    return false;
+  }
+
   function computeKpis(leads) {
     leads = leads || [];
     var total = leads.length;
     var mail1 = 0, fus = 0, responded = 0, meetings = 0, meetingProposed = 0, humanTakeover = 0, converted = 0, discarded = 0, contacted = 0;
+    var convertedViaMeeting = 0;
     // Positive/neutral replies only (exclude discarded negatives)
     var repliedForRate = 0;
     var REPLY_POSITIVE = {
@@ -111,11 +127,15 @@
       if (st === 'meeting_proposed') meetingProposed++;
       if (st === 'meeting_scheduled') meetings++;
       if (st === 'human_takeover') humanTakeover++;
-      if (st === 'converted') converted++;
+      if (st === 'converted') {
+        converted++;
+        if (wentThroughMeeting(l)) convertedViaMeeting++;
+      }
       if (st === 'discarded') discarded++;
     });
-    // Meetings = proposed + scheduled + human takeover (active meeting path)
-    var meetingsAll = meetingProposed + meetings + humanTakeover;
+    // Meetings = proposed + scheduled + takeover + converted that went through meeting
+    // (converted still also count under Converted — dual count by design)
+    var meetingsAll = meetingProposed + meetings + humanTakeover + convertedViaMeeting;
     var rate = repliedForRate
       ? Math.round((meetingsAll / repliedForRate) * 1000) / 10
       : null;
@@ -152,6 +172,7 @@
       meetings: meetingsAll,
       meetings_all: meetingsAll,
       human_takeover: humanTakeover,
+      converted_via_meeting: convertedViaMeeting,
       converted_leads: converted,
       discarded_leads: discarded,
       contacted_leads: contacted,
@@ -203,6 +224,7 @@
     followUpLabel: followUpLabel,
     mail1CardTone: mail1CardTone,
     pipelineBucket: pipelineBucket,
+    wentThroughMeeting: wentThroughMeeting,
     computeKpis: computeKpis,
     findLeadByEmail: findLeadByEmail,
     looksLikeAuditRows: looksLikeAuditRows,

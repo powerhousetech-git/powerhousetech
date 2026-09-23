@@ -591,13 +591,14 @@
     var funnelDrop = s.funnel_drop || s.funnel || [];
     var maxFunnel = Math.max(1, ...funnelDrop.map(function(f){ return f.count; }));
 
-    var meetingsCount = s.meetings_all != null ? s.meetings_all : ((s.meetings_proposed || 0) + (s.meetings_scheduled || 0) + (s.human_takeover || 0));
+    var meetingsCount = s.meetings_all != null ? s.meetings_all : ((s.meetings_proposed || 0) + (s.meetings_scheduled || 0) + (s.human_takeover || 0) + (s.converted_via_meeting || 0));
     var rate = s.meeting_conversion_rate == null ? '—' : (s.meeting_conversion_rate + '%');
     var meetHintParts = [];
     if (s.meetings_proposed) meetHintParts.push(s.meetings_proposed + ' proposed');
     if (s.meetings_scheduled) meetHintParts.push(s.meetings_scheduled + ' scheduled');
     if (s.human_takeover) meetHintParts.push(s.human_takeover + ' takeover');
-    var meetHint = meetHintParts.length ? meetHintParts.join(' · ') : 'Proposed + scheduled + takeover';
+    if (s.converted_via_meeting) meetHintParts.push(s.converted_via_meeting + ' converted');
+    var meetHint = meetHintParts.length ? meetHintParts.join(' · ') : 'Proposed + scheduled + takeover + converted';
     var rateHint = (s.replied_for_rate || 0) === 0
       ? 'No replies yet'
       : (meetingsCount + ' of ' + (s.replied_for_rate || 0) + ' replies');
@@ -2079,6 +2080,7 @@
       { key: 'follow_up', label: 'FOLLOW-UP' },
       { key: 'meeting_scheduled', label: 'MEETING' },
       { key: 'converted', label: 'CONVERTED' },
+      { key: 'discarded', label: 'DISCARDED' },
     ];
 
     function leadsForCol(col) {
@@ -2193,10 +2195,8 @@
     var main = $('main-content');
     main.innerHTML = '<p style="color:var(--muted);padding:20px">Loading leads…</p>';
     var [leads, emailLog] = await Promise.all([loadSheetLeads(false), loadEmailLog(false)]);
-    // Keep converted leads visible; still hide discarded from the default list
-    var list = (leads || []).filter(function (l) {
-      return PS2Sheet.normStatus(l.status) !== 'discarded';
-    });
+    // Show all statuses including converted + discarded
+    var list = leads || [];
     // Prefetch hot-reply emails for attention filter
     if (state.leadTrackerAttention === 'hot_replies') {
       var att = buildNeedsAttention(list, emailLog);
@@ -2217,8 +2217,8 @@
     var stFilter = state.leadTrackerStatus || '';
     var batchFilter = state.leadTrackerBatch || '';
     var batchOptions = getUniqueBatches(all);
-    // Allowed filters: pipeline buckets + converted
-    var allowed = { new: 1, mail_1_sent: 1, follow_up: 1, meeting_scheduled: 1, converted: 1 };
+    // Allowed filters: pipeline buckets + converted + discarded
+    var allowed = { new: 1, mail_1_sent: 1, follow_up: 1, meeting_scheduled: 1, converted: 1, discarded: 1 };
     if (stFilter && !allowed[stFilter]) {
       stFilter = '';
       state.leadTrackerStatus = '';
@@ -2253,12 +2253,13 @@
       { key: 'follow_up', label: 'Follow-up' },
       { key: 'meeting_scheduled', label: 'Meeting' },
       { key: 'converted', label: 'Converted' },
+      { key: 'discarded', label: 'Discarded' },
     ];
 
     main.innerHTML =
       syncBarHtml() +
       '<div class="page-head"><div><h1 class="page-title">Lead Tracker</h1>' +
-        '<p class="page-sub">All leads including converted · click a row for full history, replies, and actions</p></div>' +
+        '<p class="page-sub">All leads including converted &amp; discarded · click a row for full history, replies, and actions</p></div>' +
         '<button class="btn btn-sm" type="button" onclick="window.PS2App.refreshAllData()">Refresh</button></div>' +
       '<div class="filter-bar">' +
         '<input id="lt-search" placeholder="Search name, email, company…" value="' + esc(state.leadTrackerFilter || '') + '" />' +
@@ -2282,7 +2283,7 @@
           (state.leadTrackerAttention === 'overdue' ? ' · no response 3+ days' : '') +
         '</span>' +
       '</div>' +
-      '<div class="panel lead-tracker-panel"><table class="data-table"><thead><tr>' +
+      '<div class="panel lead-tracker-panel"><div class="lead-tracker-scroll"><table class="data-table"><thead><tr>' +
         '<th>Name</th><th>Company</th><th>Email</th><th>Status</th><th>Batch</th><th>Region</th><th title="Follow Up Count includes Mail 1 (1 = Mail 1; 2+ = follow-ups)">FU Count</th><th>Last email</th><th>Source</th>' +
       '</tr></thead><tbody>' +
       (rows.length ? rows.map(function(l){
@@ -2301,8 +2302,8 @@
           '<td style="font-size:12px">' + esc(l.source || '—') + '</td>' +
         '</tr>';
       }).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:28px">No leads match this filter</td></tr>') +
-      '</tbody></table></div>' +
-      '<p style="font-size:12px;color:var(--muted);margin-top:10px">Mail 1 filter includes replies (positive/negative). Meeting Scheduled is Calendly-confirmed. FU Count: 1 = Mail 1; 2+ = follow-ups. Converted leads stay listed here (filter: Converted).</p>';
+      '</tbody></table></div></div>' +
+      '<p style="font-size:12px;color:var(--muted);margin-top:10px">Mail 1 filter includes replies (positive/negative). Meeting Scheduled is Calendly-confirmed. FU Count: 1 = Mail 1; 2+ = follow-ups. Use status filter for Converted or Discarded.</p>';
 
     var search = $('lt-search');
     var sel = $('lt-status');
