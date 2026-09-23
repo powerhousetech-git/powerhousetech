@@ -148,9 +148,58 @@
     var leads = raw.map(normalizeSheetLead).filter(function(l){ return l.email || l.full_name || l.company; });
     state.leads = leads;
     state.leadsTotal = leads.length;
+    // Tracker / pipeline / dashboard share this same array
+    state.leadTrackerList = leads;
     state.sheetFetchedAt = Date.now();
     updateSyncBar();
     return leads;
+  }
+
+  /** Single source of truth: master sheet rows loaded by loadSheetLeads. */
+  function getMasterLeads() {
+    return state.leads || [];
+  }
+
+  function masterLeadCount() {
+    return getMasterLeads().length;
+  }
+
+  /** Optional view filters — never mutates master list. */
+  function filterMasterLeads(opts) {
+    opts = opts || {};
+    var batchFilter = opts.batch || '';
+    var dateRange = opts.dateRange || 'all';
+    var statusBucket = opts.statusBucket || '';
+    var q = String(opts.search || '').trim().toLowerCase();
+
+    function leadCreatedMs(l) {
+      var raw = l.created_at || l['Created At'] || l['Start Date'] || l['Date Added'] || '';
+      var t = raw ? new Date(raw).getTime() : NaN;
+      return isNaN(t) ? 0 : t;
+    }
+    function inDateRange(l) {
+      if (dateRange === 'all') return true;
+      var t = leadCreatedMs(l);
+      if (!t) return true;
+      var now = Date.now();
+      if (dateRange === '7d') return (now - t) <= 7 * 86400000;
+      if (dateRange === 'month') {
+        var d = new Date();
+        return t >= new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+      }
+      return true;
+    }
+
+    return getMasterLeads().filter(function (l) {
+      if (batchFilter && (l.Batch || l.batch || '') !== batchFilter) return false;
+      if (!inDateRange(l)) return false;
+      if (statusBucket && PS2Sheet.pipelineBucket(l) !== statusBucket) return false;
+      if (q) {
+        var blob = [l.full_name, l.email, l.company, l.phone, l.designation, l.source, l.Batch || l.batch, l.region, l.status].join(' ').toLowerCase();
+        if (blob.indexOf(q) < 0) return false;
+      }
+      return true;
+    });
   }
 
   async function loadEmailLog(force) {
@@ -524,30 +573,9 @@
     var batchFilter = state.dashboardBatchFilter || '';
     var dateRange = state.dashboardDateRange || 'all';
     var batchOptions = getUniqueBatches(leadsAll);
+    var masterCount = leadsAll.length;
 
-    function leadCreatedMs(l) {
-      var raw = l.created_at || l['Created At'] || l['Start Date'] || l['Date Added'] || '';
-      var t = raw ? new Date(raw).getTime() : NaN;
-      return isNaN(t) ? 0 : t;
-    }
-    function inDateRange(l) {
-      if (dateRange === 'all') return true;
-      var t = leadCreatedMs(l);
-      if (!t) return true; // keep undated leads visible rather than hide
-      var now = Date.now();
-      if (dateRange === '7d') return (now - t) <= 7 * 86400000;
-      if (dateRange === 'month') {
-        var d = new Date();
-        var start = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
-        return t >= start;
-      }
-      return true;
-    }
-
-    var leads = leadsAll.filter(function (l) {
-      if (batchFilter && (l.Batch || l.batch || '') !== batchFilter) return false;
-      return inDateRange(l);
-    });
+    var leads = filterMasterLeads({ batch: batchFilter, dateRange: dateRange });
 
     // Activity also filtered by lead created / event time when date range active
     function activityInRange(ts) {
@@ -634,7 +662,7 @@
           '</div>' +
         '</div></div>' +
       '<div class="kpi-row">' +
-        kpi('Total Leads', s.total_leads || 0, '') +
+        kpi('Total Leads', s.total_leads || 0, '', leads.length === masterCount ? 'Master sheet' : ('of ' + masterCount + ' in sheet')) +
         kpi('Emailed', s.mail_1_sent || 0, 'blue') +
         kpi('Follow-up Emails Sent', s.follow_ups_sent || 0, '', 'After Mail 1') +
         kpi('Responses', s.responses || 0, 'green', 'Excludes discarded') +
@@ -2068,9 +2096,9 @@
     var main = $('main-content');
     var leads = await loadSheetLeads(false);
     if (state.leadsStatus) {
-      leads = leads.filter(function(l){
-        return PS2Sheet.normStatus(l.status) === state.leadsStatus || PS2Sheet.pipelineBucket(l) === state.leadsStatus;
-      });
+      leads = filterMasterLeads({ statusBucket: state.leadsStatus });
+    } else {
+      leads = getMasterLeads();
     }
 
     // Keep Mail 1 colour system; add Meeting Scheduled as its own stage (Calendly / WF-E)
@@ -2195,8 +2223,8 @@
     var main = $('main-content');
     main.innerHTML = '<p style="color:var(--muted);padding:20px">Loading leads…</p>';
     var [leads, emailLog] = await Promise.all([loadSheetLeads(false), loadEmailLog(false)]);
-    // Show all statuses including converted + discarded
-    var list = leads || [];
+    // Same master list as Dashboard Total Leads (no status exclusions)
+    var list = leads || getMasterLeads();
     // Prefetch hot-reply emails for attention filter
     if (state.leadTrackerAttention === 'hot_replies') {
       var att = buildNeedsAttention(list, emailLog);
@@ -2212,7 +2240,9 @@
 
   function paintLeadTracker(enter) {
     var main = $('main-content');
-    var all = state.leadTrackerList || [];
+    // Always re-bind to master sheet list so counts stay in sync with dashboard
+    var all = getMasterLeads();
+    state.leadTrackerList = all;
     var q = String(state.leadTrackerFilter || '').trim().toLowerCase();
     var stFilter = state.leadTrackerStatus || '';
     var batchFilter = state.leadTrackerBatch || '';
@@ -2223,9 +2253,11 @@
       stFilter = '';
       state.leadTrackerStatus = '';
     }
-    var rows = all.filter(function(l){
-      if (stFilter && PS2Sheet.pipelineBucket(l) !== stFilter) return false;
-      if (batchFilter && (l.Batch || l.batch || '') !== batchFilter) return false;
+    var rows = filterMasterLeads({
+      batch: batchFilter,
+      statusBucket: stFilter,
+      search: q,
+    }).filter(function (l) {
       // Needs Attention deep-link from dashboard
       if (state.leadTrackerAttention === 'hot_replies') {
         var attHot = (state._attentionEmailsHot || {});
@@ -2236,9 +2268,7 @@
         var last = l.last_email_sent ? new Date(l.last_email_sent).getTime() : 0;
         if (!last || (Date.now() - last) < 3 * 86400000) return false;
       }
-      if (!q) return true;
-      var blob = [l.full_name, l.email, l.company, l.phone, l.designation, l.source, l.Batch || l.batch, l.region].join(' ').toLowerCase();
-      return blob.indexOf(q) >= 0;
+      return true;
     });
     rows = rows.slice().sort(function(a, b){
       var ta = new Date(a.last_email_sent || a.updated_at || a.created_at || 0).getTime();
@@ -2256,10 +2286,12 @@
       { key: 'discarded', label: 'Discarded' },
     ];
 
+    var masterCount = masterLeadCount();
+
     main.innerHTML =
       syncBarHtml() +
       '<div class="page-head"><div><h1 class="page-title">Lead Tracker</h1>' +
-        '<p class="page-sub">All leads including converted &amp; discarded · click a row for full history, replies, and actions</p></div>' +
+        '<p class="page-sub">Same master sheet as Dashboard (' + masterCount + ' leads) · click a row for full history</p></div>' +
         '<button class="btn btn-sm" type="button" onclick="window.PS2App.refreshAllData()">Refresh</button></div>' +
       '<div class="filter-bar">' +
         '<input id="lt-search" placeholder="Search name, email, company…" value="' + esc(state.leadTrackerFilter || '') + '" />' +
@@ -2278,7 +2310,7 @@
         (state.leadTrackerAttention
           ? '<button type="button" class="btn btn-sm" onclick="window.PS2App.clearAttentionFilter()">Clear attention filter</button>'
           : '') +
-        '<span class="filter-note" style="font-size:13px;color:var(--muted)">' + rows.length + ' of ' + all.length + ' leads' +
+        '<span class="filter-note" style="font-size:13px;color:var(--muted)">' + rows.length + ' of ' + masterCount + ' leads' +
           (state.leadTrackerAttention === 'hot_replies' ? ' · drafts pending review' : '') +
           (state.leadTrackerAttention === 'overdue' ? ' · no response 3+ days' : '') +
         '</span>' +
@@ -2303,7 +2335,7 @@
         '</tr>';
       }).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:28px">No leads match this filter</td></tr>') +
       '</tbody></table></div></div>' +
-      '<p style="font-size:12px;color:var(--muted);margin-top:10px">Mail 1 filter includes replies (positive/negative). Meeting Scheduled is Calendly-confirmed. FU Count: 1 = Mail 1; 2+ = follow-ups. Use status filter for Converted or Discarded.</p>';
+      '<p style="font-size:12px;color:var(--muted);margin-top:10px">Counts match Dashboard Total Leads from the same master sheet load. Filter Converted / Discarded without hiding them from the sheet total.</p>';
 
     var search = $('lt-search');
     var sel = $('lt-status');
