@@ -24,3 +24,6 @@ README.md
 medspa-dashboard/node_modules
 medspa-dashboard/.next
 medspa-dashboard/out
+
+# Outreach analytics dashboard source (published build lives at /outreach-dashboard)
+outreach-analytics

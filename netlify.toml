@@ -43,6 +43,19 @@
   to = "/harshul/index.html"
   status = 200
 
+# PowerhouseTech Outreach Analytics dashboard (standalone Vite app; separate
+# from PS2 Lead Management and from the n8n workflows). Built static output is
+# committed under /outreach-dashboard (source lives in /outreach-analytics).
+[[redirects]]
+  from = "/outreach-dashboard"
+  to = "/outreach-dashboard/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/outreach-dashboard/"
+  to = "/outreach-dashboard/index.html"
+  status = 200
+
 # PS2 lead management entry page on the static website.
 # The interactive Next.js app itself should be deployed to a server host
 # (for example Railway) and then proxied here as /ps2/*.
