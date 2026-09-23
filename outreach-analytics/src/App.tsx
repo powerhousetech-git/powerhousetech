@@ -16,6 +16,8 @@ import type { CampaignSelection, Lead } from './types';
 
 const CAMPAIGNS: CampaignSelection[] = ['Both', 'India', 'US'];
 
+const isMockMode = import.meta.env.VITE_USE_MOCK_DATA === 'true';
+
 export default function App() {
   const { data, loading, error, configError, lastFetched, refresh } =
     useSheetData();
@@ -83,9 +85,16 @@ export default function App() {
               ☰
             </button>
             <div className="mr-auto">
-              <h1 className="text-lg font-semibold text-white">
-                Outreach Analytics
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-semibold text-white">
+                  Outreach Analytics
+                </h1>
+                {isMockMode && (
+                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300 ring-1 ring-amber-500/30">
+                    Sample data
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate-500">
                 Last refreshed: {formatRefreshed(lastFetched)}
               </p>

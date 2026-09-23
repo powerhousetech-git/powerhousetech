@@ -134,6 +134,46 @@ npm run build
 npm run preview
 ```
 
+## Deploying on the PowerhouseTech site (`/outreach-dashboard`)
+
+This app is published as committed static assets on the main Netlify site, served
+at **`/outreach-dashboard/`** (source stays in `outreach-analytics/`, built output
+is committed to `outreach-dashboard/` at the repo root — mirroring the medspa
+dashboard convention). A helper script does the build + publish:
+
+```bash
+# from the repo root — builds in SAMPLE-DATA mode (safe, no secrets):
+scripts/build-outreach-analytics.sh
+```
+
+Then commit the regenerated `outreach-dashboard/` folder. Netlify redirects for
+the route live in `netlify.toml`, and the raw source folder is excluded from the
+CDN upload via `.netlifyignore`.
+
+> **Why sample-data mode for the committed build?** Vite inlines `VITE_*` env
+> vars at build time. Committing a build made with a real
+> `VITE_GOOGLE_SERVICE_ACCOUNT_JSON` would publish the service-account **private
+> key** into a public static bundle — a credential leak. So the committed public
+> build uses the built-in sample dataset and shows a "Sample data" badge.
+
+### Going live with real data (securely)
+
+Because the key must never be shipped to the browser on a public site, use one of:
+
+- **Private host / access-gated deploy** — build with real env vars on an
+  internal host that is not publicly reachable:
+
+  ```bash
+  VITE_USE_MOCK_DATA=false \
+  VITE_SPREADSHEET_ID=... \
+  VITE_GOOGLE_SERVICE_ACCOUNT_JSON=... \
+  scripts/build-outreach-analytics.sh
+  ```
+
+- **Backend proxy (recommended for public)** — move the fetch in
+  `src/lib/sheetsClient.ts` into a small serverless function that holds the key
+  server-side and returns only data; point the frontend at that endpoint.
+
 ## ⚠️ Security note (please read)
 
 This app signs a Google JWT **in the browser** using the service account's
