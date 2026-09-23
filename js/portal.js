@@ -12,7 +12,6 @@
   const userAvatar = document.getElementById('user-avatar');
   const userEmail = document.getElementById('user-email');
   const greetName = document.getElementById('greet-name');
-  const adminLink = document.getElementById('admin-link');
 
   let handledUid = null;
   let bootDone = false;
@@ -69,7 +68,6 @@
     authView?.classList.remove('hidden');
     signOutBtn?.classList.add('hidden');
     userChip?.classList.remove('show');
-    adminLink?.classList.add('hidden');
   }
 
   async function afterSignIn(user, opts) {
@@ -92,9 +90,8 @@
 
     gate().writeUser(user);
 
-    let session = null;
     if (opts.record !== false) {
-      session = await gate().recordSession(opts.eventType || 'sign_in', '/portal', {
+      await gate().recordSession(opts.eventType || 'sign_in', '/portal', {
         display_name: user.displayName || '',
       });
     }
@@ -103,22 +100,9 @@
     const qReturn = params.get('returnTo');
     if (qReturn) gate().setReturnTo(qReturn);
 
-    const me = session || (await gate().fetchAdminMe());
-    const isAdmin = Boolean(me && me.is_admin);
-
-    if (adminLink) {
-      adminLink.classList.toggle('hidden', !isAdmin);
-    }
-
     const stored = gate().peekReturnTo();
     const hasExplicitReturn =
       stored && stored !== '/portal' && stored !== '/portal/';
-
-    // Fresh Google popup: admins land on /admin unless they had a returnTo.
-    if (isAdmin && !hasExplicitReturn && opts.preferAdmin) {
-      window.location.replace('/admin');
-      return;
-    }
 
     if (hasExplicitReturn && opts.followReturn) {
       const dest = gate().consumeReturnTo('/portal');

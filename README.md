@@ -8,8 +8,7 @@ Static HTML/CSS/JS published via Netlify (`netlify.toml` → publish `.`).
 
 - Marketing: `index.html`, `services.html`, `industries.html`, `about.html`, `contact.html`
 - **Client portal (post sign-in home):** `/portal`
-- **Admin:** `/admin` — `shreyas@powerhousetech.in` (Supabase `is_admin`)
-- **Outreach portal (admin-only):** `portal/` — Node API + dashboard for n8n contact sequences (`npm start` → `http://localhost:3000`). Linked from Admin → Outreach portal.
+- **Outreach portal (admin-only):** `portal/` — Node API + dashboard for n8n contact sequences (`npm start` → `http://localhost:3000`). Reachable directly at `/outreach` (Google admin sign-in).
 - **Demos:** `/sample-automations` — AI Sales Outreach, Card Capture, Invoice Radar samples
 - Live Invoice Radar: `/app/invoice-radar`
 - Sample demos: `/demo/ai-sales-outreach`, `/demo/card-capture`, `/invoice-dashboard/`

@@ -173,16 +173,6 @@
   to = "/portal.html"
   status = 200
 
-[[redirects]]
-  from = "/admin"
-  to = "/admin.html"
-  status = 200
-
-[[redirects]]
-  from = "/admin/"
-  to = "/admin.html"
-  status = 200
-
 # Outreach portal dashboard (admin Google sign-in; API on Supabase)
 [[redirects]]
   from = "/outreach"

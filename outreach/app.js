@@ -361,7 +361,6 @@
         <p class="nav-settings-note muted">Cadence &amp; templates now live per-industry — see Controls for global defaults.</p>
         <div id="admin-email" class="muted">${esc(email || '')}</div>
         <button type="button" id="admin-signout" style="margin-top:8px;width:100%">Sign out</button>
-        <a class="btn" href="/admin" style="margin-top:8px;width:100%;justify-content:center">← Admin</a>
       </div>
     `;
 
