@@ -12,6 +12,10 @@
   const userAvatar = document.getElementById('user-avatar');
   const userEmail = document.getElementById('user-email');
   const greetName = document.getElementById('greet-name');
+  // Admin-only entry point to the Outreach Command Center (shown after an
+  // admin such as shreyas@powerhousetech.in signs in). The old /admin console
+  // has been removed; the Command Center replaces it.
+  const commandCenterLink = document.getElementById('command-center-link');
 
   let handledUid = null;
   let bootDone = false;
@@ -68,6 +72,7 @@
     authView?.classList.remove('hidden');
     signOutBtn?.classList.add('hidden');
     userChip?.classList.remove('show');
+    commandCenterLink?.classList.add('hidden');
   }
 
   async function afterSignIn(user, opts) {
@@ -94,6 +99,16 @@
       await gate().recordSession(opts.eventType || 'sign_in', '/portal', {
         display_name: user.displayName || '',
       });
+    }
+
+    // Reveal the Command Center link only for admins (e.g. shreyas).
+    if (commandCenterLink) {
+      try {
+        const me = await gate().fetchAdminMe();
+        commandCenterLink.classList.toggle('hidden', !(me && me.is_admin));
+      } catch {
+        commandCenterLink.classList.add('hidden');
+      }
     }
 
     const params = new URLSearchParams(window.location.search);
