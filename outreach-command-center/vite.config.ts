@@ -1,32 +1,21 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Outreach Command Center — fully client-side (no app backend).
-// Published under /command-center/ on the static site in production.
-// In dev we proxy n8n API calls through /n8n-api to avoid browser CORS issues.
-export default defineConfig(({ command, mode }) => {
+// Outreach Command Center — client app. All Google/n8n calls go through the
+// serverless functions in /api (see api/*.ts), so no proxy config is needed.
+//
+// Two build targets:
+//  - Vercel (primary): default base "/" and outDir "dist".
+//  - Netlify sample preview: BASE_PATH=/command-center/ OUT_DIR=../command-center
+//    with VITE_USE_MOCK_DATA=true (see scripts/build-outreach-command-center.sh).
+export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
-  const n8nBase =
-    env.VITE_N8N_BASE_URL?.trim() || 'https://shreyas-sinha.app.n8n.cloud';
-
   return {
     plugins: [react()],
-    base: command === 'build' ? '/command-center/' : '/',
-    server: {
-      port: 5181,
-      proxy: {
-        // Dev-only proxy: /n8n-api/* -> {n8nBase}/api/v1/*
-        '/n8n-api': {
-          target: n8nBase,
-          changeOrigin: true,
-          secure: true,
-          rewrite: (path) => path.replace(/^\/n8n-api/, '/api/v1'),
-        },
-      },
-    },
+    base: env.BASE_PATH || '/',
+    server: { port: 5181 },
     build: {
-      // Publish built assets into a committed, Netlify-served folder at repo root.
-      outDir: '../command-center',
+      outDir: env.OUT_DIR || 'dist',
       emptyOutDir: true,
     },
   };

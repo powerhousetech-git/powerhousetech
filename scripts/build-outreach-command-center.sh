@@ -20,8 +20,11 @@ else
   npm install
 fi
 
-echo "→ Building static site (base=/command-center/)…"
-VITE_USE_MOCK_DATA="${VITE_USE_MOCK_DATA:-true}" npm run build
+echo "→ Building static site (base=/command-center/, sample-data mode)…"
+BASE_PATH="/command-center/" \
+OUT_DIR="../command-center" \
+VITE_USE_MOCK_DATA="${VITE_USE_MOCK_DATA:-true}" \
+npm run build
 
 echo "→ Published to $ROOT/command-center"
 ls -la "$ROOT/command-center" | head -20

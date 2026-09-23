@@ -1,35 +1,17 @@
 /**
- * n8n public REST API (v1) client. Only reads status/executions and triggers
- * runs / (de)activation — it never edits workflow logic.
+ * n8n access — through the server-side proxy (`/api/n8n`). The API key stays in
+ * the serverless function's env. The client sends the sub-path (after
+ * `/api/v1/`), including any query string, URL-encoded in `path`.
  *
- * NOTE ON CORS: n8n Cloud does not send permissive CORS headers, so calling the
- * API directly from a browser on a different origin is blocked. In dev we go
- * through the Vite proxy (`/n8n-api`). In production you need a same-origin
- * proxy (serverless function) that forwards to n8n and injects the API key.
- * See README.
+ * Only reads status/executions and triggers runs / (de)activation — never edits
+ * workflow logic.
  */
 
 import type { Execution, ExecutionStatus, WorkflowStatus } from '../types';
-import { loadN8nConfig, type N8nConfig } from './config';
+import { apiFetch } from './apiClient';
 
-export class N8nApiError extends Error {}
-
-function headers(cfg: N8nConfig): HeadersInit {
-  return {
-    'X-N8N-API-KEY': cfg.apiKey,
-    Accept: 'application/json',
-  };
-}
-
-async function handle<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    if (res.status === 401) {
-      throw new N8nApiError('n8n auth failed (401). Check VITE_N8N_API_KEY.');
-    }
-    throw new N8nApiError(`n8n API error (${res.status}). ${detail}`.trim());
-  }
-  return (await res.json()) as T;
+function n8nUrl(subPath: string): string {
+  return `/api/n8n?path=${encodeURIComponent(subPath)}`;
 }
 
 function normalizeStatus(raw: unknown): ExecutionStatus {
@@ -37,21 +19,15 @@ function normalizeStatus(raw: unknown): ExecutionStatus {
   if (s === 'running' || s === 'success' || s === 'error' || s === 'waiting' || s === 'canceled') {
     return s;
   }
-  // Older n8n uses `finished`/`stoppedAt` semantics — best-effort mapping.
   if (s === 'finished') return 'success';
   if (s === 'crashed' || s === 'failed') return 'error';
   return 'unknown';
 }
 
-export async function getWorkflow(
-  workflowId: string,
-  config?: N8nConfig,
-): Promise<WorkflowStatus> {
-  const cfg = config ?? loadN8nConfig();
-  const res = await fetch(`${cfg.apiBase}/workflows/${workflowId}`, {
-    headers: headers(cfg),
-  });
-  const data = await handle<{ id: string; name: string; active: boolean; updatedAt?: string }>(res);
+export async function getWorkflow(workflowId: string): Promise<WorkflowStatus> {
+  const data = await apiFetch<{ id: string; name: string; active: boolean; updatedAt?: string }>(
+    n8nUrl(`workflows/${workflowId}`),
+  );
   return {
     id: String(data.id),
     name: data.name,
@@ -63,15 +39,12 @@ export async function getWorkflow(
 export async function setWorkflowActive(
   workflowId: string,
   active: boolean,
-  config?: N8nConfig,
 ): Promise<WorkflowStatus> {
-  const cfg = config ?? loadN8nConfig();
   const action = active ? 'activate' : 'deactivate';
-  const res = await fetch(`${cfg.apiBase}/workflows/${workflowId}/${action}`, {
-    method: 'POST',
-    headers: headers(cfg),
-  });
-  const data = await handle<{ id: string; name: string; active: boolean; updatedAt?: string }>(res);
+  const data = await apiFetch<{ id: string; name: string; active: boolean; updatedAt?: string }>(
+    n8nUrl(`workflows/${workflowId}/${action}`),
+    { method: 'POST', body: {} },
+  );
   return {
     id: String(data.id),
     name: data.name,
@@ -80,31 +53,18 @@ export async function setWorkflowActive(
   };
 }
 
-export async function runWorkflow(
-  workflowId: string,
-  config?: N8nConfig,
-): Promise<{ executionId: string }> {
-  const cfg = config ?? loadN8nConfig();
-  const res = await fetch(`${cfg.apiBase}/workflows/${workflowId}/run`, {
-    method: 'POST',
-    headers: { ...headers(cfg), 'Content-Type': 'application/json' },
-    body: JSON.stringify({}),
-  });
-  const data = await handle<{ executionId?: string; id?: string }>(res);
+export async function runWorkflow(workflowId: string): Promise<{ executionId: string }> {
+  const data = await apiFetch<{ executionId?: string; id?: string }>(
+    n8nUrl(`workflows/${workflowId}/run`),
+    { method: 'POST', body: {} },
+  );
   return { executionId: String(data.executionId ?? data.id ?? '') };
 }
 
-export async function listExecutions(
-  workflowId: string,
-  limit = 10,
-  config?: N8nConfig,
-): Promise<Execution[]> {
-  const cfg = config ?? loadN8nConfig();
-  const res = await fetch(
-    `${cfg.apiBase}/executions?workflowId=${encodeURIComponent(workflowId)}&limit=${limit}`,
-    { headers: headers(cfg) },
+export async function listExecutions(workflowId: string, limit = 10): Promise<Execution[]> {
+  const data = await apiFetch<{ data?: Array<Record<string, unknown>> }>(
+    n8nUrl(`executions?workflowId=${encodeURIComponent(workflowId)}&limit=${limit}`),
   );
-  const data = await handle<{ data?: Array<Record<string, unknown>> }>(res);
   return (data.data ?? []).map((e) => ({
     id: String(e.id),
     workflowId: e.workflowId ? String(e.workflowId) : workflowId,
@@ -115,16 +75,10 @@ export async function listExecutions(
   }));
 }
 
-export async function getExecution(
-  executionId: string,
-  config?: N8nConfig,
-): Promise<Execution> {
-  const cfg = config ?? loadN8nConfig();
-  const res = await fetch(
-    `${cfg.apiBase}/executions/${encodeURIComponent(executionId)}?includeData=true`,
-    { headers: headers(cfg) },
+export async function getExecution(executionId: string): Promise<Execution> {
+  const e = await apiFetch<Record<string, unknown>>(
+    n8nUrl(`executions/${encodeURIComponent(executionId)}?includeData=true`),
   );
-  const e = await handle<Record<string, unknown>>(res);
   return {
     id: String(e.id),
     workflowId: e.workflowId ? String(e.workflowId) : undefined,

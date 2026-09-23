@@ -12,6 +12,7 @@ interface HeaderProps {
   us: WorkflowStatus | null;
   isMock: boolean;
   onOpenMobile: () => void;
+  onSignOut: () => void;
 }
 
 function StatusPill({ label, active }: { label: string; active: boolean | null }) {
@@ -45,6 +46,7 @@ export function Header({
   us,
   isMock,
   onOpenMobile,
+  onSignOut,
 }: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 border-b border-surface-700/60 bg-surface-950/85 backdrop-blur">
@@ -98,6 +100,17 @@ export function Header({
           <span className={loading ? 'inline-block animate-spin' : ''}>↻</span>
           {loading ? 'Refreshing…' : 'Refresh'}
         </button>
+
+        {!isMock && (
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="btn-ghost"
+            title="Sign out"
+          >
+            Sign out
+          </button>
+        )}
       </div>
     </header>
   );

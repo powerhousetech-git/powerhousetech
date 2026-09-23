@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Campaign, Execution, WorkflowStatus } from '../types';
-import { ConfigError, IS_MOCK, loadN8nConfig, type N8nConfig } from '../lib/config';
+import { IS_MOCK, loadConfig } from '../lib/config';
 import {
   getExecution,
   getWorkflow,
@@ -21,7 +21,6 @@ export interface UseN8nResult {
   workflows: Record<Campaign, WorkflowState>;
   loading: boolean;
   error: string | null;
-  configError: boolean;
   refresh: () => void;
   toggleActive: (campaign: Campaign) => Promise<void>;
   run: (campaign: Campaign) => Promise<string>;
@@ -30,33 +29,16 @@ export interface UseN8nResult {
 
 const CAMPAIGNS: Campaign[] = ['India', 'US'];
 
-export function useN8nWorkflows(): UseN8nResult {
-  const config = useMemo<{ value?: N8nConfig; error?: string }>(() => {
-    if (IS_MOCK) return {};
-    try {
-      return { value: loadN8nConfig() };
-    } catch (err) {
-      return {
-        error: err instanceof ConfigError ? err.message : 'Invalid n8n configuration.',
-      };
-    }
-  }, []);
-
+export function useN8nWorkflows(enabled: boolean = true): UseN8nResult {
+  const config = useMemo(() => loadConfig(), []);
   const idFor = useCallback(
-    (campaign: Campaign): string => {
-      if (IS_MOCK) {
-        return campaign === 'India' ? 'yrYIauoO1q46DORb' : '41O5a05zrxyWqpe2';
-      }
-      return campaign === 'India'
-        ? config.value?.indiaWorkflowId ?? ''
-        : config.value?.usWorkflowId ?? '';
-    },
+    (c: Campaign) => (c === 'India' ? config.indiaWorkflowId : config.usWorkflowId),
     [config],
   );
 
   const [workflows, setWorkflows] = useState<Record<Campaign, WorkflowState>>({
-    India: { campaign: 'India', id: idFor('India'), status: null, executions: [], busy: false },
-    US: { campaign: 'US', id: idFor('US'), status: null, executions: [], busy: false },
+    India: { campaign: 'India', id: config.indiaWorkflowId, status: null, executions: [], busy: false },
+    US: { campaign: 'US', id: config.usWorkflowId, status: null, executions: [], busy: false },
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,29 +52,19 @@ export function useN8nWorkflows(): UseN8nResult {
       const id = idFor(campaign);
       if (IS_MOCK) {
         const { getMockWorkflows, getMockExecutions } = await import('../lib/mockData');
-        patch(campaign, {
-          id,
-          status: getMockWorkflows()[campaign],
-          executions: getMockExecutions(id),
-        });
+        patch(campaign, { id, status: getMockWorkflows()[campaign], executions: getMockExecutions(id) });
         return;
       }
-      const cfg = config.value!;
       const [status, executions] = await Promise.all([
-        getWorkflow(id, cfg),
-        listExecutions(id, 5, cfg).catch(() => [] as Execution[]),
+        getWorkflow(id),
+        listExecutions(id, 5).catch(() => [] as Execution[]),
       ]);
       patch(campaign, { id, status, executions });
     },
-    [config, idFor, patch],
+    [idFor, patch],
   );
 
   const refresh = useCallback(async () => {
-    if (!IS_MOCK && !config.value) {
-      setError(config.error ?? 'n8n not configured.');
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     setError(null);
     try {
@@ -102,16 +74,18 @@ export function useN8nWorkflows(): UseN8nResult {
     } finally {
       setLoading(false);
     }
-  }, [config, loadOne]);
+  }, [loadOne]);
 
   useEffect(() => {
+    if (!enabled) return;
     void refresh();
-  }, [refresh]);
+  }, [enabled, refresh]);
 
   // Poll every 15s while any execution is running.
   const workflowsRef = useRef(workflows);
   workflowsRef.current = workflows;
   useEffect(() => {
+    if (!enabled) return;
     const anyRunning = CAMPAIGNS.some((c) =>
       workflows[c].executions.some((e) => e.status === 'running' || e.status === 'waiting'),
     );
@@ -125,7 +99,7 @@ export function useN8nWorkflows(): UseN8nResult {
       });
     }, 15_000);
     return () => window.clearInterval(timer);
-  }, [workflows, loadOne]);
+  }, [enabled, workflows, loadOne]);
 
   const toggleActive = useCallback(
     async (campaign: Campaign) => {
@@ -142,13 +116,13 @@ export function useN8nWorkflows(): UseN8nResult {
           });
           return;
         }
-        const status = await setWorkflowActive(wf.id, target, config.value!);
+        const status = await setWorkflowActive(wf.id, target);
         patch(campaign, { status });
       } finally {
         patch(campaign, { busy: false });
       }
     },
-    [config, patch],
+    [patch],
   );
 
   const run = useCallback(
@@ -167,49 +141,41 @@ export function useN8nWorkflows(): UseN8nResult {
             mode: 'trigger',
           };
           patch(campaign, { executions: [running, ...wf.executions].slice(0, 5) });
-          // Simulate completion after a few seconds.
           window.setTimeout(() => {
             setWorkflows((prev) => ({
               ...prev,
               [campaign]: {
                 ...prev[campaign],
                 executions: prev[campaign].executions.map((e) =>
-                  e.id === execId
-                    ? { ...e, status: 'success', stoppedAt: new Date().toISOString() }
-                    : e,
+                  e.id === execId ? { ...e, status: 'success', stoppedAt: new Date().toISOString() } : e,
                 ),
               },
             }));
           }, 6000);
           return execId;
         }
-        const { executionId } = await runWorkflow(wf.id, config.value!);
-        // Pull fresh executions so the new run shows up.
+        const { executionId } = await runWorkflow(wf.id);
         void loadOne(campaign);
         return executionId;
       } finally {
         patch(campaign, { busy: false });
       }
     },
-    [config, loadOne, patch],
+    [loadOne, patch],
   );
 
-  const fetchExecutionDetail = useCallback(
-    async (id: string): Promise<Execution> => {
-      if (IS_MOCK) {
-        const { getMockExecutionDetail } = await import('../lib/mockData');
-        return getMockExecutionDetail(id);
-      }
-      return getExecution(id, config.value!);
-    },
-    [config],
-  );
+  const fetchExecutionDetail = useCallback(async (id: string): Promise<Execution> => {
+    if (IS_MOCK) {
+      const { getMockExecutionDetail } = await import('../lib/mockData');
+      return getMockExecutionDetail(id);
+    }
+    return getExecution(id);
+  }, []);
 
   return {
     workflows,
     loading,
     error,
-    configError: !IS_MOCK && !config.value,
     refresh: () => void refresh(),
     toggleActive,
     run,

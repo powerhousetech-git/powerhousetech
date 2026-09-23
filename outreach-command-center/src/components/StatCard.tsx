@@ -4,26 +4,27 @@ export interface StatCardProps {
   label: string;
   value: ReactNode;
   hint?: string;
-  /** Optional trend indicator, e.g. "+12%". */
   trend?: { value: string; direction: 'up' | 'down' | 'neutral' };
   accent?: 'india' | 'us' | 'positive' | 'default';
   icon?: ReactNode;
   loading?: boolean;
 }
 
-const accentBar: Record<NonNullable<StatCardProps['accent']>, string> = {
-  india: 'bg-india',
-  us: 'bg-us',
-  positive: 'bg-positive',
-  default: 'bg-slate-500',
+const accentStyles: Record<
+  NonNullable<StatCardProps['accent']>,
+  { chip: string; glow: string }
+> = {
+  india: { chip: 'bg-india/15 text-india ring-india/30', glow: 'from-india/25' },
+  us: { chip: 'bg-us/15 text-us ring-us/30', glow: 'from-us/25' },
+  positive: { chip: 'bg-positive/15 text-positive ring-positive/30', glow: 'from-positive/25' },
+  default: { chip: 'bg-slate-500/15 text-slate-300 ring-slate-500/30', glow: 'from-slate-500/20' },
 };
 
-const trendColor: Record<NonNullable<StatCardProps['trend']>['direction'], string> =
-  {
-    up: 'text-emerald-400',
-    down: 'text-rose-400',
-    neutral: 'text-slate-400',
-  };
+const trendColor: Record<NonNullable<StatCardProps['trend']>['direction'], string> = {
+  up: 'text-emerald-400',
+  down: 'text-rose-400',
+  neutral: 'text-slate-400',
+};
 
 export function StatCard({
   label,
@@ -34,13 +35,15 @@ export function StatCard({
   icon,
   loading = false,
 }: StatCardProps) {
+  const styles = accentStyles[accent];
   return (
-    <div className="card relative overflow-hidden p-4 sm:p-5">
-      <span
-        className={`absolute inset-y-0 left-0 w-1 ${accentBar[accent]}`}
+    <div className="card relative overflow-hidden p-5 transition-transform duration-200 hover:-translate-y-0.5">
+      {/* Soft corner glow in the accent color */}
+      <div
+        className={`pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gradient-to-br ${styles.glow} to-transparent opacity-70 blur-2xl`}
         aria-hidden
       />
-      <div className="flex items-start justify-between gap-3">
+      <div className="relative flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-xs font-medium uppercase tracking-wide text-slate-400">
             {label}
@@ -48,22 +51,26 @@ export function StatCard({
           {loading ? (
             <div className="skeleton mt-2 h-8 w-24" />
           ) : (
-            <p className="mt-1 text-2xl font-semibold text-white sm:text-3xl">
+            <p className="mt-1 text-3xl font-semibold tracking-tight text-slate-100">
               {value}
             </p>
           )}
-          {hint && !loading && (
-            <p className="mt-1 text-xs text-slate-500">{hint}</p>
+          {hint && !loading && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+          {trend && !loading && (
+            <p className={`mt-2 text-xs font-medium ${trendColor[trend.direction]}`}>
+              {trend.direction === 'up' ? '▲' : trend.direction === 'down' ? '▼' : '—'} {trend.value}
+            </p>
           )}
         </div>
-        {icon && <div className="shrink-0 text-slate-500">{icon}</div>}
+        {icon && (
+          <span
+            className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-lg ring-1 ${styles.chip}`}
+            aria-hidden
+          >
+            {icon}
+          </span>
+        )}
       </div>
-      {trend && !loading && (
-        <p className={`mt-3 text-xs font-medium ${trendColor[trend.direction]}`}>
-          {trend.direction === 'up' ? '▲' : trend.direction === 'down' ? '▼' : '—'}{' '}
-          {trend.value}
-        </p>
-      )}
     </div>
   );
 }

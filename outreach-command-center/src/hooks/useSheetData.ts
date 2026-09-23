@@ -1,56 +1,30 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Campaign, Lead, NewLeadInput, SheetData } from '../types';
-import {
-  ConfigError,
-  IS_MOCK,
-  loadSheetsConfig,
-  type SheetsConfig,
-} from '../lib/config';
-import {
-  appendLead,
-  fetchSheetData,
-  updateLeadCell,
-} from '../lib/sheetsClient';
+import { IS_MOCK, loadConfig } from '../lib/config';
+import { appendLead, fetchSheetData, updateLeadCell } from '../lib/sheetsClient';
 
 export interface UseSheetDataResult {
   data: SheetData | null;
   loading: boolean;
   error: string | null;
-  configError: boolean;
   lastFetched: Date | null;
   refresh: () => void;
   addLead: (input: NewLeadInput) => Promise<void>;
-  /** Optimistically update a single field (Status/Notes) and write back. */
-  updateLeadField: (
-    lead: Lead,
-    field: 'Status' | 'Notes',
-    value: string,
-  ) => Promise<void>;
+  updateLeadField: (lead: Lead, field: 'Status' | 'Notes', value: string) => Promise<void>;
 }
 
-export function useSheetData(): UseSheetDataResult {
+export function useSheetData(enabled: boolean = true): UseSheetDataResult {
   const [data, setData] = useState<SheetData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [configError, setConfigError] = useState(false);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
 
-  const config = useMemo<{ value?: SheetsConfig; error?: string }>(() => {
-    if (IS_MOCK) return {};
-    try {
-      return { value: loadSheetsConfig() };
-    } catch (err) {
-      return {
-        error: err instanceof ConfigError ? err.message : 'Invalid Sheets configuration.',
-      };
-    }
-  }, []);
+  const config = useMemo(() => loadConfig(), []);
 
   const load = useCallback(async () => {
     if (IS_MOCK) {
       setLoading(true);
       setError(null);
-      setConfigError(false);
       const { getMockData } = await import('../lib/mockData');
       await new Promise((r) => setTimeout(r, 400));
       setData(getMockData());
@@ -58,29 +32,23 @@ export function useSheetData(): UseSheetDataResult {
       setLoading(false);
       return;
     }
-    if (!config.value) {
-      setError(config.error ?? 'Invalid configuration.');
-      setConfigError(true);
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     setError(null);
-    setConfigError(false);
     try {
-      const result = await fetchSheetData(config.value);
+      const result = await fetchSheetData(config);
       setData(result);
       setLastFetched(new Date());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not connect to Google Sheets.');
+      setError(err instanceof Error ? err.message : 'Could not load data from Google Sheets.');
     } finally {
       setLoading(false);
     }
   }, [config]);
 
   useEffect(() => {
+    if (!enabled) return;
     void load();
-  }, [load]);
+  }, [enabled, load]);
 
   const addLead = useCallback(
     async (input: NewLeadInput) => {
@@ -108,16 +76,13 @@ export function useSheetData(): UseSheetDataResult {
           if (!prev) return prev;
           const listKey = campaign === 'US' ? 'usLeads' : 'indiaLeads';
           const list = prev[listKey];
-          const rowIndex = list.length + 2;
-          return { ...prev, [listKey]: [...list, { ...lead, _rowIndex: rowIndex }] };
+          return { ...prev, [listKey]: [...list, { ...lead, _rowIndex: list.length + 2 }] };
         });
         return;
       }
 
-      if (!config.value) throw new Error(config.error ?? 'Not configured.');
-      await appendLead(lead, config.value);
-      // Refetch so row indices stay correct for later edits.
-      await load();
+      await appendLead(lead, config);
+      await load(); // refetch so row indices stay correct
     },
     [config, load],
   );
@@ -142,9 +107,8 @@ export function useSheetData(): UseSheetDataResult {
 
       if (IS_MOCK) return;
 
-      if (!config.value) throw new Error(config.error ?? 'Not configured.');
       try {
-        await updateLeadCell(lead.campaign, lead._rowIndex, field, value, config.value);
+        await updateLeadCell(lead.campaign, lead._rowIndex, field, value, config);
       } catch (err) {
         // Revert on failure.
         setData((prev) => {
@@ -168,7 +132,6 @@ export function useSheetData(): UseSheetDataResult {
     data,
     loading,
     error,
-    configError,
     lastFetched,
     refresh: () => void load(),
     addLead,

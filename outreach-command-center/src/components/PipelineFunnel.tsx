@@ -39,11 +39,11 @@ export function PipelineFunnel({
             </div>
             <div className="h-7 w-full overflow-hidden rounded-md bg-surface-800">
               <div
-                className="flex h-full items-center rounded-md transition-all duration-500"
+                className="flex h-full items-center rounded-md shadow-sm transition-all duration-500"
                 style={{
                   width: `${widthPct}%`,
-                  backgroundColor: accent,
-                  opacity: 1 - i * 0.11,
+                  backgroundImage: `linear-gradient(90deg, ${accent}, ${accent}bb)`,
+                  opacity: 1 - i * 0.1,
                 }}
               />
             </div>

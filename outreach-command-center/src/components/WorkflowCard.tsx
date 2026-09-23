@@ -69,7 +69,13 @@ export function WorkflowCard({
   const name = state.status?.name ?? `${campaignLabel[state.campaign]} Outreach Sequence`;
 
   return (
-    <div className="card p-4 sm:p-5">
+    <div className="card overflow-hidden p-0">
+      <div
+        className="h-1 w-full"
+        style={{ backgroundImage: `linear-gradient(90deg, ${accent}, transparent)` }}
+        aria-hidden
+      />
+      <div className="p-4 sm:p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -152,6 +158,7 @@ export function WorkflowCard({
             )}
           </tbody>
         </table>
+      </div>
       </div>
     </div>
   );
