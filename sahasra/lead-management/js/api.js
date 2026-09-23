@@ -55,6 +55,77 @@
     return res;
   }
 
+  function sleep(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  function normStatusValue(s) {
+    return String(s || '').trim().toLowerCase().replace(/\s+/g, '_');
+  }
+
+  function rowEmail(row) {
+    return String((row && (row.Email || row.email)) || '').toLowerCase().trim();
+  }
+
+  function rowStatus(row) {
+    return normStatusValue(row && (row.Status || row.status));
+  }
+
+  /**
+   * n8n update/add often returns Respond Immediately ("Workflow was started").
+   * Poll portal-data leads until the expected sheet state is visible.
+   */
+  async function verifyLeadOnSheet(email, expect) {
+    email = String(email || '').toLowerCase().trim();
+    if (!email) return { ok: false };
+    expect = expect || {};
+    var wantStatus = expect.status ? normStatusValue(expect.status) : '';
+    var attempts = 5;
+    for (var i = 0; i < attempts; i++) {
+      if (i > 0) await sleep(700 + i * 350);
+      var res = await portalData('leads');
+      if (!res.ok) continue;
+      var rows = asRows(res.data);
+      var hit = null;
+      for (var r = 0; r < rows.length; r++) {
+        if (rowEmail(rows[r]) === email) { hit = rows[r]; break; }
+      }
+      if (!hit) {
+        if (expect.mustExist === false) return { ok: true, missing: true };
+        continue;
+      }
+      if (wantStatus) {
+        if (rowStatus(hit) === wantStatus) return { ok: true, lead: hit, verified: true };
+        continue;
+      }
+      return { ok: true, lead: hit, verified: true };
+    }
+    return { ok: false };
+  }
+
+  async function confirmWriteOrVerify(res, label, verify) {
+    if (!res) return { ok: false, status: 0, data: { error: 'No response' } };
+    if (res.ackOnly) {
+      if (verify && typeof verify === 'function') {
+        var checked = await verify();
+        if (checked && checked.ok) {
+          return {
+            ok: true,
+            status: res.status || 200,
+            ackOnly: true,
+            verified: true,
+            data: Object.assign({ ok: true, verified: true }, checked.lead ? { lead: checked.lead } : {}, res.data || {}),
+          };
+        }
+      }
+      return requireWriteConfirm(res, label);
+    }
+    if (res.ok && res.data && res.data.ok === false) {
+      return { ok: false, status: res.status, data: res.data };
+    }
+    return res;
+  }
+
   function webhookPath(key) {
     return (N8N_WEBHOOKS && N8N_WEBHOOKS[key]) || '';
   }
@@ -198,14 +269,21 @@
 
     // ─── WRITES (n8n webhooks) ───
     addLeadToSheet: function (lead) {
-      return n8nWebhook(webhookPath('add_lead'), toSheetPayload(lead, { action: 'create', event: 'lead.create' }))
-        .then(function (res) { return requireWriteConfirm(res, 'ps2-add-lead'); });
+      var payload = toSheetPayload(lead, { action: 'create', event: 'lead.create' });
+      return n8nWebhook(webhookPath('add_lead'), payload).then(function (res) {
+        return confirmWriteOrVerify(res, 'ps2-add-lead', function () {
+          return verifyLeadOnSheet(payload.email, { mustExist: true });
+        });
+      });
     },
     updateLeadInSheet: function (lead) {
       var payload = toSheetPayload(lead, { action: 'update', event: 'lead.update' });
       if (!payload.email) return Promise.resolve({ ok: false, status: 400, data: { error: 'email required' } });
-      return n8nWebhook(webhookPath('update_lead'), payload)
-        .then(function (res) { return requireWriteConfirm(res, 'ps2-update-lead'); });
+      return n8nWebhook(webhookPath('update_lead'), payload).then(function (res) {
+        return confirmWriteOrVerify(res, 'ps2-update-lead', function () {
+          return verifyLeadOnSheet(payload.email, { status: payload.status, mustExist: true });
+        });
+      });
     },
     enrichWebsite: function (email, website) {
       return n8nWebhook(webhookPath('enrich_website'), { event: 'lead.created', email: email, website: website });

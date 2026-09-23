@@ -3058,14 +3058,16 @@
     var lead = state.selectedLead || PS2Sheet.findLeadByEmail(state.leads, emailKey) || {};
     var email = lead.email || emailKey;
     openModal('<div class="modal-card"><h2>Convert to project</h2><div class="form-panel">' +
-      '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">Sets sheet Status to <strong>converted</strong> and creates a Client Tracker entry at Enquiry.</p>' +
+      '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">Sets master sheet Status to <strong>converted</strong>. The lead leaves the pre-conversion tracker.</p>' +
       '<label class="field-label">Client name<input id="cv-client" value="' + esc(lead.company || lead.full_name || '') + '" /></label>' +
       '<label class="field-label">Project name<input id="cv-project" placeholder="e.g. Transformer supply" value="' + esc((lead.company || 'Project') + ' — enquiry') + '" /></label>' +
       '<label class="field-label">Order value (₹, optional)<input id="cv-value" type="number" /></label>' +
       '<label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:8px 0 4px">' +
         '<input type="checkbox" id="cv-confirm" /> I confirm — convert this lead</label>' +
-      '<div class="form-actions"><button class="btn btn-primary" onclick="window.PS2App.submitConvert(\'' + encodeURIComponent(email) + '\')">Convert</button>' +
-      '<button class="btn btn-ghost" onclick="window.PS2App.closeModal()">Cancel</button></div></div></div>');
+      '<div class="form-actions"><button class="btn btn-primary" id="cv-submit" onclick="window.PS2App.submitConvert(\'' + encodeURIComponent(email) + '\')">Convert</button>' +
+      '<button class="btn btn-ghost" onclick="window.PS2App.closeModal()">Cancel</button></div>' +
+      '<p id="cv-status" style="display:none;margin:10px 0 0;font-size:12px;color:var(--muted)"></p>' +
+      '</div></div>');
   }
 
   async function submitConvert(encodedKey) {
@@ -3075,38 +3077,44 @@
     }
     var email = decodeURIComponent(encodedKey || '');
     var lead = state.selectedLead || PS2Sheet.findLeadByEmail(state.leads, email) || {};
+    var btn = $('cv-submit');
+    var statusEl = $('cv-status');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Converting…'; }
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.textContent = 'Updating master sheet status…';
+    }
     var sheetRes = await PS2Api.updateLeadInSheet({
       email: email,
       status: 'converted',
-      name: lead.full_name,
+      name: lead.full_name || lead.name,
       company: lead.company,
+      phone: lead.phone,
+      designation: lead.designation,
+      website: lead.website,
+      source: lead.source,
+      notes: lead.notes,
+      batch: lead.Batch || lead.batch,
+      region: lead.region || lead.Region,
+      follow_up_count: lead.follow_up_count,
     });
     if (!sheetRes.ok) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Convert'; }
+      if (statusEl) statusEl.textContent = '';
       toast((sheetRes.data && sheetRes.data.error) || 'Sheet update failed', true);
       return;
     }
-    var body = {
-      client_name: ($('cv-client') || {value:''}).value.trim() || lead.company || lead.full_name || 'Client',
-      project_name: ($('cv-project') || {value:''}).value.trim() || 'Enquiry',
-      order_value: ($('cv-value') || {value:''}).value || null,
-      notes: 'Converted from lead ' + email,
-    };
-    var projRes = { ok: true, data: { id: null } }; // projects tracker retired with Supabase
-    toast('Converted — status updated in master sheet');
+    toast(sheetRes.verified
+      ? 'Converted — sheet status confirmed'
+      : 'Converted — status updated in master sheet');
     closeModal();
     closeDetail();
     state.sheetFetchedAt = null;
-    if (projRes.ok && projRes.data.data && projRes.data.data.id) {
-      setView('tracker');
-      location.hash = 'tracker';
-      setTimeout(function(){ openProject(projRes.data.data.id); }, 400);
-    } else if (projRes.ok && projRes.data.data && projRes.data.data.project) {
-      setView('tracker');
-      location.hash = 'tracker';
-      setTimeout(function(){ openProject(projRes.data.data.project.id); }, 400);
-    } else {
-      renderPipeline();
-    }
+    state.emailLogFetchedAt = null;
+    if (state.view === 'lead-tracker') renderLeadTracker();
+    else if (state.view === 'pipeline') renderPipeline();
+    else if (state.view === 'dashboard') renderDashboard();
+    else renderLeads();
   }
 
   async function discardLead(emailKey) {
