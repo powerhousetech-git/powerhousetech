@@ -56,6 +56,20 @@
   to = "/outreach-dashboard/index.html"
   status = 200
 
+# PowerhouseTech Outreach Command Center (standalone Vite app; Google Sheets
+# read/write + n8n workflow control). Built static output is committed under
+# /command-center (source lives in /outreach-command-center). Published in
+# sample-data mode — real credentials must never ship in this public build.
+[[redirects]]
+  from = "/command-center"
+  to = "/command-center/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/command-center/"
+  to = "/command-center/index.html"
+  status = 200
+
 # PS2 lead management entry page on the static website.
 # The interactive Next.js app itself should be deployed to a server host
 # (for example Railway) and then proxied here as /ps2/*.
