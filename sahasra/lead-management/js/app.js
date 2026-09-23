@@ -2187,25 +2187,26 @@
   ──────────────────────────────────────────────────────────────────────────── */
 
   /* ─────────────────────────────────────────────────────────────────────────
-     LEAD TRACKER — pre-conversion CRM list (click → full history panel)
+     LEAD TRACKER — CRM list incl. converted (click → full history panel)
   ──────────────────────────────────────────────────────────────────────────── */
   async function renderLeadTracker() {
     var main = $('main-content');
     main.innerHTML = '<p style="color:var(--muted);padding:20px">Loading leads…</p>';
     var [leads, emailLog] = await Promise.all([loadSheetLeads(false), loadEmailLog(false)]);
-    var pre = (leads || []).filter(function(l){
-      return PS2Sheet.normStatus(l.status) !== 'converted';
+    // Keep converted leads visible; still hide discarded from the default list
+    var list = (leads || []).filter(function (l) {
+      return PS2Sheet.normStatus(l.status) !== 'discarded';
     });
     // Prefetch hot-reply emails for attention filter
     if (state.leadTrackerAttention === 'hot_replies') {
-      var att = buildNeedsAttention(pre, emailLog);
+      var att = buildNeedsAttention(list, emailLog);
       var map = {};
       (att.hot || []).forEach(function (l) { map[String(l.email || '').toLowerCase()] = true; });
       state._attentionEmailsHot = map;
     }
     state.leadTrackerFilter = state.leadTrackerFilter || '';
     state.leadTrackerStatus = state.leadTrackerStatus || '';
-    state.leadTrackerList = pre;
+    state.leadTrackerList = list;
     paintLeadTracker(true);
   }
 
@@ -2216,13 +2217,13 @@
     var stFilter = state.leadTrackerStatus || '';
     var batchFilter = state.leadTrackerBatch || '';
     var batchOptions = getUniqueBatches(all);
-    // Drop legacy status keys — pipeline buckets + meeting_scheduled
-    if (stFilter && stFilter !== 'new' && stFilter !== 'mail_1_sent' && stFilter !== 'follow_up' && stFilter !== 'meeting_scheduled') {
+    // Allowed filters: pipeline buckets + converted
+    var allowed = { new: 1, mail_1_sent: 1, follow_up: 1, meeting_scheduled: 1, converted: 1 };
+    if (stFilter && !allowed[stFilter]) {
       stFilter = '';
       state.leadTrackerStatus = '';
     }
     var rows = all.filter(function(l){
-      // Same buckets as Pipeline: New / Mail 1 / Follow-up / Meeting Scheduled
       if (stFilter && PS2Sheet.pipelineBucket(l) !== stFilter) return false;
       if (batchFilter && (l.Batch || l.batch || '') !== batchFilter) return false;
       // Needs Attention deep-link from dashboard
@@ -2246,17 +2247,18 @@
     });
 
     var statusOpts = [
-      { key: '', label: 'All pre-conversion' },
+      { key: '', label: 'All leads' },
       { key: 'new', label: 'New' },
       { key: 'mail_1_sent', label: 'Mail 1' },
       { key: 'follow_up', label: 'Follow-up' },
       { key: 'meeting_scheduled', label: 'Meeting' },
+      { key: 'converted', label: 'Converted' },
     ];
 
     main.innerHTML =
       syncBarHtml() +
       '<div class="page-head"><div><h1 class="page-title">Lead Tracker</h1>' +
-        '<p class="page-sub">Pre-conversion clients · click a row for full history, replies, and actions</p></div>' +
+        '<p class="page-sub">All leads including converted · click a row for full history, replies, and actions</p></div>' +
         '<button class="btn btn-sm" type="button" onclick="window.PS2App.refreshAllData()">Refresh</button></div>' +
       '<div class="filter-bar">' +
         '<input id="lt-search" placeholder="Search name, email, company…" value="' + esc(state.leadTrackerFilter || '') + '" />' +
@@ -2298,9 +2300,9 @@
           '<td style="font-size:12px;color:var(--muted)">' + esc(l.last_email_sent ? fmtDateTime(l.last_email_sent) : '—') + '</td>' +
           '<td style="font-size:12px">' + esc(l.source || '—') + '</td>' +
         '</tr>';
-      }).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:28px">No pre-conversion leads match this filter</td></tr>') +
+      }).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:28px">No leads match this filter</td></tr>') +
       '</tbody></table></div>' +
-      '<p style="font-size:12px;color:var(--muted);margin-top:10px">Mail 1 filter includes replies (positive/negative). Meeting Scheduled is Calendly-confirmed. FU Count: 1 = Mail 1; 2+ = follow-ups. Converted clients move to <a href="#tracker">Client Tracker</a>.</p>';
+      '<p style="font-size:12px;color:var(--muted);margin-top:10px">Mail 1 filter includes replies (positive/negative). Meeting Scheduled is Calendly-confirmed. FU Count: 1 = Mail 1; 2+ = follow-ups. Converted leads stay listed here (filter: Converted).</p>';
 
     var search = $('lt-search');
     var sel = $('lt-status');
@@ -3058,7 +3060,7 @@
     var lead = state.selectedLead || PS2Sheet.findLeadByEmail(state.leads, emailKey) || {};
     var email = lead.email || emailKey;
     openModal('<div class="modal-card"><h2>Convert to project</h2><div class="form-panel">' +
-      '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">Sets master sheet Status to <strong>converted</strong>. The lead leaves the pre-conversion tracker.</p>' +
+      '<p style="font-size:13px;color:var(--muted);margin:0 0 10px">Sets master sheet Status to <strong>converted</strong>. The lead stays on Lead Tracker with a Converted status tag.</p>' +
       '<label class="field-label">Client name<input id="cv-client" value="' + esc(lead.company || lead.full_name || '') + '" /></label>' +
       '<label class="field-label">Project name<input id="cv-project" placeholder="e.g. Transformer supply" value="' + esc((lead.company || 'Project') + ' — enquiry') + '" /></label>' +
       '<label class="field-label">Order value (₹, optional)<input id="cv-value" type="number" /></label>' +
