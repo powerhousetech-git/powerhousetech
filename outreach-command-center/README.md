@@ -42,14 +42,14 @@ Browser (React)  ──►  /api/auth    ──►  checks APP_PASSWORD
 
 ## Tech stack
 
-React + TypeScript + Vite · Recharts · Tailwind CSS · Vercel serverless
-functions (`@vercel/node`, `google-auth-library`) for the proxy.
+React + TypeScript + Vite · Recharts · Tailwind CSS · **Netlify Functions**
+(`@netlify/functions`, `google-auth-library`) for the serverless proxy.
 
 ## Environment variables
 
 The two groups are kept strictly separate.
 
-### Server-side (Vercel → Settings → Environment Variables) — SECRET
+### Server-side (Netlify → Site configuration → Environment variables) — SECRET
 
 | Var | Value |
 |-----|-------|
@@ -76,7 +76,7 @@ VITE_N8N_US_WORKFLOW_ID=41O5a05zrxyWqpe2
    with its `client_email` as **Editor**. Base64-encode the key:
    `base64 -w0 service-account.json` (macOS: `base64 -i … | tr -d '\n'`).
 2. **n8n API key.** n8n → Settings → n8n API → Create an API key.
-3. Put the secrets in Vercel (see table). Copy `.env.example` to `.env` for the
+3. Put the secrets in Netlify (see table). Copy `.env.example` to `.env` for the
    client vars.
 
 ### Run locally
@@ -87,31 +87,30 @@ npm install
 # Sample data (no backend/secrets needed):
 VITE_USE_MOCK_DATA=true npm run dev          # http://localhost:5181
 
-# Real data (runs the /api functions locally via Vercel):
-npm i -g vercel
-vercel dev                                    # put the SECRET env vars in .env for this
+# Real data (runs the Netlify Functions locally):
+npm i -g netlify-cli
+netlify dev                                   # put the SECRET env vars in .env for this
 ```
 
-## Deploy to Vercel (primary)
+## Deploy to Netlify (primary)
 
-```bash
-npm i -g vercel
-vercel            # project: powerhousetech-command-center, framework: Vite,
-                  # build: npm run build, output: dist
-```
+This app is a **dedicated Netlify site** (separate from the main powerhousetech
+marketing site). Its config is `outreach-command-center/netlify.toml` and its
+functions are in `netlify/functions/`.
 
-Then add the **server-side** env vars in the Vercel dashboard and redeploy:
+1. In Netlify, connect this repo as a **new site** and set:
+   - **Base directory:** `outreach-command-center`  ← required, so Netlify reads
+     `outreach-command-center/netlify.toml`
+   - Build command `npm run build` and publish `dist` (already in `netlify.toml`).
+2. Add the five **server-side** env vars (see table above) under
+   *Site configuration → Environment variables*.
+3. Deploy — Netlify auto-deploys on `git push`. The `netlify.toml` routes
+   `/api/sheets`, `/api/n8n`, `/api/auth` to the Netlify Functions, which hold the
+   secrets. Add a custom domain (e.g. `dashboard.powerhousetech.in`) under
+   *Domain management*.
 
-```bash
-vercel --prod
-```
-
-Live at `powerhousetech-command-center.vercel.app` (add a custom domain such as
-`dashboard.powerhousetech.in` in Vercel → Domains). `vercel.json` is included
-(Vite framework, SPA rewrite, `/api/*` preserved).
-
-> This is the correct place to run against **real data**: secrets stay in
-> Vercel's env, the browser never sees them.
+> This is where **real data** runs: secrets stay in the Netlify site's env; the
+> browser only ever calls `/api/*`.
 
 ## Sample preview on the PowerhouseTech site (`/command-center`)
 
@@ -123,14 +122,14 @@ scripts/build-outreach-command-center.sh    # from repo root; base=/command-cent
 ```
 
 This build has no `/api` backend and never touches real data — it exists only so
-the UI can be seen without the Vercel/secret setup.
+the UI can be seen without the real-site/secret setup.
 
 ## Security notes
 
 - **No secret is ever prefixed with `VITE_`** or bundled into the client.
 - The browser never calls Google or n8n directly — only `/api/*`.
 - The single-password gate is intentionally simple (internal tool). For stronger
-  auth, put the app behind your identity provider / SSO in front of Vercel.
+  auth, put the app behind your identity provider / SSO in front of Netlify.
 
 ## Row-index tracking (writes)
 
@@ -142,7 +141,9 @@ leads use `values.append`, after which data is refetched so indices stay correct
 
 ```
 outreach-command-center/
-├── api/            sheets.ts, n8n.ts, auth.ts   (Vercel serverless proxy)
+├── netlify/
+│   └── functions/  sheets.ts, n8n.ts, auth.ts   (serverless proxy)
+├── netlify.toml    (dedicated-site build + /api redirects)
 ├── src/
 │   ├── components/ Sidebar, Header, LoginScreen, StatCard, Panel, WorkflowCard,
 │   │               ExecutionModal, PipelineFunnel, AddLeadForm, LeadTable,
@@ -154,7 +155,6 @@ outreach-command-center/
 │   ├── types/      index.ts
 │   ├── App.tsx     (auth gate + dashboard)
 │   └── main.tsx
-├── vercel.json
 ├── .env.example
 └── README.md
 ```

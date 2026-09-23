@@ -1,0 +1,41 @@
+# Netlify config for the Outreach Command Center — a DEDICATED Netlify site
+# (separate from the main powerhousetech marketing site, which uses the repo-root
+# netlify.toml). Real secrets live in this site's environment variables.
+#
+# One required Netlify UI setting: set this site's **Base directory** to
+#   outreach-command-center
+# so Netlify reads THIS file (and treats this folder as the build root). Because
+# the base directory is already this folder, `base` is intentionally omitted here
+# (adding it would double the path). The 5 server-side env vars go under
+# Site configuration → Environment variables (APP_PASSWORD,
+# GOOGLE_SERVICE_ACCOUNT_JSON, N8N_API_KEY, SPREADSHEET_ID, N8N_BASE_URL).
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Route the app's /api/* calls to the Netlify Functions (secrets stay server-side).
+[[redirects]]
+  from = "/api/sheets"
+  to = "/.netlify/functions/sheets"
+  status = 200
+
+[[redirects]]
+  from = "/api/n8n"
+  to = "/.netlify/functions/n8n"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth"
+  to = "/.netlify/functions/auth"
+  status = 200
+
+# SPA fallback (must come after the /api rules).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
