@@ -101,9 +101,10 @@ model Contact {
 }
 
 model OutreachConfig {
-  id          Int      @id @default(1)
-  cadenceDays Json     @default("[1,4,9,null,null,null,null,null,null,null]")
-  updatedAt   DateTime @updatedAt
+  id            Int      @id @default(1)
+  cadenceDays   Json     @default("[1,4,9,null,null,null,null,null,null,null]")
+  systemEnabled Boolean  @default(false)
+  updatedAt     DateTime @updatedAt
 }
 
 model EmailLog {
