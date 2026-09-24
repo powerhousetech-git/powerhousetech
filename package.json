@@ -10,6 +10,15 @@
     "test:nova-flat": "npx -y deno run --allow-read --allow-run scripts/test-nova-flat.ts",
     "test:meridian": "python3 scripts/generate-meridian-fixture.py && npx -y deno run --allow-read --allow-run scripts/test-meridian-flat.ts",
     "test:compressed-nova": "npx -y deno run --allow-read --allow-run scripts/test-compressed-nova.ts",
-    "test:reminder-whatsapp": "bash scripts/test-reminder-whatsapp.sh test"
+    "test:reminder-whatsapp": "bash scripts/test-reminder-whatsapp.sh test",
+    "typecheck:functions": "tsc --noEmit -p tsconfig.functions.json"
+  },
+  "dependencies": {
+    "google-auth-library": "^9.14.1"
+  },
+  "devDependencies": {
+    "@netlify/functions": "^2.8.1",
+    "@types/node": "^20.16.5",
+    "typescript": "^5.5.4"
   }
 }

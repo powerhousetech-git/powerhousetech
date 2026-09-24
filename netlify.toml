@@ -4,6 +4,26 @@
   publish = "."
   command = ""
 
+[build.environment]
+  NODE_VERSION = "20"
+
+# Serverless proxy for the Outreach Command Center (/command-center). Secrets
+# (GOOGLE_SERVICE_ACCOUNT_JSON, N8N_API_KEY, SPREADSHEET_ID, N8N_BASE_URL) live in
+# this site's env vars; the functions authorize callers via the site's admin
+# sign-in (Firebase ID token -> admin-api ?op=me).
+[functions]
+  directory = "netlify/functions"
+
+[[redirects]]
+  from = "/api/sheets"
+  to = "/.netlify/functions/sheets"
+  status = 200
+
+[[redirects]]
+  from = "/api/n8n"
+  to = "/.netlify/functions/n8n"
+  status = 200
+
 [dev]
   framework = "#static"
   publish = "."
