@@ -9,9 +9,10 @@
 
 import type { Execution, ExecutionStatus, WorkflowStatus } from '../types';
 import { apiFetch } from './apiClient';
+import { COMMAND_CENTER_API } from './config';
 
 function n8nUrl(subPath: string): string {
-  return `/api/n8n?path=${encodeURIComponent(subPath)}`;
+  return `${COMMAND_CENTER_API}?target=n8n&path=${encodeURIComponent(subPath)}`;
 }
 
 function normalizeStatus(raw: unknown): ExecutionStatus {

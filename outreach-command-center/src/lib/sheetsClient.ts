@@ -6,7 +6,7 @@
 
 import type { Lead, SheetData } from '../types';
 import { apiFetch } from './apiClient';
-import { loadConfig, type AppConfig } from './config';
+import { COMMAND_CENTER_API, loadConfig, type AppConfig } from './config';
 import {
   columnLetter,
   LEAD_COLUMNS_INDIA,
@@ -15,9 +15,9 @@ import {
   parseLog,
 } from './parse';
 
-/** Build the /api/sheets URL for a Sheets sub-path (+ optional query string). */
+/** Build the proxy URL for a Sheets sub-path (+ optional query string). */
 function sheetsUrl(subPath: string): string {
-  return `/api/sheets?path=${encodeURIComponent(subPath)}`;
+  return `${COMMAND_CENTER_API}?target=sheets&path=${encodeURIComponent(subPath)}`;
 }
 
 function quoteTab(tab: string): string {

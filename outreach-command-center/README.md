@@ -12,21 +12,28 @@ to reach the old `/admin` console (e.g. `shreyas@powerhousetech.in`). There is
 powerhousetech.in  →  sign in (Google)  →  admin  →  /command-center dashboard
 ```
 
-All Google/n8n secrets live **server-side** in Netlify Functions; the browser
-bundle contains no secrets and never calls Google or n8n directly.
+All Google/n8n secrets live **server-side** in a Supabase Edge Function (the same
+platform as the site's other backends, e.g. `admin-api`, `outreach-api`); the
+browser bundle contains no secrets and never calls Google or n8n directly.
 
 ## Architecture
 
 ```
 Browser (React, /command-center)
   │  Authorization: Bearer <Firebase ID token>   (from the site sign-in)
-  ├─►  /api/sheets  → netlify/functions/sheets.ts → Google Sheets API
-  └─►  /api/n8n     → netlify/functions/n8n.ts    → n8n REST API
-                       │
-                       └─ each function first verifies the caller is_admin via
-                          the site's admin-api ?op=me, then uses the server-only
-                          secrets to call Google / n8n.
+  └─►  Supabase Edge Function  supabase/functions/command-center
+         ?target=sheets → Google Sheets API (service account)
+         ?target=n8n    → n8n REST API (X-N8N-API-KEY)
+         │
+         └─ verifies the Firebase token + that the email is an admin
+            (ADMIN_EMAILS), then uses server-only secrets to call Google / n8n.
 ```
+
+> Why Supabase and not Netlify Functions: the main powerhousetech Netlify site is
+> a pre-built multi-app static site, and enabling Netlify Functions on it broke
+> its deploy. This project already runs its secret-holding backends as Supabase
+> Edge Functions, so the Command Center proxy lives there too — the SPA still
+> ships on the main site at `/command-center`, unchanged.
 
 - The React app reuses `window.phAuthGate` (the site's `/js/auth-gate.js`) for
   sign-in state, admin check, and the Firebase ID token.
@@ -42,26 +49,30 @@ daily send volume, Interested/Replied tracker (**Mark Interested**), email log
 (recent 100), Apollo efficiency. Dark/light theme, toasts, skeletons, and a
 sample-data preview mode.
 
-## Deploy (main Netlify site)
+## Deploy
 
-This app is part of the **existing** powerhousetech Netlify site — not a separate
-site. The pieces are already in the repo:
+Two independent pieces:
 
-- **Functions:** `netlify/functions/{sheets,n8n}.ts` (at the repo root).
-- **Routing + runtime:** the repo-root `netlify.toml` declares
-  `[functions] directory = "netlify/functions"`, `NODE_VERSION = "20"`, and
-  redirects `/api/sheets` + `/api/n8n` to the functions.
-- **Frontend:** the built app is committed to `/command-center` (built by
-  `scripts/build-outreach-command-center.sh`).
+**A. Frontend (main Netlify site).** The built app is committed to `/command-center`
+and served by the existing powerhousetech Netlify site — no Netlify build/functions
+changes. Rebuild with `scripts/build-outreach-command-center.sh` and merge; Netlify
+auto-deploys. Sign in as an admin and the portal shows a **Command Center** link
+(admins are routed there on sign-in).
 
-To go live:
+**B. Backend (Supabase Edge Function).** Deploy the proxy and set its secrets:
 
-1. In the main site's Netlify env vars, add the four **server-side** secrets:
-   `GOOGLE_SERVICE_ACCOUNT_JSON` (base64), `N8N_API_KEY`,
-   `SPREADSHEET_ID=1l-Mg8QEw90EfKUMQZgCKmKy2Jr4iX8JH3ur0rnw6MOM`,
-   `N8N_BASE_URL=https://shreyas-sinha.app.n8n.cloud`.
-2. Merge to `main` — Netlify auto-deploys. Sign in on the site as an admin; the
-   portal shows a **Command Center** link (and admins are routed there on sign-in).
+```bash
+supabase functions deploy command-center            # from repo root
+supabase secrets set \
+  GOOGLE_SERVICE_ACCOUNT_JSON="$(base64 -w0 service-account.json)" \
+  SPREADSHEET_ID=1l-Mg8QEw90EfKUMQZgCKmKy2Jr4iX8JH3ur0rnw6MOM \
+  N8N_BASE_URL=https://shreyas-sinha.app.n8n.cloud \
+  N8N_API_KEY=your_n8n_api_key \
+  ADMIN_EMAILS=shreyas@powerhousetech.in
+```
+
+`verify_jwt = false` is already set for this function in `supabase/config.toml`
+(it does its own Firebase-admin verification).
 
 ### Google service account
 Enable the Sheets API, create a service account, download a JSON key, share the
@@ -79,9 +90,9 @@ npm install
 # Sample data (no backend / no sign-in needed):
 VITE_USE_MOCK_DATA=true npm run dev        # http://localhost:5181
 
-# Real data locally: run the whole site with Netlify CLI from the repo root so
-# /js/auth-gate.js and the functions are available, with the secrets in a local
-# .env: `netlify dev`.
+# Real data locally: serve the Supabase function (`supabase functions serve
+# command-center --no-verify-jwt` with the secrets in supabase/.env) and set
+# VITE_COMMAND_CENTER_API to its local URL.
 ```
 
 ## Client env (`.env`, non-secret)
@@ -96,15 +107,14 @@ VITE_N8N_US_WORKFLOW_ID=41O5a05zrxyWqpe2
 ## Security notes
 
 - No secret is prefixed with `VITE_` or bundled into the client.
-- The browser only calls `/api/*`; the functions authorize every call via the
-  site admin session (`is_admin`) before touching Google/n8n.
+- The browser only calls the Supabase `command-center` function with the admin's
+  Firebase token; the function verifies the admin before touching Google/n8n.
 
 ## Project structure
 
 ```
 repo root
-├── netlify/functions/  sheets.ts, n8n.ts     (serverless proxy, admin-gated)
-├── netlify.toml        (functions dir + /api redirects, on the main site)
+├── supabase/functions/command-center/index.ts   (serverless proxy, admin-gated)
 ├── command-center/     (committed built app, served at /command-center)
 └── outreach-command-center/   (source)
     ├── src/

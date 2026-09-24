@@ -11,6 +11,7 @@ interface ImportMetaEnv {
   readonly VITE_SHEET_US?: string;
   readonly VITE_SHEET_EMAIL_LOG?: string;
   readonly VITE_USE_MOCK_DATA?: string;
+  readonly VITE_COMMAND_CENTER_API?: string;
 }
 
 interface ImportMeta {

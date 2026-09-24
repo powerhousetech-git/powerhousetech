@@ -6,6 +6,15 @@
 
 export const IS_MOCK = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 
+/**
+ * Backend proxy: a Supabase Edge Function (same platform as the site's other
+ * serverless APIs). It holds the Google/n8n secrets and authorizes callers via
+ * their Firebase admin session. Overridable for local `supabase functions serve`.
+ */
+export const COMMAND_CENTER_API =
+  import.meta.env.VITE_COMMAND_CENTER_API?.trim() ||
+  'https://msratyvmnuvozuthgkmi.supabase.co/functions/v1/command-center';
+
 /** Non-secret display config + workflow ids used to address the proxy. */
 export interface AppConfig {
   /** For display only (the server holds the authoritative id). */
