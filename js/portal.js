@@ -101,14 +101,16 @@
       });
     }
 
-    // Reveal the Command Center link only for admins (e.g. shreyas).
+    // Check admin status once (reveal the Command Center link + route admins).
+    let isAdmin = false;
+    try {
+      const me = await gate().fetchAdminMe();
+      isAdmin = Boolean(me && me.is_admin);
+    } catch {
+      isAdmin = false;
+    }
     if (commandCenterLink) {
-      try {
-        const me = await gate().fetchAdminMe();
-        commandCenterLink.classList.toggle('hidden', !(me && me.is_admin));
-      } catch {
-        commandCenterLink.classList.add('hidden');
-      }
+      commandCenterLink.classList.toggle('hidden', !isAdmin);
     }
 
     const params = new URLSearchParams(window.location.search);
@@ -118,6 +120,13 @@
     const stored = gate().peekReturnTo();
     const hasExplicitReturn =
       stored && stored !== '/portal' && stored !== '/portal/';
+
+    // Fresh admin sign-in with no explicit destination → go straight to the
+    // Command Center (it replaces the old /admin console).
+    if (isAdmin && !hasExplicitReturn && opts.preferAdmin) {
+      window.location.replace('/command-center');
+      return;
+    }
 
     if (hasExplicitReturn && opts.followReturn) {
       const dest = gate().consumeReturnTo('/portal');
