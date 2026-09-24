@@ -1,15 +1,27 @@
-import type { Handler } from '@netlify/functions';
-import { GoogleAuth } from 'google-auth-library';
+import { createSign } from 'node:crypto';
 
 /**
  * Server-side proxy for Google Sheets API v4 (Netlify Function on the main site).
- * Secrets live only in the site's env vars.
+ * Self-contained: uses only Node built-ins (no npm dependencies) so it bundles
+ * cleanly and doesn't change the main site's build. Signs the service-account
+ * JWT with node:crypto (RS256) and exchanges it for an access token.
  *
- * Authorization reuses the website's existing admin sign-in: the client sends
- * its Firebase ID token as `Authorization: Bearer <token>`, which this function
- * verifies against the Supabase `admin-api?op=me` endpoint (same check the site
- * uses). Only `is_admin` users (e.g. shreyas@powerhousetech.in) are allowed.
+ * Authorization reuses the website's admin sign-in: the client sends its Firebase
+ * ID token as `Authorization: Bearer <token>`, verified against the Supabase
+ * `admin-api?op=me` endpoint. Only `is_admin` users are allowed.
  */
+
+interface NetlifyEvent {
+  httpMethod: string;
+  headers: Record<string, string | undefined>;
+  queryStringParameters: Record<string, string | undefined> | null;
+  body: string | null;
+}
+interface NetlifyResult {
+  statusCode: number;
+  headers?: Record<string, string>;
+  body: string;
+}
 
 const ADMIN_ME_API =
   'https://msratyvmnuvozuthgkmi.supabase.co/functions/v1/admin-api?op=me';
@@ -26,7 +38,50 @@ async function isAdmin(authHeader: string | undefined): Promise<boolean> {
   }
 }
 
-export const handler: Handler = async (event) => {
+interface ServiceAccount {
+  client_email: string;
+  private_key: string;
+  token_uri?: string;
+}
+
+let cachedToken: { token: string; expiresAt: number } | null = null;
+
+async function getAccessToken(sa: ServiceAccount): Promise<string> {
+  if (cachedToken && cachedToken.expiresAt - 60_000 > Date.now()) return cachedToken.token;
+
+  const tokenUri = sa.token_uri || 'https://oauth2.googleapis.com/token';
+  const now = Math.floor(Date.now() / 1000);
+  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+  const claim = Buffer.from(
+    JSON.stringify({
+      iss: sa.client_email,
+      scope: 'https://www.googleapis.com/auth/spreadsheets',
+      aud: tokenUri,
+      iat: now,
+      exp: now + 3600,
+    }),
+  ).toString('base64url');
+  const signingInput = `${header}.${claim}`;
+  const signature = createSign('RSA-SHA256').update(signingInput).sign(sa.private_key, 'base64url');
+  const assertion = `${signingInput}.${signature}`;
+
+  const res = await fetch(tokenUri, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion,
+    }).toString(),
+  });
+  if (!res.ok) {
+    throw new Error(`Token exchange failed (${res.status}): ${await res.text().catch(() => '')}`);
+  }
+  const data = (await res.json()) as { access_token: string; expires_in: number };
+  cachedToken = { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 };
+  return data.access_token;
+}
+
+export const handler = async (event: NetlifyEvent): Promise<NetlifyResult> => {
   const authHeader = event.headers['authorization'] || event.headers['Authorization'];
   if (!(await isAdmin(authHeader))) {
     return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
@@ -38,34 +93,27 @@ export const handler: Handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: 'Server not configured (missing Google env).' }) };
   }
 
-  let credentials: Record<string, unknown>;
+  let sa: ServiceAccount;
   try {
-    credentials = JSON.parse(Buffer.from(b64, 'base64').toString('utf-8'));
+    sa = JSON.parse(Buffer.from(b64, 'base64').toString('utf-8')) as ServiceAccount;
+    if (!sa.client_email || !sa.private_key) throw new Error('missing fields');
   } catch {
-    return { statusCode: 500, body: JSON.stringify({ error: 'GOOGLE_SERVICE_ACCOUNT_JSON is not valid base64 JSON.' }) };
+    return { statusCode: 500, body: JSON.stringify({ error: 'GOOGLE_SERVICE_ACCOUNT_JSON is not a valid base64 service-account JSON.' }) };
   }
 
   try {
-    const auth = new GoogleAuth({
-      credentials,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
-    const client = await auth.getClient();
-    const accessToken = await client.getAccessToken();
-
-    // `path` already contains the sub-path + its own query string.
+    const accessToken = await getAccessToken(sa);
     const sheetsPath = event.queryStringParameters?.path || '';
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}${sheetsPath}`;
 
     const response = await fetch(url, {
       method: event.httpMethod,
       headers: {
-        Authorization: `Bearer ${accessToken.token}`,
+        Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: event.httpMethod !== 'GET' ? event.body || undefined : undefined,
     });
-
     const text = await response.text();
     return { statusCode: response.status, headers: { 'Content-Type': 'application/json' }, body: text };
   } catch (err) {

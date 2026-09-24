@@ -1,13 +1,24 @@
-import type { Handler } from '@netlify/functions';
-
 /**
  * Server-side proxy for the n8n REST API v1 (Netlify Function on the main site).
- * The n8n API key lives only in the site's env vars.
+ * Self-contained: only Node built-ins, no npm dependencies. The n8n API key lives
+ * only in the site's env vars.
  *
  * Authorization reuses the website's admin sign-in: the client sends its Firebase
  * ID token as `Authorization: Bearer <token>`, verified against the Supabase
  * `admin-api?op=me` endpoint. Only `is_admin` users are allowed.
  */
+
+interface NetlifyEvent {
+  httpMethod: string;
+  headers: Record<string, string | undefined>;
+  queryStringParameters: Record<string, string | undefined> | null;
+  body: string | null;
+}
+interface NetlifyResult {
+  statusCode: number;
+  headers?: Record<string, string>;
+  body: string;
+}
 
 const ADMIN_ME_API =
   'https://msratyvmnuvozuthgkmi.supabase.co/functions/v1/admin-api?op=me';
@@ -24,7 +35,7 @@ async function isAdmin(authHeader: string | undefined): Promise<boolean> {
   }
 }
 
-export const handler: Handler = async (event) => {
+export const handler = async (event: NetlifyEvent): Promise<NetlifyResult> => {
   const authHeader = event.headers['authorization'] || event.headers['Authorization'];
   if (!(await isAdmin(authHeader))) {
     return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
@@ -48,7 +59,6 @@ export const handler: Handler = async (event) => {
       },
       body: event.httpMethod !== 'GET' ? event.body || undefined : undefined,
     });
-
     const text = await response.text();
     return { statusCode: response.status, headers: { 'Content-Type': 'application/json' }, body: text };
   } catch (err) {
