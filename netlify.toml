@@ -58,8 +58,9 @@
 
 # PowerhouseTech Outreach Command Center (standalone Vite app; Google Sheets
 # read/write + n8n workflow control). Built static output is committed under
-# /command-center (source lives in /outreach-command-center). Published in
-# sample-data mode — real credentials must never ship in this public build.
+# /command-center (source lives in /outreach-command-center). Gated by the site's
+# Google admin sign-in; real data comes from the Supabase `command-center` function
+# (no secrets in the client bundle).
 [[redirects]]
   from = "/command-center"
   to = "/command-center/index.html"
@@ -69,6 +70,10 @@
   from = "/command-center/"
   to = "/command-center/index.html"
   status = 200
+
+# To use dashboard.powerhousetech.in: add it as a domain alias for this Netlify
+# site (DNS CNAME → Netlify). It then serves this same site, so the Command Center
+# is reachable at https://dashboard.powerhousetech.in/command-center/.
 
 # PS2 lead management entry page on the static website.
 # The interactive Next.js app itself should be deployed to a server host

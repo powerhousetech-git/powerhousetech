@@ -31,7 +31,7 @@ interface ServiceAccount {
 // --- admin check -------------------------------------------------------------
 
 function isAdminEmail(email: string): boolean {
-  const list = (Deno.env.get('ADMIN_EMAILS') || 'shreyas@powerhousetech.in')
+  const list = (Deno.env.get('ADMIN_EMAILS') || 'shreyas@powerhousetech.in,yash@powerhousetech.in')
     .split(',')
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);

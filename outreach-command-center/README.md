@@ -68,11 +68,20 @@ supabase secrets set \
   SPREADSHEET_ID=1l-Mg8QEw90EfKUMQZgCKmKy2Jr4iX8JH3ur0rnw6MOM \
   N8N_BASE_URL=https://shreyas-sinha.app.n8n.cloud \
   N8N_API_KEY=your_n8n_api_key \
-  ADMIN_EMAILS=shreyas@powerhousetech.in
+  ADMIN_EMAILS=shreyas@powerhousetech.in,yash@powerhousetech.in
 ```
 
 `verify_jwt = false` is already set for this function in `supabase/config.toml`
-(it does its own Firebase-admin verification).
+(it does its own Firebase-admin verification). `ADMIN_EMAILS` is a comma-separated
+allowlist of who may use the dashboard; it defaults to
+`shreyas@powerhousetech.in,yash@powerhousetech.in` and is overridable via the
+secret above.
+
+### Custom domain (`dashboard.powerhousetech.in`)
+Add `dashboard.powerhousetech.in` as a **domain alias** for the main Netlify site
+(DNS CNAME → Netlify, then add it under Domain management). It serves the same
+site, so the Command Center is reachable at
+`https://dashboard.powerhousetech.in/command-center/`.
 
 ### Google service account
 Enable the Sheets API, create a service account, download a JSON key, share the
