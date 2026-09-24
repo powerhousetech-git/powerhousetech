@@ -2,7 +2,9 @@
 # Dashboard HTML/JS is committed under /dashboard and /_next (built via scripts/build-dashboard.sh).
 [build]
   publish = "."
-  command = ""
+  # Explicit no-op so Netlify never auto-detects a framework build (the repo
+  # contains next.config.ts etc.); this site is pre-built static + functions only.
+  command = "echo 'No build step — static site + Netlify Functions'"
 
 # Serverless proxy for the Outreach Command Center (/command-center). Functions
 # live in the default netlify/functions directory (auto-detected). Secrets
