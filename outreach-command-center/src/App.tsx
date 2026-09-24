@@ -12,7 +12,7 @@ import DailySendChart from './components/DailySendChart';
 import ReplyTracker from './components/ReplyTracker';
 import EmailLogTable from './components/EmailLogTable';
 import ApolloEfficiency from './components/ApolloEfficiency';
-import LoginScreen from './components/LoginScreen';
+import AccessGate from './components/AccessGate';
 import { useSheetData } from './hooks/useSheetData';
 import { useN8nWorkflows } from './hooks/useN8nWorkflows';
 import { useTheme } from './hooks/useTheme';
@@ -20,37 +20,54 @@ import { useToast } from './components/Toast';
 import { emailsSentToday } from './lib/analytics';
 import { COLORS } from './lib/theme';
 import { IS_MOCK } from './lib/config';
-import {
-  clearAppToken,
-  getAppToken,
-  setAppToken,
-  UNAUTHORIZED_EVENT,
-} from './lib/apiClient';
+import { UNAUTHORIZED_EVENT } from './lib/apiClient';
+import { redirectToSignIn, signOutSite, waitForGate } from './lib/siteAuth';
 import type { Campaign, CampaignSelection, Execution, Lead } from './types';
 
 const TABS: CampaignSelection[] = ['Both', 'India', 'US'];
 
+type GateState = 'checking' | 'authed' | 'denied';
+
 export default function App() {
-  const [authed, setAuthed] = useState<boolean>(IS_MOCK || !!getAppToken());
+  // Access is gated by the main site's Google admin sign-in (no separate
+  // password). Mock mode skips the gate for local/sample previews.
+  const [gate, setGate] = useState<GateState>(IS_MOCK ? 'authed' : 'checking');
 
   useEffect(() => {
-    const onUnauthorized = () => setAuthed(false);
+    if (IS_MOCK) return;
+    let cancelled = false;
+    (async () => {
+      const g = await waitForGate();
+      if (cancelled) return;
+      if (!g) {
+        redirectToSignIn();
+        return;
+      }
+      const user = await g.waitForAuthUser();
+      if (cancelled) return;
+      if (!user || !user.email) {
+        redirectToSignIn();
+        return;
+      }
+      const me = await g.fetchAdminMe();
+      if (cancelled) return;
+      setGate(me.is_admin ? 'authed' : 'denied');
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onUnauthorized = () => setGate('denied');
     window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
   }, []);
 
-  if (!authed) {
-    return (
-      <LoginScreen
-        onSuccess={(pwd) => {
-          setAppToken(pwd);
-          setAuthed(true);
-        }}
-      />
-    );
-  }
+  if (gate === 'checking') return <AccessGate state="checking" />;
+  if (gate === 'denied') return <AccessGate state="denied" onSignOut={() => void signOutSite()} />;
 
-  return <Dashboard onSignOut={() => { clearAppToken(); setAuthed(false); }} />;
+  return <Dashboard onSignOut={() => void signOutSite()} />;
 }
 
 function Dashboard({ onSignOut }: { onSignOut: () => void }) {

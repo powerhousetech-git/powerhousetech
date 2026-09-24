@@ -1,160 +1,121 @@
 # PowerhouseTech — Outreach Command Center
 
-A password-protected control panel for PowerhouseTech's cold email outreach. It
-**reads and writes** a Google Sheet and **controls two n8n workflows** (India +
-US) — status, activate/deactivate, manual "Run Now", and recent executions.
+The admin control panel for PowerhouseTech's cold email outreach. It **reads and
+writes** a Google Sheet and **controls two n8n workflows** (India + US).
 
-All Google/n8n secrets live **server-side** in serverless functions (`/api/*`);
-the browser bundle contains **no secrets** and never calls Google or n8n
-directly. Access is gated by a single shared password.
+It is served on the **main PowerhouseTech site** at **`/command-center`** and
+gated by the site's existing **Google admin sign-in** — the same account that used
+to reach the old `/admin` console (e.g. `shreyas@powerhousetech.in`). There is
+**no separate site and no separate password**:
 
-> Separate from the PS2 lead-management portal, the Sahasra/Harshul dashboards,
-> and the read-only `/outreach-dashboard`. It does **not** modify n8n workflow
-> logic — only triggers runs and toggles active state. The old `/admin` console
-> has been removed; this is the admin's post-sign-in destination.
+```
+powerhousetech.in  →  sign in (Google)  →  admin  →  /command-center dashboard
+```
+
+All Google/n8n secrets live **server-side** in Netlify Functions; the browser
+bundle contains no secrets and never calls Google or n8n directly.
 
 ## Architecture
 
 ```
-Browser (React)  ──►  /api/auth    ──►  checks APP_PASSWORD
-                 ──►  /api/sheets  ──►  Google Sheets API (service account)
-                 ──►  /api/n8n     ──►  n8n REST API (X-N8N-API-KEY)
+Browser (React, /command-center)
+  │  Authorization: Bearer <Firebase ID token>   (from the site sign-in)
+  ├─►  /api/sheets  → netlify/functions/sheets.ts → Google Sheets API
+  └─►  /api/n8n     → netlify/functions/n8n.ts    → n8n REST API
+                       │
+                       └─ each function first verifies the caller is_admin via
+                          the site's admin-api ?op=me, then uses the server-only
+                          secrets to call Google / n8n.
 ```
 
-- The client stores the password in `sessionStorage` and sends it as the
-  `x-app-token` header on every `/api/*` request.
-- The serverless functions validate that header against `APP_PASSWORD`, then use
-  the server-only secrets to call Google / n8n and forward the response.
+- The React app reuses `window.phAuthGate` (the site's `/js/auth-gate.js`) for
+  sign-in state, admin check, and the Firebase ID token.
+- Signed-out users are redirected to `/portal?returnTo=/command-center`.
+- Non-admins get an "access restricted" screen.
 
 ## Features
 
-- **Login screen** — single shared password (no username), `sessionStorage`
-  session, **Sign out** in the header. Wrong password shows an inline error.
-- **Workflow control** — India & US cards: status pills, activate/deactivate,
-  **Run Now** (toast "Execution started: {id}"), last-5 executions, click a row
-  for full execution JSON. Polls every 15s while a run is `running`.
-- **Analytics overview**, **pipeline funnel** (tabbed), **Add lead** (append),
-  **lead table** with inline Status/Notes writes (optimistic + revert-on-error),
-  **daily send volume**, **Interested/Replied tracker** (Mark Interested),
-  **email log** (recent 100), **Apollo efficiency**.
-- Dark/light theme toggle (persisted), toasts, loading skeletons, error states,
-  and a **sample-data preview mode**.
+Workflow control (status, activate/deactivate, **Run Now**, last-5 executions +
+JSON modal, 15s polling), analytics KPIs, tabbed pipeline funnel, **Add Lead**
+(append), lead table with inline **Status/Notes** writes (optimistic + revert),
+daily send volume, Interested/Replied tracker (**Mark Interested**), email log
+(recent 100), Apollo efficiency. Dark/light theme, toasts, skeletons, and a
+sample-data preview mode.
 
-## Tech stack
+## Deploy (main Netlify site)
 
-React + TypeScript + Vite · Recharts · Tailwind CSS · **Netlify Functions**
-(`@netlify/functions`, `google-auth-library`) for the serverless proxy.
+This app is part of the **existing** powerhousetech Netlify site — not a separate
+site. The pieces are already in the repo:
 
-## Environment variables
+- **Functions:** `netlify/functions/{sheets,n8n}.ts` (at the repo root).
+- **Routing + runtime:** the repo-root `netlify.toml` declares
+  `[functions] directory = "netlify/functions"`, `NODE_VERSION = "20"`, and
+  redirects `/api/sheets` + `/api/n8n` to the functions.
+- **Frontend:** the built app is committed to `/command-center` (built by
+  `scripts/build-outreach-command-center.sh`).
 
-The two groups are kept strictly separate.
+To go live:
 
-### Server-side (Netlify → Site configuration → Environment variables) — SECRET
+1. In the main site's Netlify env vars, add the four **server-side** secrets:
+   `GOOGLE_SERVICE_ACCOUNT_JSON` (base64), `N8N_API_KEY`,
+   `SPREADSHEET_ID=1l-Mg8QEw90EfKUMQZgCKmKy2Jr4iX8JH3ur0rnw6MOM`,
+   `N8N_BASE_URL=https://shreyas-sinha.app.n8n.cloud`.
+2. Merge to `main` — Netlify auto-deploys. Sign in on the site as an admin; the
+   portal shows a **Command Center** link (and admins are routed there on sign-in).
 
-| Var | Value |
-|-----|-------|
-| `APP_PASSWORD` | any strong shared password (e.g. `pht-internal-2026`) |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | base64 of the service-account JSON (Editor on the sheet) |
-| `N8N_API_KEY` | your n8n API key |
-| `SPREADSHEET_ID` | `1l-Mg8QEw90EfKUMQZgCKmKy2Jr4iX8JH3ur0rnw6MOM` |
-| `N8N_BASE_URL` | `https://shreyas-sinha.app.n8n.cloud` |
+### Google service account
+Enable the Sheets API, create a service account, download a JSON key, share the
+spreadsheet with its `client_email` as **Editor**, then base64-encode the key
+(`base64 -w0 service-account.json`) into `GOOGLE_SERVICE_ACCOUNT_JSON`.
 
-### Client-side (`.env`, safe/non-secret)
+### n8n API key
+n8n → Settings → n8n API → Create an API key → `N8N_API_KEY`.
+
+## Local development
+
+```bash
+npm install
+
+# Sample data (no backend / no sign-in needed):
+VITE_USE_MOCK_DATA=true npm run dev        # http://localhost:5181
+
+# Real data locally: run the whole site with Netlify CLI from the repo root so
+# /js/auth-gate.js and the functions are available, with the secrets in a local
+# .env: `netlify dev`.
+```
+
+## Client env (`.env`, non-secret)
 
 ```
 VITE_SPREADSHEET_ID=1l-Mg8QEw90EfKUMQZgCKmKy2Jr4iX8JH3ur0rnw6MOM
 VITE_N8N_BASE_URL=https://shreyas-sinha.app.n8n.cloud
 VITE_N8N_INDIA_WORKFLOW_ID=yrYIauoO1q46DORb
 VITE_N8N_US_WORKFLOW_ID=41O5a05zrxyWqpe2
-# VITE_USE_MOCK_DATA=true   # optional: sample-data preview, skips login + network
 ```
-
-## Setup
-
-1. **Google service account (read + write).** In Google Cloud, enable the Sheets
-   API, create a service account, download a JSON key, and share the spreadsheet
-   with its `client_email` as **Editor**. Base64-encode the key:
-   `base64 -w0 service-account.json` (macOS: `base64 -i … | tr -d '\n'`).
-2. **n8n API key.** n8n → Settings → n8n API → Create an API key.
-3. Put the secrets in Netlify (see table). Copy `.env.example` to `.env` for the
-   client vars.
-
-### Run locally
-
-```bash
-npm install
-
-# Sample data (no backend/secrets needed):
-VITE_USE_MOCK_DATA=true npm run dev          # http://localhost:5181
-
-# Real data (runs the Netlify Functions locally):
-npm i -g netlify-cli
-netlify dev                                   # put the SECRET env vars in .env for this
-```
-
-## Deploy to Netlify (primary)
-
-This app is a **dedicated Netlify site** (separate from the main powerhousetech
-marketing site). Its config is `outreach-command-center/netlify.toml` and its
-functions are in `netlify/functions/`.
-
-1. In Netlify, connect this repo as a **new site** and set:
-   - **Base directory:** `outreach-command-center`  ← required, so Netlify reads
-     `outreach-command-center/netlify.toml`
-   - Build command `npm run build` and publish `dist` (already in `netlify.toml`).
-2. Add the five **server-side** env vars (see table above) under
-   *Site configuration → Environment variables*.
-3. Deploy — Netlify auto-deploys on `git push`. The `netlify.toml` routes
-   `/api/sheets`, `/api/n8n`, `/api/auth` to the Netlify Functions, which hold the
-   secrets. Add a custom domain (e.g. `dashboard.powerhousetech.in`) under
-   *Domain management*.
-
-> This is where **real data** runs: secrets stay in the Netlify site's env; the
-> browser only ever calls `/api/*`.
-
-## Sample preview on the PowerhouseTech site (`/command-center`)
-
-A **sample-data** build (no secrets, login bypassed) is committed to the repo and
-served by Netlify at `/command-center` for previewing the UI. Rebuild it with:
-
-```bash
-scripts/build-outreach-command-center.sh    # from repo root; base=/command-center/, mock
-```
-
-This build has no `/api` backend and never touches real data — it exists only so
-the UI can be seen without the real-site/secret setup.
 
 ## Security notes
 
-- **No secret is ever prefixed with `VITE_`** or bundled into the client.
-- The browser never calls Google or n8n directly — only `/api/*`.
-- The single-password gate is intentionally simple (internal tool). For stronger
-  auth, put the app behind your identity provider / SSO in front of Netlify.
-
-## Row-index tracking (writes)
-
-Each fetched lead keeps its 1-based sheet row number (`_rowIndex`; header = row
-1). Inline Status/Notes edits target the exact cell via `values.update`; new
-leads use `values.append`, after which data is refetched so indices stay correct.
+- No secret is prefixed with `VITE_` or bundled into the client.
+- The browser only calls `/api/*`; the functions authorize every call via the
+  site admin session (`is_admin`) before touching Google/n8n.
 
 ## Project structure
 
 ```
-outreach-command-center/
-├── netlify/
-│   └── functions/  sheets.ts, n8n.ts, auth.ts   (serverless proxy)
-├── netlify.toml    (dedicated-site build + /api redirects)
-├── src/
-│   ├── components/ Sidebar, Header, LoginScreen, StatCard, Panel, WorkflowCard,
-│   │               ExecutionModal, PipelineFunnel, AddLeadForm, LeadTable,
-│   │               DailySendChart, ReplyTracker, EmailLogTable, ApolloEfficiency,
-│   │               Toast
-│   ├── hooks/      useSheetData, useN8nWorkflows, useTheme
-│   ├── lib/        apiClient, config, sheetsClient, n8nClient, parse, analytics,
-│   │               dates, theme, mockData
-│   ├── types/      index.ts
-│   ├── App.tsx     (auth gate + dashboard)
-│   └── main.tsx
-├── .env.example
-└── README.md
+repo root
+├── netlify/functions/  sheets.ts, n8n.ts     (serverless proxy, admin-gated)
+├── netlify.toml        (functions dir + /api redirects, on the main site)
+├── command-center/     (committed built app, served at /command-center)
+└── outreach-command-center/   (source)
+    ├── src/
+    │   ├── components/ Sidebar, Header, AccessGate, StatCard, Panel,
+    │   │               WorkflowCard, ExecutionModal, PipelineFunnel,
+    │   │               AddLeadForm, LeadTable, DailySendChart, ReplyTracker,
+    │   │               EmailLogTable, ApolloEfficiency, Toast
+    │   ├── hooks/      useSheetData, useN8nWorkflows, useTheme
+    │   ├── lib/        apiClient, siteAuth, config, sheetsClient, n8nClient,
+    │   │               parse, analytics, dates, theme, mockData
+    │   ├── App.tsx     (admin gate + dashboard)
+    │   └── main.tsx
+    └── index.html      (loads Firebase + /js/auth-gate.js)
 ```
