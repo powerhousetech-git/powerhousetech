@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/command-center/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="robots" content="noindex" />
+    <title>PowerhouseTech — Outreach Command Center</title>
+
+    <!-- Reuse the main site's Firebase Google sign-in + admin auth gate so the
+         Command Center is gated by the same admin login (no separate password). -->
+    <script type="module">
+      import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
+      import {
+        getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
+        setPersistence, browserLocalPersistence,
+      } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
+
+      const firebaseConfig = {
+        apiKey: 'AIzaSyD9fHOILnFLauZqd-C2AZwm-vrkpQk-sV4',
+        authDomain: 'powerhouse-tech-f6da1.firebaseapp.com',
+        projectId: 'powerhouse-tech-f6da1',
+        storageBucket: 'powerhouse-tech-f6da1.firebasestorage.app',
+        messagingSenderId: '946732625664',
+        appId: '1:946732625664:web:627677c716fcf7c16b0de5',
+        measurementId: 'G-QRZLG84GYV',
+      };
+
+      const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const googleProvider = new GoogleAuthProvider();
+      window.phFirebaseAuth = { auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged };
+      setPersistence(auth, browserLocalPersistence)
+        .catch(() => {})
+        .finally(() => window.dispatchEvent(new CustomEvent('ph-firebase-ready')));
+    </script>
+    <script src="/js/auth-gate.js?v=3"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

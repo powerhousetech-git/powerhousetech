@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Dark is the default palette. */
+  :root,
+  .dark {
+    --s-950: 11 17 32; /* page background  #0B1120 */
+    --s-900: 15 23 42; /* card             #0F172A */
+    --s-850: 19 28 49; /* raised           */
+    --s-800: 30 41 59; /* tracks / hover   #1E293B */
+    --s-700: 51 65 85; /* borders          #334155 */
+    --text: 241 245 249;
+    color-scheme: dark;
+  }
+
+  /* Light palette. */
+  html:not(.dark) {
+    --s-950: 241 245 249; /* page  */
+    --s-900: 255 255 255; /* card  */
+    --s-850: 248 250 252;
+    --s-800: 226 232 240; /* tracks / hover */
+    --s-700: 203 213 225; /* borders */
+    --text: 15 23 42;
+    color-scheme: light;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-surface-950;
+    color: rgb(var(--text));
+    font-family:
+      system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+      'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--s-700)) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: rgb(var(--s-700));
+    border-radius: 9999px;
+  }
+
+  /* In light mode, remap the dark-oriented text utilities used by shared
+     components so they stay readable on a light background. */
+  html:not(.dark) .text-white { color: #0f172a; }
+  html:not(.dark) .text-slate-100 { color: #0f172a; }
+  html:not(.dark) .text-slate-200 { color: #1e293b; }
+  html:not(.dark) .text-slate-300 { color: #334155; }
+  html:not(.dark) .text-slate-400 { color: #475569; }
+  html:not(.dark) .text-slate-500 { color: #64748b; }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-surface-700/60 bg-surface-900 shadow-lg shadow-black/10;
+  }
+
+  .skeleton {
+    @apply animate-pulse rounded-md bg-surface-800;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-surface-700 bg-surface-950 px-3 py-2 text-sm outline-none transition-colors focus:border-india/60 focus:ring-2 focus:ring-india/20;
+    color: rgb(var(--text));
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-primary {
+    @apply btn text-white shadow-sm shadow-orange-900/20 hover:brightness-110 active:brightness-95;
+    background-image: linear-gradient(135deg, #fb923c 0%, #f97316 55%, #ea580c 100%);
+  }
+  .btn-ghost {
+    @apply btn border border-surface-700 text-slate-300 hover:bg-surface-800;
+  }
+}
