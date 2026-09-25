@@ -14,10 +14,12 @@ import { corsHeaders, jsonResponse, optionsResponse } from '../_shared/cors.ts';
  *   target = "sheets" | "n8n"
  *   path   = URL-encoded sub-path (+ its own query string)
  *
- * Env (Supabase → Edge Function secrets):
- *   GOOGLE_SERVICE_ACCOUNT_JSON (base64), SPREADSHEET_ID,
- *   N8N_BASE_URL, N8N_API_KEY,
- *   ADMIN_EMAILS (optional, comma-separated; defaults to shreyas@powerhousetech.in)
+ * Env (Supabase → Edge Function secrets). All are CC_-prefixed so they never
+ * collide with other functions' project-wide secrets (e.g. ps2-lead-api's
+ * N8N_API_KEY, outreach-api's ADMIN_EMAILS):
+ *   CC_GOOGLE_SERVICE_ACCOUNT_JSON (base64), CC_SPREADSHEET_ID,
+ *   CC_N8N_BASE_URL, CC_N8N_API_KEY,
+ *   CC_ADMIN_EMAILS (optional, comma-separated; defaults to shreyas+yash@powerhousetech.in)
  */
 
 const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
@@ -31,7 +33,7 @@ interface ServiceAccount {
 // --- admin check -------------------------------------------------------------
 
 function isAdminEmail(email: string): boolean {
-  const list = (Deno.env.get('ADMIN_EMAILS') || 'shreyas@powerhousetech.in,yash@powerhousetech.in')
+  const list = (Deno.env.get('CC_ADMIN_EMAILS') || 'shreyas@powerhousetech.in,yash@powerhousetech.in')
     .split(',')
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
@@ -118,8 +120,8 @@ Deno.serve(async (req) => {
 
   try {
     if (target === 'sheets') {
-      const b64 = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON');
-      const spreadsheetId = Deno.env.get('SPREADSHEET_ID');
+      const b64 = Deno.env.get('CC_GOOGLE_SERVICE_ACCOUNT_JSON');
+      const spreadsheetId = Deno.env.get('CC_SPREADSHEET_ID');
       if (!b64 || !spreadsheetId) return jsonResponse(500, { error: 'Sheets env not configured' });
       const sa = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)))) as ServiceAccount;
       const accessToken = await getGoogleToken(sa);
@@ -136,8 +138,8 @@ Deno.serve(async (req) => {
     }
 
     if (target === 'n8n') {
-      const base = Deno.env.get('N8N_BASE_URL');
-      const apiKey = Deno.env.get('N8N_API_KEY');
+      const base = Deno.env.get('CC_N8N_BASE_URL');
+      const apiKey = Deno.env.get('CC_N8N_API_KEY');
       if (!base || !apiKey) return jsonResponse(500, { error: 'n8n env not configured' });
       const upstream = await fetch(`${base.replace(/\/$/, '')}/api/v1/${path}`, {
         method: req.method,

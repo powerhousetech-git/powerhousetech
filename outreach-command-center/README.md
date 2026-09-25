@@ -62,20 +62,22 @@ auto-deploys. Sign in as an admin and the portal shows a **Command Center** link
 **B. Backend (Supabase Edge Function).** Deploy the proxy and set its secrets:
 
 ```bash
-supabase functions deploy command-center            # from repo root
+supabase functions deploy command-center            # from repo root; deploys ONLY this function
 supabase secrets set \
-  GOOGLE_SERVICE_ACCOUNT_JSON="$(base64 -w0 service-account.json)" \
-  SPREADSHEET_ID=1l-Mg8QEw90EfKUMQZgCKmKy2Jr4iX8JH3ur0rnw6MOM \
-  N8N_BASE_URL=https://shreyas-sinha.app.n8n.cloud \
-  N8N_API_KEY=your_n8n_api_key \
-  ADMIN_EMAILS=shreyas@powerhousetech.in,yash@powerhousetech.in
+  CC_GOOGLE_SERVICE_ACCOUNT_JSON="$(base64 -w0 service-account.json)" \
+  CC_SPREADSHEET_ID=1l-Mg8QEw90EfKUMQZgCKmKy2Jr4iX8JH3ur0rnw6MOM \
+  CC_N8N_BASE_URL=https://shreyas-sinha.app.n8n.cloud \
+  CC_N8N_API_KEY=your_n8n_api_key \
+  CC_ADMIN_EMAILS=shreyas@powerhousetech.in,yash@powerhousetech.in
 ```
 
-`verify_jwt = false` is already set for this function in `supabase/config.toml`
-(it does its own Firebase-admin verification). `ADMIN_EMAILS` is a comma-separated
-allowlist of who may use the dashboard; it defaults to
-`shreyas@powerhousetech.in,yash@powerhousetech.in` and is overridable via the
-secret above.
+All secrets are **`CC_`-prefixed** so they never collide with other functions'
+project-wide secrets (e.g. `ps2-lead-api` uses `N8N_API_KEY`, `outreach-api` uses
+`ADMIN_EMAILS`) — setting the `CC_` ones adds brand-new secrets and changes
+nothing for the other dashboards. `verify_jwt = false` is already set for this
+function in `supabase/config.toml` (it does its own Firebase-admin verification).
+`CC_ADMIN_EMAILS` is a comma-separated allowlist of who may use the dashboard;
+it defaults to `shreyas@powerhousetech.in,yash@powerhousetech.in`.
 
 ### Custom domain (`dashboard.powerhousetech.in`)
 Add `dashboard.powerhousetech.in` as a **domain alias** for the main Netlify site
