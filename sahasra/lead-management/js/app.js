@@ -22,9 +22,21 @@
     uploadRegion: 'IN',
     dashboardBatchFilter: '',
     dashboardDateRange: 'all', // all | 7d | month
+    leadTrackerFilter: '',
+    leadTrackerStatus: '', // '' = all statuses incl. converted + discarded
     leadTrackerBatch: '',
     leadTrackerAttention: '', // '' | hot_replies | overdue
+    mailConfigFetchedAt: null,
   };
+
+  /** Fallback when Mail Config API is empty — step order matches outreach workflow. */
+  var DEFAULT_MAIL_STEPS = [
+    { step_number: 1, label: 'Mail 1', day_offset: 0, is_active: true, subject_template: '', body_template: '' },
+    { step_number: 2, label: 'Follow-up 1', day_offset: 3, is_active: true, subject_template: '', body_template: '' },
+    { step_number: 3, label: 'Follow-up 2', day_offset: 7, is_active: true, subject_template: '', body_template: '' },
+    { step_number: 4, label: 'Follow-up 3', day_offset: 14, is_active: true, subject_template: '', body_template: '' },
+    { step_number: 5, label: 'Follow-up 4', day_offset: 21, is_active: true, subject_template: '', body_template: '' },
+  ];
 
   /** Tab-switch lag fix: reuse sheet data for 2 minutes unless Refresh / write. */
   var CACHE_TTL_MS = 2 * 60 * 1000;
@@ -94,7 +106,9 @@
       designation: row.Designation || row.designation || '',
       website: row.Website || row.website || '',
       source: row.Source || row.source || 'manual',
-      status: String(row.Status || row.status || 'new').toLowerCase().trim().replace(/\s+/g, '_'),
+      status: (typeof PS2Sheet !== 'undefined' && PS2Sheet.normStatus)
+        ? PS2Sheet.normStatus(row.Status || row.status || 'new')
+        : String(row.Status || row.status || 'new').toLowerCase().trim().replace(/\s+/g, '_'),
       follow_up_count: row['Follow Up Count'] || row.follow_up_count || '0',
       website_summary: row['Website Summary'] || row.website_summary || '',
       last_email_sent: row['Last Email Sent'] || row.last_email_sent || '',
@@ -263,9 +277,11 @@
   async function refreshAllData() {
     state.sheetFetchedAt = null;
     state.emailLogFetchedAt = null;
+    state.mailConfigFetchedAt = null;
     toast('Refreshing…');
     await loadSheetLeads(true);
     await loadEmailLog(true);
+    try { await ensureMailConfig(true); } catch (_) {}
     toast('Data refreshed');
     renderView(state.view);
   }
@@ -1695,6 +1711,37 @@
     toast('Sheet refreshed');
   }
 
+  async function ensureMailConfig(force) {
+    if (!force && state.mailConfig && state.mailConfig.length && state.mailConfigFetchedAt &&
+        (Date.now() - state.mailConfigFetchedAt) < CACHE_TTL_MS) {
+      return state.mailConfig;
+    }
+    var steps = [];
+    try {
+      var res = await PS2Api.mailConfig();
+      var rawSteps = [];
+      if (res && res.ok) {
+        rawSteps = Array.isArray(res.data) ? res.data
+          : (res.data && Array.isArray(res.data.data) ? res.data.data : []);
+      }
+      steps = rawSteps.map(function (s) {
+        return {
+          step_number: parseInt(s.step_number, 10) || 0,
+          is_active: String(s.is_active).toUpperCase() === 'TRUE' || s.is_active === true,
+          label: s.label || '',
+          subject_template: s.subject_template || '',
+          day_offset: parseInt(s.day_offset, 10) || 0,
+          body_template: s.body_template || s.body_template_notes || '',
+        };
+      }).filter(function (s) { return s.step_number >= 1; });
+    } catch (_) { steps = []; }
+    if (!steps.length) steps = DEFAULT_MAIL_STEPS.slice();
+    steps.sort(function (a, b) { return a.step_number - b.step_number; });
+    state.mailConfig = steps;
+    state.mailConfigFetchedAt = Date.now();
+    return steps;
+  }
+
   async function openLeadDetail(emailOrId) {
     var key = String(emailOrId || '').trim();
     if (!key) { toast('Missing lead email', true); return; }
@@ -1719,8 +1766,9 @@
         return em && (to === em || (e.lead_id && e.lead_id === lead.id));
       });
     } catch (_) {}
-    // Lazy-load audit log only when opening detail (Change 2C)
+    // Lazy-load audit log + mail config for sequence plan
     var auditEvents = await loadAuditLogForLead(lead.email);
+    try { await ensureMailConfig(false); } catch (_) {}
     showLeadPanel(lead, emails, auditEvents);
   }
 
@@ -1836,6 +1884,11 @@
         (lead.notes ? '<div style="margin-top:14px"><label style="font-size:11px;color:var(--muted);text-transform:uppercase">Notes</label><p style="font-size:13px;margin:4px 0">' + esc(lead.notes) + '</p></div>' : '') +
         (lead.website_summary ? '<div style="margin-top:10px"><label style="font-size:11px;color:var(--muted);text-transform:uppercase">Website summary (AI)</label><p style="font-size:13px;margin:4px 0;color:var(--muted)">' + esc(lead.website_summary) + '</p></div>' : '') +
 
+        '<div class="pipeline-history mail-sequence-section">' +
+          '<h3>Mail sequence</h3>' +
+          mailSequencePlanHtml(lead, sortedEmails) +
+        '</div>' +
+
         '<div class="pipeline-history audit-section">' +
           '<h3>Activity timeline</h3>' +
           auditTimelineHtml(auditEvents) +
@@ -1886,6 +1939,133 @@
     if (n === 1) return 'Mail 1';
     if (n > 1) return 'Follow-up ' + (n - 1);
     return 'Step ' + step;
+  }
+
+  /** Sequence stops when lead leaves active outreach. */
+  function sequenceStoppedStatus(st) {
+    st = PS2Sheet.normStatus(st);
+    return st === 'responded' || st === 'meeting_proposed' || st === 'meeting_scheduled' ||
+      st === 'human_takeover' || st === 'converted' || st === 'discarded';
+  }
+
+  /**
+   * Planned vs executed mail steps (Mail Config order).
+   * Flags Missed when a due planned step was not executed by the workflow.
+   */
+  function buildMailSequencePlan(lead, emails) {
+    var steps = (state.mailConfig || []).filter(function (s) {
+      return s && s.is_active !== false && (parseInt(s.step_number, 10) || 0) >= 1;
+    }).slice().sort(function (a, b) {
+      return (parseInt(a.step_number, 10) || 0) - (parseInt(b.step_number, 10) || 0);
+    });
+    if (!steps.length) steps = DEFAULT_MAIL_STEPS.slice();
+
+    var sheetCount = Number(lead && lead.follow_up_count);
+    if (isNaN(sheetCount) || sheetCount < 0) sheetCount = 0;
+    var lastSent = (lead && (lead.last_email_sent || lead['Last Email Sent'])) || '';
+    // Due dates are anchored to campaign trigger — not Created At (avoids false Missed)
+    var triggered = (lead && (lead.batch_triggered_at || lead['Batch Triggered At'])) || '';
+    var triggeredMs = triggered ? new Date(triggered).getTime() : NaN;
+    var st = PS2Sheet.normStatus(lead && lead.status);
+    var stopped = sequenceStoppedStatus(st);
+
+    var byStep = {};
+    (emails || []).filter(isOutboundSent).forEach(function (e) {
+      var n = emailSequenceStep(e);
+      var t = emailTimestamp(e) || '';
+      var prev = byStep[n];
+      if (!prev) {
+        byStep[n] = { email: e, t: t };
+        return;
+      }
+      var prevMs = prev.t ? new Date(prev.t).getTime() : Infinity;
+      var nextMs = t ? new Date(t).getTime() : Infinity;
+      if (nextMs < prevMs) byStep[n] = { email: e, t: t };
+    });
+
+    var now = Date.now();
+    return steps.map(function (step) {
+      var n = parseInt(step.step_number, 10) || 0;
+      var label = step.label || sequenceLabel(n);
+      var dayOffset = parseInt(step.day_offset, 10);
+      if (isNaN(dayOffset) || dayOffset < 0) dayOffset = 0;
+      var hit = byStep[n];
+      var executed = !!(hit || sheetCount >= n);
+      var sentAt = '';
+      if (hit && hit.t) sentAt = hit.t;
+      else if (executed && n === sheetCount && lastSent) sentAt = lastSent;
+      else if (executed && n === 1 && triggered) sentAt = triggered;
+      var subject = hit && hit.email ? (hit.email.subject || hit.email.Subject || '') : '';
+
+      var dueMs = !isNaN(triggeredMs) ? triggeredMs + dayOffset * 86400000 : NaN;
+      var duePast = !isNaN(dueMs) && dueMs <= now;
+      var dueLabel = !isNaN(dueMs) ? fmtDateTime(new Date(dueMs).toISOString()) : '';
+
+      var stateKey = 'pending';
+      var flag = '';
+      if (executed) {
+        stateKey = 'sent';
+      } else if (duePast) {
+        // Due by Batch Triggered At + day_offset and not recorded → workflow gap
+        stateKey = 'missed';
+        flag = 'Planned step not executed by workflow';
+      } else if (stopped) {
+        stateKey = 'stopped';
+      } else if (!isNaN(dueMs)) {
+        stateKey = 'scheduled';
+      } else {
+        stateKey = 'pending';
+      }
+
+      return {
+        step: n,
+        label: label,
+        dayOffset: dayOffset,
+        executed: executed,
+        sentAt: sentAt,
+        subject: subject,
+        dueMs: dueMs,
+        dueLabel: dueLabel,
+        stateKey: stateKey,
+        flag: flag,
+      };
+    });
+  }
+
+  function mailSequencePlanHtml(lead, emails) {
+    var plan = buildMailSequencePlan(lead, emails);
+    var missed = plan.filter(function (p) { return p.stateKey === 'missed'; }).length;
+    var summary = missed
+      ? '<div class="mail-seq-alert" role="status">' + missed + ' planned step' + (missed === 1 ? '' : 's') +
+        ' not executed by the workflow</div>'
+      : '<p class="mail-seq-ok">All due planned steps recorded as sent (sheet FU count and/or email log).</p>';
+
+    var rows = plan.map(function (p, idx) {
+      var badgeCls = 'mail-seq-badge mail-seq-' + p.stateKey;
+      var badgeText = p.stateKey === 'sent' ? 'Sent'
+        : p.stateKey === 'missed' ? 'Missed'
+        : p.stateKey === 'stopped' ? 'Stopped'
+        : p.stateKey === 'scheduled' ? 'Scheduled'
+        : 'Pending';
+      var when = p.executed
+        ? (p.sentAt ? fmtDateTime(p.sentAt) : 'Recorded on master sheet')
+        : (p.dueLabel ? ('Due ' + p.dueLabel) : 'Awaiting batch trigger');
+      return '<li class="mail-seq-item mail-seq-item-' + p.stateKey + '">' +
+        '<div class="mail-seq-index" aria-hidden="true">' + (idx + 1) + '</div>' +
+        '<div class="mail-seq-body">' +
+          '<div class="mail-seq-top">' +
+            '<span class="mail-seq-title">' + esc(p.label) + '</span>' +
+            '<span class="' + badgeCls + '">' + badgeText + '</span>' +
+          '</div>' +
+          '<div class="mail-seq-meta">Day offset ' + p.dayOffset +
+            (p.subject ? ' · ' + esc(p.subject) : '') +
+          '</div>' +
+          '<div class="mail-seq-when">' + esc(when) + '</div>' +
+          (p.flag ? '<div class="mail-seq-flag">' + esc(p.flag) + '</div>' : '') +
+        '</div></li>';
+    }).join('');
+
+    return summary + '<ol class="mail-seq-list">' + rows + '</ol>';
   }
 
   function fmtDateTime(ts) {
@@ -2222,10 +2402,9 @@
   async function renderLeadTracker() {
     var main = $('main-content');
     main.innerHTML = '<p style="color:var(--muted);padding:20px">Loading leads…</p>';
-    var [leads, emailLog] = await Promise.all([loadSheetLeads(false), loadEmailLog(false)]);
-    // Same master list as Dashboard Total Leads (no status exclusions)
+    // Force fresh master sheet so converted / discarded always appear
+    var [leads, emailLog] = await Promise.all([loadSheetLeads(true), loadEmailLog(true)]);
     var list = leads || getMasterLeads();
-    // Prefetch hot-reply emails for attention filter
     if (state.leadTrackerAttention === 'hot_replies') {
       var att = buildNeedsAttention(list, emailLog);
       var map = {};
@@ -2238,15 +2417,25 @@
     paintLeadTracker(true);
   }
 
+  function leadTrackerBucketCounts(all) {
+    var counts = { new: 0, mail_1_sent: 0, follow_up: 0, meeting_scheduled: 0, converted: 0, discarded: 0 };
+    (all || []).forEach(function (l) {
+      var b = PS2Sheet.pipelineBucket(l);
+      if (counts[b] != null) counts[b]++;
+    });
+    return counts;
+  }
+
   function paintLeadTracker(enter) {
     var main = $('main-content');
-    // Always re-bind to master sheet list so counts stay in sync with dashboard
+    // Always re-bind to master sheet list — never drop converted / discarded
     var all = getMasterLeads();
     state.leadTrackerList = all;
     var q = String(state.leadTrackerFilter || '').trim().toLowerCase();
     var stFilter = state.leadTrackerStatus || '';
     var batchFilter = state.leadTrackerBatch || '';
     var batchOptions = getUniqueBatches(all);
+    var bucketCounts = leadTrackerBucketCounts(all);
     // Allowed filters: pipeline buckets + converted + discarded
     var allowed = { new: 1, mail_1_sent: 1, follow_up: 1, meeting_scheduled: 1, converted: 1, discarded: 1 };
     if (stFilter && !allowed[stFilter]) {
@@ -2264,35 +2453,62 @@
         if (!attHot[String(l.email || '').toLowerCase()]) return false;
       } else if (state.leadTrackerAttention === 'overdue') {
         var stAtt = PS2Sheet.normStatus(l.status);
+        if (stAtt === 'converted' || stAtt === 'discarded') return false;
         if (stAtt !== 'mail_1_sent' && !/^follow_up_/.test(stAtt)) return false;
         var last = l.last_email_sent ? new Date(l.last_email_sent).getTime() : 0;
         if (!last || (Date.now() - last) < 3 * 86400000) return false;
       }
       return true;
     });
-    rows = rows.slice().sort(function(a, b){
-      var ta = new Date(a.last_email_sent || a.updated_at || a.created_at || 0).getTime();
-      var tb = new Date(b.last_email_sent || b.updated_at || b.created_at || 0).getTime();
+    // Sort: active outreach first by recency, then converted, then discarded (still all visible)
+    var bucketRank = { new: 0, mail_1_sent: 1, follow_up: 2, meeting_scheduled: 3, converted: 4, discarded: 5 };
+    rows = rows.slice().sort(function (a, b) {
+      var ra = bucketRank[PS2Sheet.pipelineBucket(a)] != null ? bucketRank[PS2Sheet.pipelineBucket(a)] : 9;
+      var rb = bucketRank[PS2Sheet.pipelineBucket(b)] != null ? bucketRank[PS2Sheet.pipelineBucket(b)] : 9;
+      if (ra !== rb) return ra - rb;
+      var ta = new Date(a.last_email_sent || a.updated_at || a.created_at || 0).getTime() || 0;
+      var tb = new Date(b.last_email_sent || b.updated_at || b.created_at || 0).getTime() || 0;
       return tb - ta;
     });
 
     var statusOpts = [
-      { key: '', label: 'All leads' },
-      { key: 'new', label: 'New' },
-      { key: 'mail_1_sent', label: 'Mail 1' },
-      { key: 'follow_up', label: 'Follow-up' },
-      { key: 'meeting_scheduled', label: 'Meeting' },
-      { key: 'converted', label: 'Converted' },
-      { key: 'discarded', label: 'Discarded' },
+      { key: '', label: 'All leads (' + all.length + ')' },
+      { key: 'new', label: 'New (' + bucketCounts.new + ')' },
+      { key: 'mail_1_sent', label: 'Mail 1 (' + bucketCounts.mail_1_sent + ')' },
+      { key: 'follow_up', label: 'Follow-up (' + bucketCounts.follow_up + ')' },
+      { key: 'meeting_scheduled', label: 'Meeting (' + bucketCounts.meeting_scheduled + ')' },
+      { key: 'converted', label: 'Converted (' + bucketCounts.converted + ')' },
+      { key: 'discarded', label: 'Discarded (' + bucketCounts.discarded + ')' },
     ];
 
     var masterCount = masterLeadCount();
+    var chipDefs = [
+      { key: '', label: 'All', count: masterCount, cls: '' },
+      { key: 'converted', label: 'Converted', count: bucketCounts.converted, cls: 'lt-chip-converted' },
+      { key: 'discarded', label: 'Discarded', count: bucketCounts.discarded, cls: 'lt-chip-discarded' },
+      { key: 'follow_up', label: 'Follow-up', count: bucketCounts.follow_up, cls: '' },
+      { key: 'meeting_scheduled', label: 'Meeting', count: bucketCounts.meeting_scheduled, cls: '' },
+    ];
+    var filtersActive = !!(stFilter || batchFilter || q || state.leadTrackerAttention);
 
     main.innerHTML =
       syncBarHtml() +
       '<div class="page-head"><div><h1 class="page-title">Lead Tracker</h1>' +
-        '<p class="page-sub">Same master sheet as Dashboard (' + masterCount + ' leads) · click a row for full history</p></div>' +
-        '<button class="btn btn-sm" type="button" onclick="window.PS2App.refreshAllData()">Refresh</button></div>' +
+        '<p class="page-sub">Every master-sheet lead including Converted and Discarded (' + masterCount + ' total) · click a row for mail sequence</p></div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+          (filtersActive
+            ? '<button class="btn btn-sm" type="button" onclick="window.PS2App.clearLeadTrackerFilters()">Show all leads</button>'
+            : '') +
+          '<button class="btn btn-sm" type="button" onclick="window.PS2App.refreshAllData()">Refresh</button>' +
+        '</div></div>' +
+      '<div class="lt-status-chips" role="group" aria-label="Status filters">' +
+        chipDefs.map(function (c) {
+          var active = (stFilter || '') === c.key;
+          return '<button type="button" class="lt-chip ' + (c.cls || '') + (active ? ' is-active' : '') + '"' +
+            ' onclick="window.PS2App.setLeadTrackerStatus(\'' + c.key + '\')">' +
+            esc(c.label) + ' <strong>' + c.count + '</strong></button>';
+        }).join('') +
+      '</div>' +
       '<div class="filter-bar">' +
         '<input id="lt-search" placeholder="Search name, email, company…" value="' + esc(state.leadTrackerFilter || '') + '" />' +
         '<select id="lt-status">' +
@@ -2313,6 +2529,7 @@
         '<span class="filter-note" style="font-size:13px;color:var(--muted)">' + rows.length + ' of ' + masterCount + ' leads' +
           (state.leadTrackerAttention === 'hot_replies' ? ' · drafts pending review' : '') +
           (state.leadTrackerAttention === 'overdue' ? ' · no response 3+ days' : '') +
+          ' · Converted ' + bucketCounts.converted + ' · Discarded ' + bucketCounts.discarded +
         '</span>' +
       '</div>' +
       '<div class="panel lead-tracker-panel"><div class="lead-tracker-scroll"><table class="data-table"><thead><tr>' +
@@ -2320,8 +2537,12 @@
       '</tr></thead><tbody>' +
       (rows.length ? rows.map(function(l){
         var st = PS2Sheet.normStatus(l.status);
+        var bucket = PS2Sheet.pipelineBucket(l);
         var key = encodeURIComponent(l.email || l.id || '');
-        return '<tr class="clickable" onclick="window.PS2App.openLead(decodeURIComponent(\'' + key + '\'))">' +
+        var rowCls = 'clickable' +
+          (bucket === 'converted' ? ' lt-row-converted' : '') +
+          (bucket === 'discarded' ? ' lt-row-discarded' : '');
+        return '<tr class="' + rowCls + '" onclick="window.PS2App.openLead(decodeURIComponent(\'' + key + '\'))">' +
           '<td><strong>' + esc(l.full_name || '—') + '</strong>' +
             (l.designation ? '<div style="font-size:11px;color:var(--muted)">' + esc(l.designation) + '</div>' : '') + '</td>' +
           '<td>' + esc(l.company || '—') + '</td>' +
@@ -2333,9 +2554,11 @@
           '<td style="font-size:12px;color:var(--muted)">' + esc(l.last_email_sent ? fmtDateTime(l.last_email_sent) : '—') + '</td>' +
           '<td style="font-size:12px">' + esc(l.source || '—') + '</td>' +
         '</tr>';
-      }).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:28px">No leads match this filter</td></tr>') +
+      }).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:28px">No leads match this filter' +
+        (filtersActive ? ' — <button type="button" class="btn btn-sm" onclick="window.PS2App.clearLeadTrackerFilters()">Show all leads</button>' : '') +
+        '</td></tr>') +
       '</tbody></table></div></div>' +
-      '<p style="font-size:12px;color:var(--muted);margin-top:10px">Counts match Dashboard Total Leads from the same master sheet load. Filter Converted / Discarded without hiding them from the sheet total.</p>';
+      '<p style="font-size:12px;color:var(--muted);margin-top:10px">All statuses stay on Lead Tracker. Open a row to see the ordered mail sequence and any missed workflow steps.</p>';
 
     var search = $('lt-search');
     var sel = $('lt-status');
@@ -2416,21 +2639,7 @@
   ──────────────────────────────────────────────────────────────────────────── */
   async function renderMailConfig() {
     var main = $('main-content');
-    var res = await PS2Api.mailConfig();
-    var rawSteps = Array.isArray(res.data) ? res.data
-      : (res.data && Array.isArray(res.data.data) ? res.data.data : []);
-    var steps = rawSteps.map(function(s) {
-      return {
-        step_number: parseInt(s.step_number, 10) || 0,
-        is_active: String(s.is_active).toUpperCase() === 'TRUE' || s.is_active === true,
-        label: s.label || '',
-        subject_template: s.subject_template || '',
-        day_offset: parseInt(s.day_offset, 10) || 0,
-        body_template: s.body_template || s.body_template_notes || '',
-        body_template_notes: s.body_template_notes || '',
-      };
-    });
-    state.mailConfig = steps;
+    var steps = await ensureMailConfig(true);
     var isAdmin = state.user && state.user.role === 'sahasra_admin';
 
     main.innerHTML =
@@ -3292,6 +3501,14 @@
       a.addEventListener('click', function(e){
         e.preventDefault();
         var v = a.dataset.view;
+        // Opening Lead Tracker from nav always shows the full master list
+        if (v === 'lead-tracker') {
+          state.leadTrackerAttention = '';
+          state._attentionEmailsHot = null;
+          state.leadTrackerStatus = '';
+          state.leadTrackerBatch = '';
+          state.leadTrackerFilter = '';
+        }
         location.hash = v;
         setView(v);
       });
@@ -3333,6 +3550,20 @@
     clearAttentionFilter: function () {
       state.leadTrackerAttention = '';
       state._attentionEmailsHot = null;
+      paintLeadTracker();
+    },
+    clearLeadTrackerFilters: function () {
+      state.leadTrackerAttention = '';
+      state._attentionEmailsHot = null;
+      state.leadTrackerStatus = '';
+      state.leadTrackerBatch = '';
+      state.leadTrackerFilter = '';
+      paintLeadTracker();
+    },
+    setLeadTrackerStatus: function (key) {
+      state.leadTrackerAttention = '';
+      state._attentionEmailsHot = null;
+      state.leadTrackerStatus = key || '';
       paintLeadTracker();
     },
     openLeadUpload: openLeadUpload, submitLeadUpload: submitLeadUpload,
