@@ -27,6 +27,8 @@
     leadTrackerBatch: '',
     leadTrackerAttention: '', // '' | hot_replies | overdue
     mailConfigFetchedAt: null,
+    backendKpis: null,
+    backendKpisFetchedAt: null,
   };
 
   /** Fallback when Mail Config API is empty — step order matches outreach workflow. */
@@ -232,6 +234,29 @@
     return list;
   }
 
+  /**
+   * Portal KPI SSOT (resource=kpis). Null when unavailable — callers keep client compute.
+   * Does not change Lead Tracker / Pipeline lead lists.
+   */
+  async function loadBackendKpis(force) {
+    if (!force && state.backendKpis && state.backendKpisFetchedAt &&
+        (Date.now() - state.backendKpisFetchedAt) < CACHE_TTL_MS) {
+      return state.backendKpis;
+    }
+    if (!PS2Api.sheetKpis) return null;
+    try {
+      var res = await PS2Api.sheetKpis();
+      if (!res || !res.ok || !res.data || !res.data.funnel) {
+        return state.backendKpis || null;
+      }
+      state.backendKpis = res.data;
+      state.backendKpisFetchedAt = Date.now();
+      return state.backendKpis;
+    } catch (_) {
+      return state.backendKpis || null;
+    }
+  }
+
   /** Lazy: only when opening a lead detail — never on tab switch / page load. */
   async function loadAuditLogForLead(email) {
     email = String(email || '').trim().toLowerCase();
@@ -240,7 +265,7 @@
       var res = await PS2Api.auditLog(email);
       if (!res.ok) return [];
       var rows = PS2Api.asRows(res.data);
-      // Guard: until n8n adds audit_log resource, API may return Sheet1 leads
+      // Guard: if API returns Sheet1 leads instead of audit rows, ignore
       if (!PS2Sheet.looksLikeAuditRows(rows)) return [];
       return rows
         .map(PS2Sheet.normalizeAuditEvent)
@@ -278,10 +303,12 @@
     state.sheetFetchedAt = null;
     state.emailLogFetchedAt = null;
     state.mailConfigFetchedAt = null;
+    state.backendKpisFetchedAt = null;
     toast('Refreshing…');
     await loadSheetLeads(true);
     await loadEmailLog(true);
     try { await ensureMailConfig(true); } catch (_) {}
+    try { await loadBackendKpis(true); } catch (_) {}
     toast('Data refreshed');
     renderView(state.view);
   }
@@ -289,6 +316,7 @@
   function refreshAfterSheetWrite() {
     state.sheetFetchedAt = null;
     state.emailLogFetchedAt = null;
+    state.backendKpisFetchedAt = null;
     if (state.view === 'pipeline') return renderPipeline();
     if (state.view === 'leads') return renderLeads();
     if (state.view === 'dashboard') return renderDashboard();
@@ -612,7 +640,25 @@
       if (l.email) leadByEmail[String(l.email).toLowerCase()] = l;
     });
 
-    var s = PS2Sheet.computeKpis(leads);
+    // Client compute always available (filters / fallback). Backend KPIs are SSOT
+    // only for unfiltered All Campaigns + All time — never breaks tracker/pipeline.
+    var localKpis = PS2Sheet.computeKpis(leads);
+    var s = localKpis;
+    var kpiFromBackend = false;
+    var filtersActive = !!(batchFilter || (dateRange && dateRange !== 'all'));
+    if (!filtersActive) {
+      try {
+        var remote = await loadBackendKpis(false);
+        var mapped = remote && PS2Sheet.mapBackendKpis
+          ? PS2Sheet.mapBackendKpis(remote, localKpis)
+          : null;
+        if (mapped) {
+          s = mapped;
+          kpiFromBackend = true;
+        }
+      } catch (_) { /* keep localKpis */ }
+    }
+
     var activity = (emailLog || [])
       .slice()
       .filter(function (e) {
@@ -635,14 +681,21 @@
     var funnelDrop = s.funnel_drop || s.funnel || [];
     var maxFunnel = Math.max(1, ...funnelDrop.map(function(f){ return f.count; }));
 
-    var meetingsCount = s.meetings_all != null ? s.meetings_all : ((s.meetings_proposed || 0) + (s.meetings_scheduled || 0) + (s.human_takeover || 0) + (s.converted_via_meeting || 0));
+    var meetingsCount = s.meetings_all != null ? s.meetings_all
+      : ((s.meetings_proposed || 0) + (s.meetings_scheduled || 0) + (s.human_takeover || 0) + (s.converted_via_meeting || 0));
     var rate = s.meeting_conversion_rate == null ? '—' : (s.meeting_conversion_rate + '%');
     var meetHintParts = [];
     if (s.meetings_proposed) meetHintParts.push(s.meetings_proposed + ' proposed');
     if (s.meetings_scheduled) meetHintParts.push(s.meetings_scheduled + ' scheduled');
-    if (s.human_takeover) meetHintParts.push(s.human_takeover + ' takeover');
-    if (s.converted_via_meeting) meetHintParts.push(s.converted_via_meeting + ' converted');
-    var meetHint = meetHintParts.length ? meetHintParts.join(' · ') : 'Proposed + scheduled + takeover + converted';
+    if (kpiFromBackend) {
+      // Backend meetings_all = proposed + scheduled only (human_takeover excluded)
+      if (s.human_takeover) meetHintParts.push(s.human_takeover + ' takeover (not in Meetings)');
+      var meetHint = meetHintParts.length ? meetHintParts.join(' · ') : 'Proposed + scheduled (portal API)';
+    } else {
+      if (s.human_takeover) meetHintParts.push(s.human_takeover + ' takeover');
+      if (s.converted_via_meeting) meetHintParts.push(s.converted_via_meeting + ' converted');
+      var meetHint = meetHintParts.length ? meetHintParts.join(' · ') : 'Proposed + scheduled + takeover + converted';
+    }
     var rateHint = (s.replied_for_rate || 0) === 0
       ? 'No replies yet'
       : (meetingsCount + ' of ' + (s.replied_for_rate || 0) + ' replies');
@@ -654,12 +707,19 @@
       ? '<span class="filter-active-note">Filtered to: ' + esc(dateLabel) + '</span>'
       : '';
 
+    // Attention lists stay client-side so View → Lead Tracker still works
     var attention = buildNeedsAttention(leads, emailLog);
+
+    var kpiSub = kpiFromBackend
+      ? 'KPIs from portal API (SSOT) · Pipeline funnel · outreach actions'
+      : (filtersActive
+        ? 'KPIs from filtered master sheet · Pipeline funnel · outreach actions'
+        : 'KPIs from master Google Sheet · Pipeline funnel · outreach actions');
 
     main.innerHTML =
       syncBarHtml() +
       (filterNote ? '<div class="dash-filter-note">' + filterNote + '</div>' : '') +
-      '<div class="page-head"><div><h1 class="page-title">Dashboard</h1><p class="page-sub">KPIs from master Google Sheet · Pipeline funnel · outreach actions</p></div>' +
+      '<div class="page-head"><div><h1 class="page-title">Dashboard</h1><p class="page-sub">' + esc(kpiSub) + '</p></div>' +
         '<div class="dash-filters">' +
           '<div class="date-range-pills" role="group" aria-label="Date range">' +
             datePill('7d', 'Last 7 days', dateRange) +
@@ -1815,7 +1875,7 @@
 
   function auditTimelineHtml(events) {
     if (!events || !events.length) {
-      return '<p class="audit-empty" style="color:var(--muted);font-size:13px;margin:0">No audit events yet for this lead. Timeline will fill once the Audit Log sheet is wired in Portal Data API (<code>resource=audit_log</code>).</p>';
+      return '<p class="audit-empty" style="color:var(--muted);font-size:13px;margin:0">No audit events yet for this lead.</p>';
     }
     return '<ul class="audit-timeline">' + events.map(function (ev) {
       var meta = AUDIT_EVENT_META[ev.event_type] || AUDIT_EVENT_META.status_changed;
@@ -3348,13 +3408,14 @@
       toast((sheetRes.data && sheetRes.data.error) || 'Sheet update failed', true);
       return;
     }
-    toast(sheetRes.verified
+    toast(sheetRes.verified || (sheetRes.data && sheetRes.data.success)
       ? 'Converted — sheet status confirmed'
       : 'Converted — status updated in master sheet');
     closeModal();
     closeDetail();
     state.sheetFetchedAt = null;
     state.emailLogFetchedAt = null;
+    state.backendKpisFetchedAt = null;
     if (state.view === 'lead-tracker') renderLeadTracker();
     else if (state.view === 'pipeline') renderPipeline();
     else if (state.view === 'dashboard') renderDashboard();

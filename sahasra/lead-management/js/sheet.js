@@ -223,6 +223,79 @@
     };
   }
 
+  /**
+   * Map portal-data resource=kpis payload → same shape as computeKpis().
+   * Backend is authoritative for meetings_all / response_rate / meeting_conversion.
+   * Falls back to local fields (e.g. discarded) when the API omits them.
+   */
+  function mapBackendKpis(payload, fallback) {
+    fallback = fallback || {};
+    if (!payload || typeof payload !== 'object' || !payload.funnel) return null;
+    var f = payload.funnel || {};
+    var r = payload.rates || {};
+    function n(v, def) {
+      if (v == null || v === '') return def != null ? def : 0;
+      var x = Number(v);
+      return isNaN(x) ? (def != null ? def : 0) : x;
+    }
+    var emailed = n(f.emailed != null ? f.emailed : f.mail_1_sent, fallback.mail_1_sent);
+    var replied = n(f.replied != null ? f.replied : f.responses, fallback.responses);
+    var meetingsAll = n(f.meetings_all, n(f.meeting_proposed) + n(f.meeting_scheduled));
+    var converted = n(f.converted, fallback.converted_leads);
+    var discarded = n(f.discarded != null ? f.discarded : f.discarded_leads, fallback.discarded_leads || 0);
+    var fus = n(f.follow_ups_sent, fallback.follow_ups_sent);
+    var newCount = n(f.new, fallback.funnel && fallback.funnel[0] ? fallback.funnel[0].count : 0);
+    var responseRate = r.response_rate_pct != null ? n(r.response_rate_pct, null) : fallback.response_rate;
+    var meetingRate = r.meeting_conversion_pct != null ? n(r.meeting_conversion_pct, null) : fallback.meeting_conversion_rate;
+    var overallRate = r.overall_conversion_pct != null ? n(r.overall_conversion_pct, null) : null;
+
+    var funnel = [
+      { key: 'new', label: 'New', count: newCount },
+      { key: 'mail_1_sent', label: 'Emailed', count: emailed },
+      { key: 'follow_up', label: 'Follow-up Emails Sent', count: fus },
+      { key: 'responded', label: 'Responses', count: replied },
+      { key: 'meeting', label: 'Meetings', count: meetingsAll },
+      { key: 'converted', label: 'Converted', count: converted },
+      { key: 'discarded', label: 'Discarded', count: discarded },
+    ];
+    var funnelDrop = [
+      { key: 'new', label: 'New', count: newCount },
+      { key: 'mail_1_sent', label: 'Mail Sent', count: emailed },
+      { key: 'follow_up', label: 'Follow Up', count: fus },
+      { key: 'responded', label: 'Replied', count: replied },
+      { key: 'meeting', label: 'Meetings', count: meetingsAll },
+      { key: 'converted', label: 'Converted', count: converted },
+    ];
+
+    return {
+      total_leads: n(f.total_leads, fallback.total_leads),
+      mail_1_sent: emailed,
+      follow_ups_sent: fus,
+      responses: replied,
+      responded_leads: replied,
+      replied_for_rate: replied,
+      meetings_proposed: n(f.meeting_proposed),
+      meetings_scheduled: n(f.meeting_scheduled),
+      meetings: meetingsAll,
+      meetings_all: meetingsAll,
+      human_takeover: n(f.human_takeover),
+      converted_via_meeting: fallback.converted_via_meeting || 0,
+      converted_leads: converted,
+      discarded_leads: discarded,
+      contacted_leads: emailed,
+      conversion_rate: meetingRate,
+      meeting_conversion_rate: meetingRate,
+      response_rate: responseRate,
+      overall_conversion_rate: overallRate,
+      funnel: funnel,
+      funnel_drop: funnelDrop,
+      needs_attention: payload.needs_attention || {},
+      campaigns: payload.campaigns || {},
+      computed_at: payload.computed_at || '',
+      from_backend: true,
+    };
+  }
+
   global.PS2Sheet = {
     FOLLOW_UP_STATUSES: FOLLOW_UP_STATUSES,
     normStatus: normStatus,
@@ -233,6 +306,7 @@
     pipelineBucket: pipelineBucket,
     wentThroughMeeting: wentThroughMeeting,
     computeKpis: computeKpis,
+    mapBackendKpis: mapBackendKpis,
     findLeadByEmail: findLeadByEmail,
     looksLikeAuditRows: looksLikeAuditRows,
     normalizeAuditEvent: normalizeAuditEvent,
