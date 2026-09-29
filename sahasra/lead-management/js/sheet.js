@@ -22,6 +22,13 @@
       'meeting_booked': 'meeting_scheduled',
       'fu_1': 'follow_up_1', 'fu_2': 'follow_up_2', 'fu_3': 'follow_up_3',
       'fu_4': 'follow_up_4', 'fu_5': 'follow_up_5',
+      'convert': 'converted',
+      'conversion': 'converted',
+      'won': 'converted',
+      'client': 'converted',
+      'discard': 'discarded',
+      'rejected': 'discarded',
+      'do_not_contact': 'discarded',
     };
     return aliases[s] || s || 'new';
   }
