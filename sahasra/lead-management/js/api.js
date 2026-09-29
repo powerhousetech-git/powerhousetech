@@ -103,8 +103,25 @@
     return { ok: false };
   }
 
+  function writeSucceeded(data) {
+    if (!data || typeof data !== 'object') return false;
+    if (data.success === true || data.success === 'true') return true;
+    if (data.ok === true || data.ok === 'true') return true;
+    if (data.verified === true) return true;
+    return false;
+  }
+
   async function confirmWriteOrVerify(res, label, verify) {
     if (!res) return { ok: false, status: 0, data: { error: 'No response' } };
+    // Convert / update now wait for sheet write and return { success: true }
+    if (res.ok && writeSucceeded(res.data)) {
+      return {
+        ok: true,
+        status: res.status || 200,
+        verified: true,
+        data: Object.assign({ ok: true, verified: true }, res.data || {}),
+      };
+    }
     if (res.ackOnly) {
       if (verify && typeof verify === 'function') {
         var checked = await verify();
@@ -248,6 +265,8 @@
 
     // ─── READS (n8n Portal Data API) ───
     sheetLeads: function () { return portalData('leads'); },
+    /** Dashboard SSOT — funnel / rates / needs_attention / campaigns */
+    sheetKpis: function () { return portalData('kpis'); },
     mailConfig: function () { return portalData('mail-config'); },
     getSettings: function () { return portalData('settings'); },
     listEmails: function () { return portalData('email-log'); },
