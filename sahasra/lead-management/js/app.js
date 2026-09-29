@@ -687,14 +687,15 @@
     var meetHintParts = [];
     if (s.meetings_proposed) meetHintParts.push(s.meetings_proposed + ' proposed');
     if (s.meetings_scheduled) meetHintParts.push(s.meetings_scheduled + ' scheduled');
+    var meetHint;
     if (kpiFromBackend) {
       // Backend meetings_all = proposed + scheduled only (human_takeover excluded)
       if (s.human_takeover) meetHintParts.push(s.human_takeover + ' takeover (not in Meetings)');
-      var meetHint = meetHintParts.length ? meetHintParts.join(' · ') : 'Proposed + scheduled (portal API)';
+      meetHint = meetHintParts.length ? meetHintParts.join(' · ') : 'Proposed + scheduled (portal API)';
     } else {
       if (s.human_takeover) meetHintParts.push(s.human_takeover + ' takeover');
       if (s.converted_via_meeting) meetHintParts.push(s.converted_via_meeting + ' converted');
-      var meetHint = meetHintParts.length ? meetHintParts.join(' · ') : 'Proposed + scheduled + takeover + converted';
+      meetHint = meetHintParts.length ? meetHintParts.join(' · ') : 'Proposed + scheduled + takeover + converted';
     }
     var rateHint = (s.replied_for_rate || 0) === 0
       ? 'No replies yet'
