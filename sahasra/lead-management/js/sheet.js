@@ -224,13 +224,47 @@
   }
 
   /**
+   * True when portal KPIs match the master-sheet universe closely enough to trust.
+   * Rejects stale/miscomputed payloads (e.g. follow_ups_sent=0 while sheet has FU rows).
+   */
+  function backendKpisConsistent(payload, local) {
+    if (!payload || !payload.funnel || !local) return false;
+    var f = payload.funnel;
+    function n(v) {
+      var x = Number(v);
+      return isNaN(x) ? 0 : x;
+    }
+    var remoteTotal = n(f.total_leads);
+    var localTotal = n(local.total_leads);
+    if (!remoteTotal || !localTotal || remoteTotal !== localTotal) return false;
+
+    var remoteEmailed = n(f.emailed != null ? f.emailed : f.mail_1_sent);
+    var remoteFu = n(f.follow_ups_sent);
+    var remoteConverted = n(f.converted);
+    var localEmailed = n(local.mail_1_sent);
+    var localFu = n(local.follow_ups_sent);
+    var localConverted = n(local.converted_leads);
+
+    // Sheet has active follow-ups but API reports none → not synced
+    if (localFu > 0 && remoteFu === 0) return false;
+    // API emailed cohort far below sheet contacted count
+    if (localEmailed >= 3 && remoteEmailed + 2 < localEmailed) return false;
+    // Converted must match sheet (dashboard/tracker SSOT)
+    if (remoteConverted !== localConverted) return false;
+    // Follow-ups should not undercount sheet by more than half
+    if (localFu >= 2 && remoteFu * 2 < localFu) return false;
+    return true;
+  }
+
+  /**
    * Map portal-data resource=kpis payload → same shape as computeKpis().
-   * Backend is authoritative for meetings_all / response_rate / meeting_conversion.
+   * Only call after backendKpisConsistent() — otherwise keep sheet computeKpis.
    * Falls back to local fields (e.g. discarded) when the API omits them.
    */
   function mapBackendKpis(payload, fallback) {
     fallback = fallback || {};
     if (!payload || typeof payload !== 'object' || !payload.funnel) return null;
+    if (!backendKpisConsistent(payload, fallback)) return null;
     var f = payload.funnel || {};
     var r = payload.rates || {};
     function n(v, def) {
@@ -306,6 +340,7 @@
     pipelineBucket: pipelineBucket,
     wentThroughMeeting: wentThroughMeeting,
     computeKpis: computeKpis,
+    backendKpisConsistent: backendKpisConsistent,
     mapBackendKpis: mapBackendKpis,
     findLeadByEmail: findLeadByEmail,
     looksLikeAuditRows: looksLikeAuditRows,
