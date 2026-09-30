@@ -464,7 +464,6 @@
     var attr = opts.attr || 'data-field';
     var locked = !!opts.locked;
     var isPct = isPctFormulaField(f);
-    var isLabour = f === 'labour_elec_override';
     var rightVal = c[f];
     var rightPh = isPct ? String(defaultPct(f)) : '';
     var rightShown = rightVal != null && rightVal !== '' ? rightVal : isPct ? defaultPct(f) : '';
