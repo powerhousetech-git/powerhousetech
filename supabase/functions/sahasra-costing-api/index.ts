@@ -93,6 +93,10 @@ function isFinalLockedStatus(status: string) {
   return status === 'final' || status === 'sent' || status === 'approved';
 }
 
+function hasCompleteTrueValues(row: { true_margin?: unknown; true_quote_price?: unknown; true_value_addition?: unknown }) {
+  return row.true_margin != null && row.true_quote_price != null && row.true_value_addition != null;
+}
+
 async function writeAudit(
   costingId: string,
   actor: string,
@@ -302,20 +306,22 @@ Deno.serve(async (req) => {
       }
       const patch = pickCostingPatch(body);
 
-      // Non-admins: final costings only allow true-value fields (+ reopen blocked).
+      // Non-admins: after true values are in, final costings only allow true-value fields.
+      // Until then the owner can reopen (draft / in_review) and keep editing.
       if (isFinalLockedStatus(existing.status) && member.role !== 'admin') {
-        const keys = Object.keys(patch);
-        const illegal = keys.filter(
-          (k) => !TRUE_VALUE_FIELDS.has(k) && !FINAL_SNAPSHOT_FIELDS.has(k),
-        );
-        // Allow status reopen only for admin; non-admin cannot change away from final except true values.
-        if (patch.status && patch.status !== existing.status && patch.status !== 'final') {
-          return jsonResponse(403, { error: 'This costing is locked. Only true values can be edited.' });
-        }
-        if (illegal.length) {
-          return jsonResponse(403, {
-            error: 'This costing is locked. Only true values can be edited.',
-          });
+        if (hasCompleteTrueValues(existing)) {
+          const keys = Object.keys(patch);
+          const illegal = keys.filter(
+            (k) => !TRUE_VALUE_FIELDS.has(k) && !FINAL_SNAPSHOT_FIELDS.has(k),
+          );
+          if (patch.status && patch.status !== existing.status && patch.status !== 'final') {
+            return jsonResponse(403, { error: 'This costing is locked. Only true values can be edited.' });
+          }
+          if (illegal.length) {
+            return jsonResponse(403, {
+              error: 'This costing is locked. Only true values can be edited.',
+            });
+          }
         }
       }
 
