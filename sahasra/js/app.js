@@ -1200,7 +1200,10 @@
     if (!c) return false;
     var st = c.status === 'submitted' ? 'final' : c.status;
     if (st !== 'final') return false;
-    return !(state.profile && state.profile.role === 'admin');
+    if (state.profile && state.profile.role === 'admin') return false;
+    // Keep the record editable until true values are filled (review actions must still work).
+    if (SahasraFormat.needsTrueValue(c)) return false;
+    return true;
   }
 
   function renderCostingWizard() {
@@ -1319,7 +1322,17 @@
     state.wizardStep = 7;
     recompute();
     var c = state.costing;
-    var comp = state.computed;
+    var comp =
+      state.computed ||
+      (typeof SahasraCompute !== 'undefined'
+        ? SahasraCompute.computeCosting(c, (state.profile && state.profile.defaults) || {})
+        : null);
+    if (!comp) {
+      $('main-content').innerHTML =
+        '<p class="muted">Could not calculate this costing. Try reloading.</p>';
+      return;
+    }
+    state.computed = comp;
     var locked = isCostingLocked();
     $('main-title').textContent = c.assembly_name;
     $('main-sub').textContent = costingSubtitle(c, SahasraFormat.progressLabel(c).label);
@@ -1409,8 +1422,16 @@
       adminReopen +
       '</div></div></div>';
 
-    $('btn-edit').onclick = function () {
-      if (locked) return;
+    $('btn-edit').onclick = async function () {
+      if (locked) {
+        toast('This costing is final. Ask an admin to reopen it, or enter true values from Costings.', true);
+        return;
+      }
+      var st = c.status === 'submitted' ? 'final' : c.status;
+      if (st === 'final') {
+        var opened = await persistCosting({ status: 'in_review', current_step: 6 }, 'Reopened for editing.');
+        if (!opened) return;
+      }
       state.wizardStep = 6;
       renderCostingWizard();
     };
@@ -1428,12 +1449,19 @@
       location.hash = '#/costings';
     };
     $('btn-draft-review').onclick = async function () {
-      if (locked) return;
+      if (locked) {
+        toast('This costing is final. Only true values can be edited from Costings.', true);
+        return;
+      }
       await persistCosting({ current_step: 7, status: 'draft' }, 'Draft saved at review stage.');
     };
     $('btn-submit-review').onclick = async function () {
-      if (locked) return;
-      var snap = calcSnapshotPatch(comp);
+      if (locked) {
+        toast('This costing is final. Only true values can be edited from Costings.', true);
+        return;
+      }
+      recompute();
+      var snap = calcSnapshotPatch(state.computed || comp);
       snap.current_step = 7;
       snap.status = 'in_review';
       var ok = await persistCosting(snap, 'Submitted for review.');
