@@ -753,9 +753,9 @@
       (state.user && state.user.role !== 'pt_admin' ? emailAutomationsPanel() : '') +
       '<div style="display:grid;grid-template-columns:1fr 340px;gap:18px">' +
         '<div class="panel">' +
-          '<div class="panel-head"><h2>Pipeline Funnel</h2><span style="font-size:12px;color:var(--muted)">Drop-off % between stages</span></div>' +
+          '<div class="panel-head"><h2>Pipeline Funnel</h2><span style="font-size:12px;color:var(--muted)">Stage counts</span></div>' +
           '<div style="padding:18px"><div class="funnel">' +
-          funnelDrop.map(function(f, i){
+          funnelDrop.map(function(f){
             var w = Math.round((f.count / maxFunnel) * 100);
             var colors = {
               new: 'var(--muted)',
@@ -770,18 +770,7 @@
               discarded: 'var(--red)',
             };
             var barColor = colors[f.key] || 'var(--primary)';
-            var dropHtml = '';
-            if (i > 0) {
-              var prev = funnelDrop[i - 1].count;
-              if (prev > 0 && f.count < prev) {
-                var pct = Math.round(((prev - f.count) / prev) * 1000) / 10;
-                dropHtml = '<div class="funnel-drop">' + pct + '% drop</div>';
-              } else if (prev > 0 && f.count >= prev) {
-                dropHtml = '<div class="funnel-drop funnel-drop-flat">no drop</div>';
-              }
-            }
-            return dropHtml +
-              '<div class="funnel-row"><span class="funnel-label">' + esc(f.label) + '</span>' +
+            return '<div class="funnel-row"><span class="funnel-label">' + esc(f.label) + '</span>' +
               '<div class="funnel-bar-wrap"><div class="funnel-bar" style="width:' + w + '%;background:' + barColor + '"></div></div>' +
               '<span class="funnel-count">' + f.count + '</span></div>';
           }).join('') +
