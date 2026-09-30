@@ -640,8 +640,8 @@
       if (l.email) leadByEmail[String(l.email).toLowerCase()] = l;
     });
 
-    // Client compute always available (filters / fallback). Backend KPIs are SSOT
-    // only for unfiltered All Campaigns + All time — never breaks tracker/pipeline.
+    // Sheet compute is always the sync baseline (matches Lead Tracker).
+    // Backend resource=kpis is used only when totals/stages agree with the sheet.
     var localKpis = PS2Sheet.computeKpis(leads);
     var s = localKpis;
     var kpiFromBackend = false;
@@ -649,9 +649,10 @@
     if (!filtersActive) {
       try {
         var remote = await loadBackendKpis(false);
-        var mapped = remote && PS2Sheet.mapBackendKpis
-          ? PS2Sheet.mapBackendKpis(remote, localKpis)
-          : null;
+        var mapped = null;
+        if (remote && PS2Sheet.backendKpisConsistent && PS2Sheet.backendKpisConsistent(remote, localKpis)) {
+          mapped = PS2Sheet.mapBackendKpis ? PS2Sheet.mapBackendKpis(remote, localKpis) : null;
+        }
         if (mapped) {
           s = mapped;
           kpiFromBackend = true;
