@@ -40,8 +40,8 @@
         'aoi',
         'pca_labeling',
         'packaging_forwarding',
+        'labour_elec_override',
       ],
-      computed: ['inventory_carrying_cost', 'labour_elec'],
     },
     {
       n: 4,
@@ -65,8 +65,8 @@
     bom_cost_elec: 'BOM Cost (Amt.) - Elec.',
     bom_cost_mech: 'BOM Cost (Amt.) - Mech.',
     pcb_cost: 'PCB Cost (Amt.)',
-    freight_in_pct_override: 'Freight In & CC (%)',
-    inventory_carrying_pct_override: 'Inventory carrying (%)',
+    freight_in_pct_override: 'Freight In & CC',
+    inventory_carrying_pct_override: 'Inventory Carrying Cost',
     inventory_carrying_cost: 'Inventory Carrying Cost',
     labour_elec: 'Labour Elec.',
     labour_mech: 'Labour Mech.',
@@ -88,11 +88,11 @@
     parts_lead_time: 'Parts LT',
     production_lead_time: 'Production Lead-Time',
     engineering_lead_time: 'Engineering LT',
-    labour_elec_override: 'Labour Elec. (manual)',
-    rejection_pct_override: 'Rejection (%)',
-    overhead_pct_override: 'Overhead (%)',
-    freight_out_pct_override: 'Freight Out (%)',
-    margin_pct_override: 'Margin (%)',
+    labour_elec_override: 'Labour Elec.',
+    rejection_pct_override: 'Rejection Cost',
+    overhead_pct_override: 'Overheads',
+    freight_out_pct_override: 'Freight Out & CC',
+    margin_pct_override: 'Margin',
   };
 
   var PLACEHOLDERS = {
@@ -150,6 +150,92 @@
     if (key === 'freight_out_pct_override') return 'Formula: Product Cost × ' + d + '%.';
     if (key === 'margin_pct_override') return 'Formula: Product Cost × ' + d + '%.';
     return 'Optional — leave blank to use org default.';
+  }
+
+  var PCT_FORMULA_FIELDS = {
+    freight_in_pct_override: {
+      amountKey: 'freight_in_cc',
+      formula: function (pct) {
+        return '(BOM Elec + BOM Mech + PCB Cost) × ' + pct + '%';
+      },
+    },
+    inventory_carrying_pct_override: {
+      amountKey: 'inventory_carrying_cost',
+      formula: function (pct) {
+        return 'Material Cost × ' + pct + '%';
+      },
+    },
+    rejection_pct_override: {
+      amountKey: 'rejection_cost',
+      formula: function (pct) {
+        return 'Sub Total 1 × ' + pct + '%';
+      },
+    },
+    overhead_pct_override: {
+      amountKey: 'overheads',
+      formula: function (pct) {
+        return 'Sub Total 2 × ' + pct + '%';
+      },
+    },
+    freight_out_pct_override: {
+      amountKey: 'freight_out_cc',
+      formula: function (pct) {
+        return 'Product Cost × ' + pct + '%';
+      },
+    },
+    margin_pct_override: {
+      amountKey: 'margin',
+      formula: function (pct) {
+        return 'Product Cost × ' + pct + '%';
+      },
+    },
+  };
+
+  function isPctFormulaField(f) {
+    return !!PCT_FORMULA_FIELDS[f];
+  }
+
+  function effectivePct(key, costing) {
+    costing = costing || state.costing || {};
+    var raw = costing[key];
+    if (raw != null && raw !== '') {
+      var n = Number(raw);
+      if (Number.isFinite(n)) return n;
+    }
+    return Number(defaultPct(key)) || 0;
+  }
+
+  function formulaAmountText(key, costing, comp) {
+    costing = costing || state.costing || {};
+    comp = comp || state.computed;
+    if (!comp) return '—';
+    var currency = costing.currency || 'USD';
+    var meta = PCT_FORMULA_FIELDS[key];
+    if (meta) return fmtMoney(comp[meta.amountKey], currency);
+    if (key === 'labour_elec_override') {
+      return comp.labour_elec_pending
+        ? 'Pending — fill SMT+PTH in Step 4'
+        : fmtMoney(comp.labour_elec, currency);
+    }
+    if (key === 'pcb_tooling_override') return fmtMoney(comp.pcb_tooling, currency);
+    return '—';
+  }
+
+  function formulaHintText(key, costing) {
+    costing = costing || state.costing || {};
+    if (PCT_FORMULA_FIELDS[key]) {
+      return 'Formula: ' + PCT_FORMULA_FIELDS[key].formula(effectivePct(key, costing));
+    }
+    if (key === 'labour_elec_override') {
+      var mult =
+        (state.profile && state.profile.defaults && state.profile.defaults.labour_elec_multiplier) ||
+        0.005;
+      return 'Formula: SMT+PTH × ' + mult + '. Change amount on the right if needed.';
+    }
+    if (key === 'pcb_tooling_override') {
+      return 'Default tooling amount: ' + defaultPct(key) + '. Change amount on the right if needed.';
+    }
+    return overrideFormula(key);
   }
 
   function getNaFields(costing) {
@@ -298,6 +384,14 @@
     document.querySelectorAll('[data-computed="inventory_carrying_cost"]').forEach(function (el) {
       el.textContent = fmtMoney(comp.inventory_carrying_cost, c.currency);
     });
+    document.querySelectorAll('[data-formula-amount]').forEach(function (el) {
+      var key = el.getAttribute('data-formula-amount');
+      el.textContent = formulaAmountText(key, c, comp);
+    });
+    document.querySelectorAll('[data-formula-hint]').forEach(function (el) {
+      var key = el.getAttribute('data-formula-hint');
+      el.textContent = formulaHintText(key, c);
+    });
   }
 
   function schedulePreviewUpdate() {
@@ -365,7 +459,63 @@
     return true;
   }
 
+  function formulaSplitRowHtml(f, c, opts) {
+    opts = opts || {};
+    var attr = opts.attr || 'data-field';
+    var locked = !!opts.locked;
+    var isPct = isPctFormulaField(f);
+    var isLabour = f === 'labour_elec_override';
+    var rightVal = c[f];
+    var rightPh = isPct ? String(defaultPct(f)) : '';
+    var rightShown = rightVal != null && rightVal !== '' ? rightVal : isPct ? defaultPct(f) : '';
+    var amount = formulaAmountText(f, c, state.computed);
+    var rightLabel = isPct ? '%' : 'Change';
+    var rightSuffix = isPct ? '<span class="formula-pct-suffix">%</span>' : '';
+    return (
+      '<div class="field-row is-optional is-formula" data-field-row="' +
+      f +
+      '">' +
+      '<div class="field-main">' +
+      '<div class="field-top"><span class="field-name">' +
+      esc(LABELS[f] || f) +
+      '</span></div>' +
+      '<div class="formula-split">' +
+      '<div class="formula-amount-wrap">' +
+      '<span class="formula-col-label">Calculated</span>' +
+      '<div class="formula-amount" data-formula-amount="' +
+      f +
+      '">' +
+      esc(amount) +
+      '</div></div>' +
+      '<div class="formula-pct-wrap">' +
+      '<span class="formula-col-label">' +
+      rightLabel +
+      '</span>' +
+      '<div class="formula-pct-box">' +
+      '<input ' +
+      attr +
+      '="' +
+      f +
+      '" type="number" step="any"' +
+      (locked ? ' disabled' : '') +
+      (rightPh ? ' placeholder="' + esc(rightPh) + '"' : '') +
+      ' value="' +
+      esc(rightShown) +
+      '" />' +
+      rightSuffix +
+      '</div></div></div>' +
+      '<span class="field-hint" data-formula-hint="' +
+      f +
+      '">' +
+      esc(formulaHintText(f, c)) +
+      '</span></div></div>'
+    );
+  }
+
   function fieldInputHtml(f, c) {
+    if (isPctFormulaField(f) || f === 'labour_elec_override' || f === 'pcb_tooling_override') {
+      return formulaSplitRowHtml(f, c);
+    }
     var val = c[f];
     var isLead = f.indexOf('lead_time') >= 0 || f.indexOf('_lt') >= 0;
     var isText = isLead || f === 'pcb_vendor' || f === 'pcb_size';
@@ -373,15 +523,11 @@
     var optional = isOverrideField(f);
     var markedNa = !optional && isNaMarked(f, c);
     var ph = '';
-    if (optional) {
-      ph = ' placeholder="' + esc(String(defaultPct(f))) + '"';
-    } else if (PLACEHOLDERS[f]) {
+    if (PLACEHOLDERS[f]) {
       ph = ' placeholder="' + esc(PLACEHOLDERS[f]) + '"';
     }
     var hint = '';
-    if (optional) {
-      hint = '<span class="field-hint">' + esc(overrideFormula(f)) + '</span>';
-    } else if (isLead) {
+    if (isLead) {
       hint = '<span class="field-hint">Include units, e.g. weeks or week / Batch</span>';
     }
     var labelText =
@@ -1231,10 +1377,6 @@
         .join('');
     }
 
-    if (state.wizardStep === 3) {
-      fieldsHtml += fieldInputHtml('labour_elec_override', c);
-    }
-
     var stepOk = stepRequiredComplete(step, c);
     var stepper = STEPS.map(function (s) {
       var done = s.n < state.wizardStep;
@@ -1261,7 +1403,7 @@
       step.n +
       ': ' +
       esc(step.title) +
-      '</h2><p class="step-req-note">Required fields marked * — use NA if not applicable. Optional % fields show the formula and stay editable.</p><form id="step-form" class="form-panel">' +
+      '</h2><p class="step-req-note">Required fields marked * — use NA if not applicable. Formula rows show the calculated amount; change the % on the right if needed.</p><form id="step-form" class="form-panel">' +
       fieldsHtml +
       '<div class="form-actions">' +
       '<button type="button" class="btn btn-ghost" id="btn-back"' +
@@ -1350,6 +1492,8 @@
       : '<p class="muted">No validation warnings.</p>';
 
     var overrideFields = [
+      'freight_in_pct_override',
+      'inventory_carrying_pct_override',
       'rejection_pct_override',
       'overhead_pct_override',
       'freight_out_pct_override',
@@ -1357,21 +1501,7 @@
     ];
     var overrides = overrideFields
       .map(function (f) {
-        return (
-          '<div class="field-row is-optional"><div class="field-main"><div class="field-top"><span class="field-name">' +
-          esc(LABELS[f]) +
-          ' <span class="opt-tag">optional</span></span></div>' +
-          '<input data-override="' +
-          f +
-          '" type="number" step="any" value="' +
-          esc(c[f] != null ? c[f] : '') +
-          '" placeholder="' +
-          esc(String(defaultPct(f))) +
-          '" />' +
-          '<span class="field-hint">' +
-          esc(overrideFormula(f)) +
-          '</span></div></div>'
-        );
+        return formulaSplitRowHtml(f, c, { attr: 'data-override', locked: locked });
       })
       .join('');
 
@@ -1392,7 +1522,7 @@
       '</tbody></table>' +
       (locked
         ? ''
-        : '<details class="override-panel" open><summary>Percentage formulas (editable)</summary><div class="form-panel">' +
+        : '<details class="override-panel" open><summary>Formula amounts (change % if needed)</summary><div class="form-panel">' +
           overrides +
           '<button type="button" class="btn btn-ghost btn-sm" id="save-overrides">Apply overrides</button></div></details>') +
       '<div class="form-actions">' +
@@ -1448,6 +1578,14 @@
     }
     var saveOv = $('save-overrides');
     if (saveOv) {
+      document.querySelectorAll('[data-override]').forEach(function (inp) {
+        inp.addEventListener('input', function () {
+          var k = inp.getAttribute('data-override');
+          var v = inp.value.trim();
+          state.costing[k] = v === '' ? null : Number(v);
+          schedulePreviewUpdate();
+        });
+      });
       saveOv.onclick = async function () {
         var patch = { current_step: 7, status: c.status === 'in_review' ? 'in_review' : 'draft' };
         document.querySelectorAll('[data-override]').forEach(function (inp) {

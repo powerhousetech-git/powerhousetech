@@ -393,6 +393,48 @@ body {
   margin-top: 4px;
 }
 
+.formula-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  gap: 10px;
+  align-items: end;
+}
+
+.formula-col-label {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.formula-amount {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: var(--text);
+  min-height: 42px;
+  box-sizing: border-box;
+}
+
+.formula-pct-box {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.formula-pct-box input {
+  width: 100%;
+  text-align: right;
+}
+
+.formula-pct-suffix {
+  color: var(--muted);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
 .computed-field {
   background: var(--surface2);
   border: 1px dashed var(--border);
@@ -419,7 +461,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-width: 480px;
+  max-width: 560px;
 }
 
 .form-panel label,
@@ -433,7 +475,8 @@ body {
 
 .form-panel input,
 .form-panel select,
-.field-row input[data-field] {
+.field-row input[data-field],
+.field-row input[data-override] {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
