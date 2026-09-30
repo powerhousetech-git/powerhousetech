@@ -760,7 +760,6 @@ body {
   .kpi-row { grid-template-columns: 1fr 1fr; }
   .dash-filters { align-items: stretch; }
   .campaign-filter-wrap { align-items: stretch; }
-  .funnel-drop { margin-left: 0; }
 }
 
 /* ── Motion (restrained) ──────────────────────────────── */
