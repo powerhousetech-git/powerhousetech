@@ -1,7 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { bearerToken, verifyFirebaseIdToken } from '../_shared/firebase-auth.ts';
 import { corsHeaders, jsonResponse, optionsResponse } from '../_shared/cors.ts';
-import { parseWebhookOverrides, parseWorkflowRunPath, runN8nWorkflow } from './n8n-run.ts';
+import { parseWebhookOverrides, parseWorkflowRunPath, readTriggerNodeName, runN8nWorkflow } from './n8n-run.ts';
 
 /**
  * Outreach Command Center backend proxy (Supabase Edge Function).
@@ -152,6 +152,7 @@ Deno.serve(async (req) => {
           baseUrl: base,
           apiKey,
           workflowId: runWorkflowId,
+          triggerNodeName: readTriggerNodeName(body),
           webhookOverride: overrides[runWorkflowId],
         });
         return jsonResponse(result.status, result.body);

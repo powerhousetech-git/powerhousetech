@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_N8N_BASE_URL?: string;
   readonly VITE_N8N_INDIA_WORKFLOW_ID?: string;
   readonly VITE_N8N_US_WORKFLOW_ID?: string;
+  readonly VITE_N8N_INDIA_TRIGGER_NODE?: string;
+  readonly VITE_N8N_US_TRIGGER_NODE?: string;
   readonly VITE_SHEET_INDIA?: string;
   readonly VITE_SHEET_US?: string;
   readonly VITE_SHEET_EMAIL_LOG?: string;

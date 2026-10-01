@@ -1,13 +1,15 @@
 /**
- * n8n Cloud's public API does not accept POST /api/v1/workflows/{id}/run
- * (production returns 405). Run Now therefore tries, in order:
+ * n8n Cloud's public API does not accept an empty POST /api/v1/workflows/{id}/run
+ * (production returned 405). Run Now therefore:
  *   1. Optional webhook URL override (CC_N8N_WEBHOOKS JSON map)
- *   2. POST /api/v1/workflows/{id}/execute  (newer n8n public API)
- *   3. A Webhook trigger discovered on the workflow, posted at /webhook/{path}
+ *   2. POST /api/v1/workflows/{id}/execute with triggerNodeName
+ *   3. POST /api/v1/workflows/{id}/run with triggerNodeName (some n8n builds)
+ *   4. A Webhook trigger discovered on the workflow
  * It never edits workflow nodes.
  */
 
 export interface N8nNode {
+  name?: string;
   type?: string;
   disabled?: boolean;
   webhookId?: string;
@@ -35,10 +37,35 @@ export function parseWorkflowRunPath(path: string): string | null {
   return match?.[1] ?? null;
 }
 
+export function readTriggerNodeName(raw: string | undefined): string | undefined {
+  if (!raw?.trim()) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as { triggerNodeName?: unknown };
+    if (typeof parsed.triggerNodeName === 'string' && parsed.triggerNodeName.trim()) {
+      return parsed.triggerNodeName.trim();
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
 export function isWebhookTriggerNode(node: N8nNode | undefined): boolean {
   if (!node || node.disabled) return false;
   const type = String(node.type || '');
   return type === 'n8n-nodes-base.webhook' || type.endsWith('.webhook');
+}
+
+export function isScheduleTriggerNode(node: N8nNode | undefined): boolean {
+  if (!node || node.disabled) return false;
+  const type = String(node.type || '').toLowerCase();
+  return type.includes('scheduletrigger') || type.endsWith('.cron') || type.endsWith('.interval');
+}
+
+export function scheduleTriggerName(nodes: N8nNode[] | undefined): string | undefined {
+  const node = (nodes || []).find(isScheduleTriggerNode);
+  const name = node?.name?.trim();
+  return name || undefined;
 }
 
 export function webhookPathFromNode(node: N8nNode): string | null {
@@ -87,6 +114,14 @@ export function parseWebhookOverrides(raw: string | undefined): Record<string, s
   }
 }
 
+export function buildTriggerPayload(triggerNodeName?: string): string {
+  if (!triggerNodeName) return '{}';
+  return JSON.stringify({
+    triggerNodeName,
+    triggerToStartFrom: { name: triggerNodeName },
+  });
+}
+
 function n8nHeaders(apiKey: string): Record<string, string> {
   return {
     'X-N8N-API-KEY': apiKey,
@@ -122,19 +157,31 @@ function normalizeSuccess(body: unknown, fallback: Record<string, unknown>): unk
   return { ...fallback, ...(rec || {}) };
 }
 
+async function postJson(
+  fetchImpl: typeof fetch,
+  url: string,
+  headers: Record<string, string>,
+  body: string,
+): Promise<{ ok: boolean; status: number; body: unknown }> {
+  const res = await fetchImpl(url, { method: 'POST', headers, body });
+  return { ok: res.ok, status: res.status, body: await readJson(res) };
+}
+
 export async function runN8nWorkflow(opts: {
   baseUrl: string;
   apiKey: string;
   workflowId: string;
+  triggerNodeName?: string;
   webhookOverride?: string;
   fetchImpl?: typeof fetch;
 }): Promise<RunResult> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const root = opts.baseUrl.replace(/\/$/, '');
   const headers = n8nHeaders(opts.apiKey);
-  const payload = JSON.stringify({
+  const webhookPayload = JSON.stringify({
     source: 'command-center',
     triggeredAt: new Date().toISOString(),
+    triggerNodeName: opts.triggerNodeName || undefined,
   });
 
   if (opts.webhookOverride?.trim()) {
@@ -142,7 +189,7 @@ export async function runN8nWorkflow(opts: {
     const hookRes = await fetchImpl(url, {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: payload,
+      body: webhookPayload,
     });
     const hookBody = await readJson(hookRes);
     if (hookRes.ok) {
@@ -151,20 +198,6 @@ export async function runN8nWorkflow(opts: {
         body: normalizeSuccess(hookBody, { started: true, via: 'webhook-override' }),
       };
     }
-    // Fall through to execute / discovered webhook if the override URL 404s.
-  }
-
-  const executeRes = await fetchImpl(`${root}/api/v1/workflows/${opts.workflowId}/execute`, {
-    method: 'POST',
-    headers,
-    body: '{}',
-  });
-  const executeBody = await readJson(executeRes);
-  if (executeRes.ok) {
-    return {
-      status: executeRes.status,
-      body: normalizeSuccess(executeBody, { started: true, via: 'execute' }),
-    };
   }
 
   const wfRes = await fetchImpl(`${root}/api/v1/workflows/${opts.workflowId}`, {
@@ -172,6 +205,38 @@ export async function runN8nWorkflow(opts: {
     headers,
   });
   const wfBody = await readJson(wfRes);
+  const workflow = wfRes.ok ? ((asRecord(wfBody) || {}) as N8nWorkflow) : null;
+  const triggerNodeName =
+    opts.triggerNodeName?.trim() || scheduleTriggerName(workflow?.nodes);
+
+  const triggerBody = buildTriggerPayload(triggerNodeName);
+
+  const execute = await postJson(
+    fetchImpl,
+    `${root}/api/v1/workflows/${opts.workflowId}/execute`,
+    headers,
+    triggerBody,
+  );
+  if (execute.ok) {
+    return {
+      status: execute.status,
+      body: normalizeSuccess(execute.body, { started: true, via: 'execute' }),
+    };
+  }
+
+  const run = await postJson(
+    fetchImpl,
+    `${root}/api/v1/workflows/${opts.workflowId}/run`,
+    headers,
+    triggerBody,
+  );
+  if (run.ok) {
+    return {
+      status: run.status,
+      body: normalizeSuccess(run.body, { started: true, via: 'run' }),
+    };
+  }
+
   if (!wfRes.ok) {
     return {
       status: wfRes.status,
@@ -184,13 +249,12 @@ export async function runN8nWorkflow(opts: {
     };
   }
 
-  const workflow = (asRecord(wfBody) || {}) as N8nWorkflow;
-  const webhook = resolveWebhookUrl(root, workflow.nodes);
+  const webhook = resolveWebhookUrl(root, workflow?.nodes);
   if (webhook) {
     const hookRes = await fetchImpl(webhook.url, {
       method: webhook.method,
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: webhook.method === 'GET' ? undefined : payload,
+      body: webhook.method === 'GET' ? undefined : webhookPayload,
     });
     const hookBody = await readJson(hookRes);
     if (hookRes.ok) {
@@ -199,7 +263,7 @@ export async function runN8nWorkflow(opts: {
         body: normalizeSuccess(hookBody, { started: true, via: 'webhook' }),
       };
     }
-    const hint = workflow.active
+    const hint = workflow?.active
       ? `Webhook ${webhook.method} ${webhook.url} failed (${hookRes.status}).`
       : 'This workflow has a Webhook trigger but is inactive, so the production webhook is not registered. Activate it, then click Run Now.';
     return {
@@ -212,13 +276,17 @@ export async function runN8nWorkflow(opts: {
   }
 
   const executeHint =
-    asRecord(executeBody)?.message || asRecord(executeBody)?.hint || `HTTP ${executeRes.status}`;
+    asRecord(execute.body)?.message || asRecord(execute.body)?.hint || `HTTP ${execute.status}`;
+  const runHint = asRecord(run.body)?.message || asRecord(run.body)?.hint || `HTTP ${run.status}`;
   return {
     status: 409,
     body: {
       error:
-        'n8n Cloud does not support POST /workflows/{id}/run, and this workflow has no Webhook trigger. Add a Webhook node in parallel with the Schedule trigger (and keep the workflow active), then click Run Now again.',
+        triggerNodeName
+          ? `Could not start "${triggerNodeName}" via n8n /execute (${executeHint}) or /run (${runHint}). Add a Webhook node in parallel with the Schedule trigger if this n8n Cloud version has no execute API.`
+          : 'n8n Cloud rejected /run, and this workflow has no Schedule or Webhook trigger to start from.',
       executeAttempt: executeHint,
+      runAttempt: runHint,
     },
   };
 }

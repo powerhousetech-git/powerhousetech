@@ -54,12 +54,15 @@ export async function setWorkflowActive(
   };
 }
 
-export async function runWorkflow(workflowId: string): Promise<{ executionId: string }> {
-  // The proxy intercepts this path: n8n Cloud returns 405 for /run, so the
-  // Edge Function tries /execute and then a discovered webhook instead.
+export async function runWorkflow(
+  workflowId: string,
+  triggerNodeName: string,
+): Promise<{ executionId: string }> {
+  // The proxy intercepts /run (n8n Cloud 405s a bare POST) and forwards
+  // triggerNodeName to /execute, then /run, then a discovered webhook.
   const data = await apiFetch<{ executionId?: string; id?: string }>(
     n8nUrl(`workflows/${workflowId}/run`),
-    { method: 'POST', body: {} },
+    { method: 'POST', body: { triggerNodeName } },
   );
   return { executionId: String(data.executionId ?? data.id ?? '') };
 }

@@ -22,6 +22,9 @@ export interface AppConfig {
   n8nBaseUrl: string;
   indiaWorkflowId: string;
   usWorkflowId: string;
+  /** n8n Schedule Trigger node names used by Run Now. */
+  indiaTriggerNodeName: string;
+  usTriggerNodeName: string;
   tabs: { india: string; us: string; emailLog: string };
 }
 
@@ -30,8 +33,13 @@ export function loadConfig(): AppConfig {
     spreadsheetId: import.meta.env.VITE_SPREADSHEET_ID?.trim() || '',
     n8nBaseUrl:
       import.meta.env.VITE_N8N_BASE_URL?.trim() || 'https://shreyas-sinha.app.n8n.cloud',
+    // Letter O, not zero — confirmed against n8n (GET/activate 200).
     indiaWorkflowId: import.meta.env.VITE_N8N_INDIA_WORKFLOW_ID?.trim() || 'yrYIauoO1q46DORb',
     usWorkflowId: import.meta.env.VITE_N8N_US_WORKFLOW_ID?.trim() || '41O5a05zrxyWqpe2',
+    indiaTriggerNodeName:
+      import.meta.env.VITE_N8N_INDIA_TRIGGER_NODE?.trim() || 'Daily 8:30 AM IST (Mon-Sat)',
+    usTriggerNodeName:
+      import.meta.env.VITE_N8N_US_TRIGGER_NODE?.trim() || 'Daily 9 AM EST (Mon-Fri)',
     tabs: {
       india: import.meta.env.VITE_SHEET_INDIA?.trim() || 'India Leads',
       us: import.meta.env.VITE_SHEET_US?.trim() || 'US Leads',
