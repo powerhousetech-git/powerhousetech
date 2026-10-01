@@ -114,12 +114,40 @@ export function parseWebhookOverrides(raw: string | undefined): Record<string, s
   }
 }
 
+/** Production webhook paths Claude added on the India/US outreach workflows. */
+export const DEFAULT_WEBHOOK_PATHS: Record<string, string> = {
+  yrYIauoO1q46DORb: 'run-india-outreach',
+  '41O5a05zrxyWqpe2': 'run-us-outreach',
+};
+
+export function webhookOverrideFor(
+  workflowId: string,
+  envOverrides: Record<string, string>,
+): string | undefined {
+  return envOverrides[workflowId] || DEFAULT_WEBHOOK_PATHS[workflowId];
+}
+
 export function buildTriggerPayload(triggerNodeName?: string): string {
   if (!triggerNodeName) return '{}';
   return JSON.stringify({
     triggerNodeName,
     triggerToStartFrom: { name: triggerNodeName },
   });
+}
+
+/** Body used by the n8n editor: POST /rest/workflows/{id}/run */
+export function buildRestRunPayload(
+  workflow: N8nWorkflow | null,
+  triggerNodeName?: string,
+): string {
+  const payload: Record<string, unknown> = {};
+  if (workflow) payload.workflowData = workflow;
+  if (triggerNodeName) {
+    payload.triggerNodeName = triggerNodeName;
+    payload.triggerToStartFrom = { name: triggerNodeName };
+    payload.startNodes = [{ name: triggerNodeName }];
+  }
+  return JSON.stringify(payload);
 }
 
 function n8nHeaders(apiKey: string): Record<string, string> {
@@ -148,9 +176,18 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function normalizeSuccess(body: unknown, fallback: Record<string, unknown>): unknown {
   const rec = asRecord(body);
+  const inner = rec && asRecord(rec.data) ? asRecord(rec.data) : rec;
+  if (inner && (inner.executionId || inner.id)) {
+    return {
+      ...inner,
+      ...fallback,
+      executionId: inner.executionId ?? inner.id ?? '',
+    };
+  }
   if (rec && (rec.executionId || rec.id || rec.data)) {
     return {
       ...rec,
+      ...fallback,
       executionId: rec.executionId ?? rec.id ?? '',
     };
   }
@@ -237,6 +274,33 @@ export async function runN8nWorkflow(opts: {
     };
   }
 
+  // n8n editor endpoint — Cloud's public /api/v1 has no execute/run (405).
+  const restBody = buildRestRunPayload(workflow, triggerNodeName);
+  const restById = await postJson(
+    fetchImpl,
+    `${root}/rest/workflows/${opts.workflowId}/run`,
+    headers,
+    restBody,
+  );
+  if (restById.ok) {
+    return {
+      status: restById.status,
+      body: normalizeSuccess(restById.body, { started: true, via: 'rest' }),
+    };
+  }
+  const restGlobal = await postJson(
+    fetchImpl,
+    `${root}/rest/workflows/run`,
+    headers,
+    restBody,
+  );
+  if (restGlobal.ok) {
+    return {
+      status: restGlobal.status,
+      body: normalizeSuccess(restGlobal.body, { started: true, via: 'rest' }),
+    };
+  }
+
   if (!wfRes.ok) {
     return {
       status: wfRes.status,
@@ -275,18 +339,16 @@ export async function runN8nWorkflow(opts: {
     };
   }
 
-  const executeHint =
-    asRecord(execute.body)?.message || asRecord(execute.body)?.hint || `HTTP ${execute.status}`;
-  const runHint = asRecord(run.body)?.message || asRecord(run.body)?.hint || `HTTP ${run.status}`;
+  const hintOf = (result: { status: number; body: unknown }) =>
+    asRecord(result.body)?.message || asRecord(result.body)?.hint || `HTTP ${result.status}`;
   return {
     status: 409,
     body: {
       error:
-        triggerNodeName
-          ? `Could not start "${triggerNodeName}" via n8n /execute (${executeHint}) or /run (${runHint}). Add a Webhook node in parallel with the Schedule trigger if this n8n Cloud version has no execute API.`
-          : 'n8n Cloud rejected /run, and this workflow has no Schedule or Webhook trigger to start from.',
-      executeAttempt: executeHint,
-      runAttempt: runHint,
+        'n8n Cloud cannot start a schedule-only workflow from the dashboard. Add a Webhook node on India (yrYIauoO1q46DORb) and US (41O5a05zrxyWqpe2) in parallel with the Schedule trigger — same outgoing connection, POST, path india-outreach-run / us-outreach-run, no extra auth — then keep the workflow Active and click Run Now.',
+      executeAttempt: hintOf(execute),
+      runAttempt: hintOf(run),
+      restAttempt: `${hintOf(restById)} / ${hintOf(restGlobal)}`,
     },
   };
 }

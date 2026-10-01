@@ -10,6 +10,7 @@ import {
   resolveWebhookUrl,
   runN8nWorkflow,
   scheduleTriggerName,
+  webhookOverrideFor,
   type N8nNode,
 } from './n8n-run.ts';
 
@@ -88,6 +89,12 @@ test('resolveWebhookUrl skips disabled webhook nodes', () => {
   assert.equal(resolveWebhookUrl('https://example.app.n8n.cloud', nodes), null);
 });
 
+test('webhookOverrideFor uses Claude webhook paths', () => {
+  assert.equal(webhookOverrideFor('yrYIauoO1q46DORb', {}), 'run-india-outreach');
+  assert.equal(webhookOverrideFor('41O5a05zrxyWqpe2', {}), 'run-us-outreach');
+  assert.equal(webhookOverrideFor('yrYIauoO1q46DORb', { yrYIauoO1q46DORb: 'custom' }), 'custom');
+});
+
 test('parseWebhookOverrides ignores invalid JSON', () => {
   assert.deepEqual(parseWebhookOverrides('not-json'), {});
   assert.deepEqual(parseWebhookOverrides('{"yrYIauoO1q46DORb":"india-run"}'), {
@@ -104,6 +111,32 @@ test('resolveOverrideWebhookUrl accepts path or absolute URL', () => {
     resolveOverrideWebhookUrl('https://n8n.example', 'https://n8n.example/webhook/custom'),
     'https://n8n.example/webhook/custom',
   );
+});
+
+test('runN8nWorkflow posts Claude webhook path first', async () => {
+  const hits: string[] = [];
+  const server = await listen((req, res) => {
+    hits.push(`${req.method} ${req.url}`);
+    if (req.url === '/webhook/run-india-outreach' && req.method === 'POST') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ message: 'Workflow got started.' }));
+      return;
+    }
+    res.writeHead(500).end();
+  });
+  try {
+    const result = await runN8nWorkflow({
+      baseUrl: server.url,
+      apiKey: 'test-key',
+      workflowId: 'yrYIauoO1q46DORb',
+      webhookOverride: webhookOverrideFor('yrYIauoO1q46DORb', {}),
+    });
+    assert.equal(result.status, 200);
+    assert.equal((result.body as { via?: string }).via, 'webhook-override');
+    assert.deepEqual(hits, ['POST /webhook/run-india-outreach']);
+  } finally {
+    await server.close();
+  }
 });
 
 test('runN8nWorkflow posts triggerNodeName to /execute', async () => {
@@ -225,6 +258,50 @@ test('runN8nWorkflow falls back from 405 /execute to the discovered webhook', as
   }
 });
 
+test('runN8nWorkflow uses /rest/workflows/{id}/run when public API is 405', async () => {
+  let restBody = '';
+  const server = await listen(async (req, res) => {
+    const url = req.url || '';
+    if (url.includes('/api/v1/') && (url.endsWith('/execute') || url.endsWith('/run'))) {
+      res.writeHead(405, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ message: 'Method Not Allowed' }));
+      return;
+    }
+    if (url === '/rest/workflows/wf-rest/run' && req.method === 'POST') {
+      restBody = await readBody(req);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ data: { executionId: 'exec-rest' } }));
+      return;
+    }
+    if (req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          id: 'wf-rest',
+          nodes: [{ name: 'Daily 8:30 AM IST (Mon-Sat)', type: 'n8n-nodes-base.scheduleTrigger' }],
+        }),
+      );
+      return;
+    }
+    res.writeHead(404).end();
+  });
+  try {
+    const result = await runN8nWorkflow({
+      baseUrl: server.url,
+      apiKey: 'test-key',
+      workflowId: 'wf-rest',
+      triggerNodeName: 'Daily 8:30 AM IST (Mon-Sat)',
+    });
+    assert.equal(result.status, 200);
+    assert.equal((result.body as { executionId: string; via?: string }).executionId, 'exec-rest');
+    assert.equal((result.body as { via?: string }).via, 'rest');
+    const parsed = JSON.parse(restBody);
+    assert.equal(parsed.triggerToStartFrom.name, 'Daily 8:30 AM IST (Mon-Sat)');
+  } finally {
+    await server.close();
+  }
+});
+
 test('runN8nWorkflow errors clearly when execute/run fail and there is no webhook', async () => {
   const server = await listen((req, res) => {
     if (String(req.url).endsWith('/execute') || String(req.url).endsWith('/run')) {
@@ -250,7 +327,7 @@ test('runN8nWorkflow errors clearly when execute/run fail and there is no webhoo
     });
     assert.equal(result.status, 409);
     const body = result.body as { error: string };
-    assert.match(body.error, /Daily 8:30 AM IST \(Mon-Sat\)/);
+    assert.match(body.error, /Webhook node/i);
   } finally {
     await server.close();
   }
