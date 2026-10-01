@@ -114,6 +114,19 @@ export function parseWebhookOverrides(raw: string | undefined): Record<string, s
   }
 }
 
+/** Production webhook paths Claude added on the India/US outreach workflows. */
+export const DEFAULT_WEBHOOK_PATHS: Record<string, string> = {
+  yrYIauoO1q46DORb: 'run-india-outreach',
+  '41O5a05zrxyWqpe2': 'run-us-outreach',
+};
+
+export function webhookOverrideFor(
+  workflowId: string,
+  envOverrides: Record<string, string>,
+): string | undefined {
+  return envOverrides[workflowId] || DEFAULT_WEBHOOK_PATHS[workflowId];
+}
+
 export function buildTriggerPayload(triggerNodeName?: string): string {
   if (!triggerNodeName) return '{}';
   return JSON.stringify({

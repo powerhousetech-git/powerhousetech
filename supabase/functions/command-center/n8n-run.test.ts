@@ -10,6 +10,7 @@ import {
   resolveWebhookUrl,
   runN8nWorkflow,
   scheduleTriggerName,
+  webhookOverrideFor,
   type N8nNode,
 } from './n8n-run.ts';
 
@@ -88,6 +89,12 @@ test('resolveWebhookUrl skips disabled webhook nodes', () => {
   assert.equal(resolveWebhookUrl('https://example.app.n8n.cloud', nodes), null);
 });
 
+test('webhookOverrideFor uses Claude webhook paths', () => {
+  assert.equal(webhookOverrideFor('yrYIauoO1q46DORb', {}), 'run-india-outreach');
+  assert.equal(webhookOverrideFor('41O5a05zrxyWqpe2', {}), 'run-us-outreach');
+  assert.equal(webhookOverrideFor('yrYIauoO1q46DORb', { yrYIauoO1q46DORb: 'custom' }), 'custom');
+});
+
 test('parseWebhookOverrides ignores invalid JSON', () => {
   assert.deepEqual(parseWebhookOverrides('not-json'), {});
   assert.deepEqual(parseWebhookOverrides('{"yrYIauoO1q46DORb":"india-run"}'), {
@@ -104,6 +111,32 @@ test('resolveOverrideWebhookUrl accepts path or absolute URL', () => {
     resolveOverrideWebhookUrl('https://n8n.example', 'https://n8n.example/webhook/custom'),
     'https://n8n.example/webhook/custom',
   );
+});
+
+test('runN8nWorkflow posts Claude webhook path first', async () => {
+  const hits: string[] = [];
+  const server = await listen((req, res) => {
+    hits.push(`${req.method} ${req.url}`);
+    if (req.url === '/webhook/run-india-outreach' && req.method === 'POST') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ message: 'Workflow got started.' }));
+      return;
+    }
+    res.writeHead(500).end();
+  });
+  try {
+    const result = await runN8nWorkflow({
+      baseUrl: server.url,
+      apiKey: 'test-key',
+      workflowId: 'yrYIauoO1q46DORb',
+      webhookOverride: webhookOverrideFor('yrYIauoO1q46DORb', {}),
+    });
+    assert.equal(result.status, 200);
+    assert.equal((result.body as { via?: string }).via, 'webhook-override');
+    assert.deepEqual(hits, ['POST /webhook/run-india-outreach']);
+  } finally {
+    await server.close();
+  }
 });
 
 test('runN8nWorkflow posts triggerNodeName to /execute', async () => {
