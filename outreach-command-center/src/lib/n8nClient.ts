@@ -55,6 +55,8 @@ export async function setWorkflowActive(
 }
 
 export async function runWorkflow(workflowId: string): Promise<{ executionId: string }> {
+  // The proxy intercepts this path: n8n Cloud returns 405 for /run, so the
+  // Edge Function tries /execute and then a discovered webhook instead.
   const data = await apiFetch<{ executionId?: string; id?: string }>(
     n8nUrl(`workflows/${workflowId}/run`),
     { method: 'POST', body: {} },

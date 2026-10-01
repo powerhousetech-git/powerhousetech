@@ -156,6 +156,8 @@ export function useN8nWorkflows(enabled: boolean = true): UseN8nResult {
         }
         const { executionId } = await runWorkflow(wf.id);
         void loadOne(campaign);
+        // Webhook-triggered runs can take a moment to appear in /executions.
+        window.setTimeout(() => void loadOne(campaign), 2500);
         return executionId;
       } finally {
         patch(campaign, { busy: false });
