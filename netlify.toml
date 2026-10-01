@@ -43,6 +43,38 @@
   to = "/harshul/index.html"
   status = 200
 
+# PowerhouseTech Outreach Analytics dashboard (standalone Vite app; separate
+# from PS2 Lead Management and from the n8n workflows). Built static output is
+# committed under /outreach-dashboard (source lives in /outreach-analytics).
+[[redirects]]
+  from = "/outreach-dashboard"
+  to = "/outreach-dashboard/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/outreach-dashboard/"
+  to = "/outreach-dashboard/index.html"
+  status = 200
+
+# PowerhouseTech Outreach Command Center (standalone Vite app; Google Sheets
+# read/write + n8n workflow control). Built static output is committed under
+# /command-center (source lives in /outreach-command-center). Gated by the site's
+# Google admin sign-in; real data comes from the Supabase `command-center` function
+# (no secrets in the client bundle).
+[[redirects]]
+  from = "/command-center"
+  to = "/command-center/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/command-center/"
+  to = "/command-center/index.html"
+  status = 200
+
+# To use dashboard.powerhousetech.in: add it as a domain alias for this Netlify
+# site (DNS CNAME → Netlify). It then serves this same site, so the Command Center
+# is reachable at https://dashboard.powerhousetech.in/command-center/.
+
 # PS2 lead management entry page on the static website.
 # The interactive Next.js app itself should be deployed to a server host
 # (for example Railway) and then proxied here as /ps2/*.
@@ -158,16 +190,6 @@
 [[redirects]]
   from = "/signin"
   to = "/portal.html"
-  status = 200
-
-[[redirects]]
-  from = "/admin"
-  to = "/admin.html"
-  status = 200
-
-[[redirects]]
-  from = "/admin/"
-  to = "/admin.html"
   status = 200
 
 # Outreach portal dashboard (admin Google sign-in; API on Supabase)

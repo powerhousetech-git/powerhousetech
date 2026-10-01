@@ -12,7 +12,10 @@
   const userAvatar = document.getElementById('user-avatar');
   const userEmail = document.getElementById('user-email');
   const greetName = document.getElementById('greet-name');
-  const adminLink = document.getElementById('admin-link');
+  // Admin-only entry point to the Outreach Command Center (shown after an
+  // admin such as shreyas@powerhousetech.in signs in). The old /admin console
+  // has been removed; the Command Center replaces it.
+  const commandCenterLink = document.getElementById('command-center-link');
 
   let handledUid = null;
   let bootDone = false;
@@ -69,7 +72,7 @@
     authView?.classList.remove('hidden');
     signOutBtn?.classList.add('hidden');
     userChip?.classList.remove('show');
-    adminLink?.classList.add('hidden');
+    commandCenterLink?.classList.add('hidden');
   }
 
   async function afterSignIn(user, opts) {
@@ -92,31 +95,36 @@
 
     gate().writeUser(user);
 
-    let session = null;
     if (opts.record !== false) {
-      session = await gate().recordSession(opts.eventType || 'sign_in', '/portal', {
+      await gate().recordSession(opts.eventType || 'sign_in', '/portal', {
         display_name: user.displayName || '',
       });
+    }
+
+    // Check admin status once (reveal the Command Center link + route admins).
+    let isAdmin = false;
+    try {
+      const me = await gate().fetchAdminMe();
+      isAdmin = Boolean(me && me.is_admin);
+    } catch {
+      isAdmin = false;
+    }
+    if (commandCenterLink) {
+      commandCenterLink.classList.toggle('hidden', !isAdmin);
     }
 
     const params = new URLSearchParams(window.location.search);
     const qReturn = params.get('returnTo');
     if (qReturn) gate().setReturnTo(qReturn);
 
-    const me = session || (await gate().fetchAdminMe());
-    const isAdmin = Boolean(me && me.is_admin);
-
-    if (adminLink) {
-      adminLink.classList.toggle('hidden', !isAdmin);
-    }
-
     const stored = gate().peekReturnTo();
     const hasExplicitReturn =
       stored && stored !== '/portal' && stored !== '/portal/';
 
-    // Fresh Google popup: admins land on /admin unless they had a returnTo.
+    // Fresh admin sign-in with no explicit destination → go straight to the
+    // Command Center (it replaces the old /admin console).
     if (isAdmin && !hasExplicitReturn && opts.preferAdmin) {
-      window.location.replace('/admin');
+      window.location.replace('/command-center');
       return;
     }
 

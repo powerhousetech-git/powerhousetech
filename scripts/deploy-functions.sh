@@ -26,6 +26,7 @@ FUNCTIONS=(
   invoice-radar-proxy
   portal-session
   admin-api
+  command-center
 )
 
 echo "Deploying: ${FUNCTIONS[*]}"

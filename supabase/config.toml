@@ -6,6 +6,9 @@ enabled = true
 [db]
 major_version = 17
 
+[functions.command-center]
+verify_jwt = false
+
 [functions.tally-map-start]
 verify_jwt = false
 
