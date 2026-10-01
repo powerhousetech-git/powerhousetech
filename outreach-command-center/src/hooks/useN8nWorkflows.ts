@@ -59,7 +59,7 @@ export function useN8nWorkflows(enabled: boolean = true): UseN8nResult {
         getWorkflow(id),
         listExecutions(id, 5).catch(() => [] as Execution[]),
       ]);
-      patch(campaign, { id, status, executions });
+      patch(campaign, { id: String(status.id || id), status, executions });
     },
     [idFor, patch],
   );
@@ -154,14 +154,18 @@ export function useN8nWorkflows(enabled: boolean = true): UseN8nResult {
           }, 6000);
           return execId;
         }
-        const { executionId } = await runWorkflow(wf.id);
+        const triggerNodeName =
+          campaign === 'India' ? config.indiaTriggerNodeName : config.usTriggerNodeName;
+        const { executionId } = await runWorkflow(wf.id, triggerNodeName);
         void loadOne(campaign);
+        // Webhook-triggered runs can take a moment to appear in /executions.
+        window.setTimeout(() => void loadOne(campaign), 2500);
         return executionId;
       } finally {
         patch(campaign, { busy: false });
       }
     },
-    [loadOne, patch],
+    [config.indiaTriggerNodeName, config.usTriggerNodeName, loadOne, patch],
   );
 
   const fetchExecutionDetail = useCallback(async (id: string): Promise<Execution> => {

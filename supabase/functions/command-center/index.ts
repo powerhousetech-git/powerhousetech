@@ -1,6 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { bearerToken, verifyFirebaseIdToken } from '../_shared/firebase-auth.ts';
 import { corsHeaders, jsonResponse, optionsResponse } from '../_shared/cors.ts';
+import { parseWebhookOverrides, parseWorkflowRunPath, readTriggerNodeName, runN8nWorkflow } from './n8n-run.ts';
 
 /**
  * Outreach Command Center backend proxy (Supabase Edge Function).
@@ -141,6 +142,22 @@ Deno.serve(async (req) => {
       const base = Deno.env.get('CC_N8N_BASE_URL');
       const apiKey = Deno.env.get('CC_N8N_API_KEY');
       if (!base || !apiKey) return jsonResponse(500, { error: 'n8n env not configured' });
+
+      // POST /workflows/{id}/run is not in n8n Cloud's public API (405). Intercept
+      // Run Now and try /execute, then a discovered or override webhook.
+      const runWorkflowId = req.method === 'POST' ? parseWorkflowRunPath(path) : null;
+      if (runWorkflowId) {
+        const overrides = parseWebhookOverrides(Deno.env.get('CC_N8N_WEBHOOKS') || '');
+        const result = await runN8nWorkflow({
+          baseUrl: base,
+          apiKey,
+          workflowId: runWorkflowId,
+          triggerNodeName: readTriggerNodeName(body),
+          webhookOverride: overrides[runWorkflowId],
+        });
+        return jsonResponse(result.status, result.body);
+      }
+
       const upstream = await fetch(`${base.replace(/\/$/, '')}/api/v1/${path}`, {
         method: req.method,
         headers: { 'X-N8N-API-KEY': apiKey, 'Content-Type': 'application/json' },

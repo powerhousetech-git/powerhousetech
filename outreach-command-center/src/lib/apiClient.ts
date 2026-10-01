@@ -13,6 +13,18 @@ export const UNAUTHORIZED_EVENT = 'occ-unauthorized';
 export class AuthError extends Error {}
 export class ApiError extends Error {}
 
+export function messageFromErrorBody(parsed: unknown, status: number): string {
+  if (parsed && typeof parsed === 'object') {
+    const record = parsed as Record<string, unknown>;
+    const parts = [record.error, record.message, record.hint]
+      .filter((value) => typeof value === 'string' && value.trim())
+      .map((value) => String(value).trim());
+    if (parts.length) return [...new Set(parts)].join(' — ');
+  }
+  if (typeof parsed === 'string' && parsed.trim()) return parsed.trim();
+  return `Request failed (${status}).`;
+}
+
 interface ApiFetchOptions {
   method?: string;
   body?: unknown;
@@ -43,11 +55,7 @@ export async function apiFetch<T>(url: string, options: ApiFetchOptions = {}): P
   }
 
   if (!res.ok) {
-    const message =
-      (parsed && typeof parsed === 'object' && 'error' in parsed
-        ? String((parsed as { error: unknown }).error)
-        : '') || `Request failed (${res.status}).`;
-    throw new ApiError(message);
+    throw new ApiError(messageFromErrorBody(parsed, res.status));
   }
 
   return parsed as T;
