@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ApolloDiscoveryInput, Campaign } from '../types';
+import { fetchApolloCredits, type ApolloCreditSnapshot } from '../lib/apolloClient';
 import { useToast } from './Toast';
 import ConfirmModal from './ConfirmModal';
 
@@ -30,9 +31,45 @@ export function PopulateLeads({ busy, onRun, onDone }: PopulateLeadsProps) {
   const [location, setLocation] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [credits, setCredits] = useState<ApolloCreditSnapshot | null>(null);
 
   const creditEstimate = useMemo(() => Math.max(1, Math.min(100, perPage)), [perPage]);
   const locationHint = campaign === 'India' ? 'India' : 'United States';
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const snap = await fetchApolloCredits();
+        if (!cancelled) setCredits(snap);
+      } catch {
+        if (!cancelled) {
+          setCredits({
+            available: false,
+            leadCreditsLeft: null,
+            leadCreditsLimit: null,
+            leadCreditsConsumed: null,
+            cycleStart: null,
+            cycleEnd: null,
+            message: 'Could not load live Apollo balance.',
+          });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const creditLine = useMemo(() => {
+    const est = `This run ≈ ${creditEstimate} credit${creditEstimate === 1 ? '' : 's'} (~1 per new lead)`;
+    if (credits?.available && credits.leadCreditsLeft !== null) {
+      const limit =
+        credits.leadCreditsLimit !== null ? ` / ${credits.leadCreditsLimit.toLocaleString()}` : '';
+      return `${est} · Apollo balance ${credits.leadCreditsLeft.toLocaleString()}${limit} left`;
+    }
+    return `${est}${credits?.message ? ` · ${credits.message}` : ''}`;
+  }, [creditEstimate, credits]);
 
   const start = async () => {
     setSubmitting(true);
@@ -48,6 +85,8 @@ export function PopulateLeads({ busy, onRun, onDone }: PopulateLeadsProps) {
       toast.success(`Discovery running in background${id ? ` (${id})` : ''}.`);
       setConfirmOpen(false);
       onDone?.();
+      // Refresh balance after kickoff (best-effort).
+      void fetchApolloCredits().then(setCredits).catch(() => undefined);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to start Apollo discovery.');
     } finally {
@@ -64,6 +103,20 @@ export function PopulateLeads({ busy, onRun, onDone }: PopulateLeadsProps) {
             Trigger Apollo Discovery (n8n). New contacts land as Pending for approval.
           </p>
         </div>
+        {credits?.available && credits.leadCreditsLeft !== null && (
+          <div className="rounded-lg border border-surface-700/60 bg-surface-950 px-3 py-2 text-right">
+            <p className="text-[11px] uppercase tracking-wide text-slate-500">Apollo lead credits</p>
+            <p className="text-lg font-semibold tabular-nums text-slate-100">
+              {credits.leadCreditsLeft.toLocaleString()}
+              {credits.leadCreditsLimit !== null && (
+                <span className="text-sm font-normal text-slate-500">
+                  {' '}
+                  / {credits.leadCreditsLimit.toLocaleString()}
+                </span>
+              )}
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -134,9 +187,7 @@ export function PopulateLeads({ busy, onRun, onDone }: PopulateLeadsProps) {
         >
           Populate Leads
         </button>
-        <p className="text-xs text-slate-500">
-          Est. ~{creditEstimate} Apollo credit{creditEstimate === 1 ? '' : 's'} (~1 per new lead).
-        </p>
+        <p className="max-w-xl text-xs text-slate-500">{creditLine}</p>
       </div>
 
       <ConfirmModal
@@ -160,9 +211,9 @@ export function PopulateLeads({ busy, onRun, onDone }: PopulateLeadsProps) {
               ) : null}
               .
             </p>
+            <p className="text-slate-400">{creditLine}</p>
             <p className="text-slate-400">
-              Estimated cost: ~{creditEstimate} credit{creditEstimate === 1 ? '' : 's'} (~1 per new
-              lead). Deduped across India + US tabs. New rows arrive as Status = Pending.
+              Deduped across India + US tabs. New rows arrive as Status = Pending.
             </p>
           </div>
         }

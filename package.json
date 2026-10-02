@@ -11,6 +11,6 @@
     "test:meridian": "python3 scripts/generate-meridian-fixture.py && npx -y deno run --allow-read --allow-run scripts/test-meridian-flat.ts",
     "test:compressed-nova": "npx -y deno run --allow-read --allow-run scripts/test-compressed-nova.ts",
     "test:reminder-whatsapp": "bash scripts/test-reminder-whatsapp.sh test",
-    "test:command-center-n8n": "node --experimental-strip-types --experimental-detect-module --test supabase/functions/command-center/n8n-run.test.ts"
+    "test:command-center-n8n": "node --experimental-strip-types --experimental-detect-module --test supabase/functions/command-center/n8n-run.test.ts supabase/functions/command-center/apollo-credits.test.ts"
   }
 }

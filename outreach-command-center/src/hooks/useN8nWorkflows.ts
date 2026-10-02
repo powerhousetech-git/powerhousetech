@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ApolloDiscoveryInput, Campaign, Execution, WorkflowStatus } from '../types';
 import { IS_MOCK, loadConfig } from '../lib/config';
+import { retireLegacyWorkflows } from '../lib/apolloClient';
 import {
   getExecution,
   getWorkflow,
@@ -84,6 +85,32 @@ export function useN8nWorkflows(enabled: boolean = true): UseN8nResult {
     if (!enabled) return;
     void refresh();
   }, [enabled, refresh]);
+
+  // One-shot: retire legacy v1 India/US workflows after portal v2 cutover.
+  useEffect(() => {
+    if (!enabled || IS_MOCK) return;
+    const key = 'occ-legacy-retired-v1';
+    try {
+      if (window.sessionStorage.getItem(key) === '1') return;
+    } catch {
+      /* ignore */
+    }
+    void (async () => {
+      try {
+        const result = await retireLegacyWorkflows();
+        const allOk = (result.retired || []).every((r) => r.ok);
+        if (allOk) {
+          try {
+            window.sessionStorage.setItem(key, '1');
+          } catch {
+            /* ignore */
+          }
+        }
+      } catch {
+        // Best-effort — v2 webhooks already point at new IDs.
+      }
+    })();
+  }, [enabled]);
 
   const workflowsRef = useRef(workflows);
   workflowsRef.current = workflows;
