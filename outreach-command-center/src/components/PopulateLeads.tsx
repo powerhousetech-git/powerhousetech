@@ -9,12 +9,17 @@ interface PopulateLeadsProps {
   onDone?: () => void;
 }
 
+/** Match Apollo Discovery n8n workflow defaults (Claude 2026-10-03). */
 const DEFAULT_TITLES = [
-  'Managing Director',
   'CEO',
   'Founder',
-  'VP Operations',
-  'Head of Operations',
+  'Co-Founder',
+  'CTO',
+  'Managing Director',
+  'President',
+  'Owner',
+  'Director',
+  'VP',
 ];
 
 export function PopulateLeads({ busy, onRun, onDone }: PopulateLeadsProps) {

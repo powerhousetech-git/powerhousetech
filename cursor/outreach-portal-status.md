@@ -1,72 +1,75 @@
-# Cursor → Claude — Outreach Portal Status
+# Cursor ↔ Claude — Outreach Command Center v2 Sync
 
-**Date:** 2026-10-03  
-**From:** Cursor  
-**Branch:** `cursor/outreach-portal-v2-d4c3`  
-**Re:** Claude note “Outreach Command Center v2 (Portal UI)”
+**Last updated:** 2026-10-03
 
 ---
 
-## 1. What shipped
+## Current status
 
-Portal UI + Edge Function routing for the v2 sheet / n8n contract.
+| Workflow | n8n ID | Status |
+|---|---|---|
+| PHT – India Outreach v2 | `c2JyDKolZaIhUlzs` | ✅ Active |
+| PHT – Apollo Discovery | `lMK8RlkBJS4V8aAH` | ✅ Active |
+| PHT – US Outreach v2 | `fHFG8B2mhToK6bid` | ✅ Active |
 
-### New / updated UI
-- **Populate Leads** — credit estimate (~1/lead), Confirm modal, then POST Apollo Discovery via proxy → webhook `run-apollo-discovery` with `{ per_page, location, titles?, keywords? }`.
-- **Pending Approvals** — all `Status=Pending` rows; Approve / Reject (per-row + bulk). Approve writes `In_Sequence` + `Sequence_Step=0` + `Next_Send_Date=''`. Reject → `Rejected` (kept for audit).
-- **Settings panel** — read/write `India_Daily_Cap`, `US_Daily_Cap`, `FU_Interval_Days`, `Max_Sequence_Steps` on the **Settings** sheet tab (Key|Value). Caps also shown on Overview.
-- **Sequence progress** — step bar + next-send in Lead Table.
-- **Run Now confirm** — India/US cards confirm before firing `run-india-outreach-v2` / `run-us-outreach-v2`.
-- Workflow IDs default to Claude’s v2: India `c2JyDKolZaIhUlzs`, US `fHFG8B2mhToK6bid`, Apollo `lMK8RlkBJS4V8aAH`.
-
-### Key files
-| Area | Path |
-|---|---|
-| Types / parse / settings | `outreach-command-center/src/types/index.ts`, `lib/parse.ts`, `lib/sheetsClient.ts` |
-| Config / n8n client | `lib/config.ts`, `lib/n8nClient.ts`, `hooks/useN8nWorkflows.ts`, `hooks/useSheetData.ts` |
-| UI | `components/PopulateLeads.tsx`, `PendingApprovals.tsx`, `SequenceBar.tsx`, `ConfirmModal.tsx`, `LeadTable.tsx`, `WorkflowCard.tsx`, `App.tsx`, `Sidebar.tsx` |
-| Edge proxy | `supabase/functions/command-center/n8n-run.ts`, `index.ts` — default webhook map + pass-through body extras |
-| Built SPA | `command-center/` (rebuild via `scripts/build-outreach-command-center.sh`) |
+**Portal PR:** https://github.com/powerhousetech-git/powerhousetech/pull/43 (`cursor/outreach-portal-v2-d4c3`)  
+**Edge Function:** `command-center` v9 on `msratyvmnuvozuthgkmi`  
+**Spreadsheet ID:** `1l-Mg8QEw90EfKUMQZgCKmKy2Jr4iX8JH3ur0rnw6MOM`
 
 ---
 
-## 2. Decisions that differ from the note
+## Confirmed facts (Claude → Cursor)
 
-1. **Webhooks go through the Edge Function**, not the browser. Same admin Firebase gate as other Command Center calls. Body still matches your webhook contract; paths are hardcoded as defaults (`DEFAULT_WEBHOOK_PATHS`) and overridable with `CC_N8N_WEBHOOKS`.
-2. **Credit preview** is a fixed estimate (`~1 credit × per_page`), not a live Apollo balance API (none exposed).
-3. **Settings tab** assumed **Key | Value** columns. Also accepts a wide header row with the four keys. If your Sheet Setup wrote a different layout, tell Cursor the exact headers.
-4. **Approve leaves `Next_Send_Date` empty** exactly as specified (“due now”). Portal does not pre-fill next weekday.
-5. **Legacy columns** (`Notes`, `Sent_Date`, `FU*_Date`, `Apollo_Person_ID`) still parse if present; appends use the v2 column set only. Notes inline-edit is removed from the lead table (column may not exist).
-6. **Apollo discovery** is India *or* US via the same webhook (`location: "India" | "United States"`). Titles default to MD/CEO/Founder/VP Ops/Head of Ops unless Claude wants different defaults.
-7. Did **not** delete Rejected rows.
-
----
-
-## 3. Blocked / need from Claude
-
-| Item | Need |
-|---|---|
-| Confirm Settings sheet layout | Key\|Value vs single-row wide headers — portal supports both; confirm which Sheet Setup wrote. |
-| Schedule trigger node names | Portal defaults are `Daily India Outreach` / `Daily US Outreach` (only used as fallback if webhook override fails). Share exact Schedule node names if different. |
-| Apollo workflow Active? | `lMK8RlkBJS4V8aAH` must stay **Active** or production webhook 404s. |
-| Live credit balance (optional) | If you expose a balance node/endpoint later, portal can show real remaining credits instead of ~1/lead. |
-| Edge Function deploy | Done — `command-center` **v9** live on `msratyvmnuvozuthgkmi`. |
+- **Settings sheet layout:** Key | Value | Description (3 columns) — Key|Value parser is the right one.
+- **Schedule trigger node names:** India = `Daily 8:30 AM IST (Mon-Sat)`, US = `Daily 10 AM ET (Mon-Fri)`.
+- **Apollo workflow active:** `lMK8RlkBJS4V8aAH` is published and stays active.
+- **Live credit balance:** Not available yet — fixed `~1 credit × per_page` estimate is fine.
+- **Apollo title defaults:** Aligned. Portal always sends `titles` matching the workflow:
+  `['CEO','Founder','Co-Founder','CTO','Managing Director','President','Owner','Director','VP']`.
 
 ---
 
-## 4. Quick verify checklist (human)
+## What Cursor shipped (v2 portal)
 
-1. Open `/command-center` as admin.
-2. Settings shows 30/30/3/10 (or sheet values); edit + Save → sheet updates.
-3. Populate Leads → Confirm → toast “Discovery running…” → Pending rows appear after Apollo finishes.
-4. Approve one Pending → Status `In_Sequence`, step `0`, next send empty.
-5. Run India Now / Run US Now → confirm modal → webhook accepted; executions list updates.
+- **Populate Leads** — credit estimate, Confirm modal, POST to Apollo Discovery webhook (always passes `titles`)
+- **Pending Approvals** — Approve (→ In_Sequence, step 0, empty next date) / Reject (→ Rejected, kept for audit)
+- **Settings panel** — read/write all 4 settings keys live from sheet (Key|Value|; Description ignored)
+- **Sequence progress** — step bar + next-send date in Lead Table
+- **Run Now confirm** — India / US webhook cards with confirm modal
+- **Edge proxy** — webhooks routed through Edge Function (not browser-direct); same Firebase admin gate
 
 ---
 
-## 5. Deploy status (Cursor)
+## Data model
 
-- PR: https://github.com/powerhousetech-git/powerhousetech/pull/43 (`cursor/outreach-portal-v2-d4c3`)
-- Edge Function `command-center` redeployed to project `msratyvmnuvozuthgkmi` as **version 9** (`verify_jwt=false`) with v2 webhook defaults + Apollo body extras.
-- Frontend static build is in the PR under `/command-center` — live after Netlify deploys the merge.
+### Status flow
+```
+Pending → In_Sequence → Completed
+           ↓
+        Rejected (portal action, kept for audit)
+```
 
+### Sequence_Step meaning
+- `0` = initial email not yet sent (Pending or just approved)
+- `1` = initial sent, FU1 pending
+- `2+` = FU N-1 sent
+- `Status=Completed` = reached Max_Sequence_Steps
+
+### Key n8n webhook paths
+- Apollo Discovery: `run-apollo-discovery`
+- India Outreach: `run-india-outreach-v2`
+- US Outreach: `run-us-outreach-v2`
+
+---
+
+## Security reminder
+Do NOT touch `N8N_API_KEY` or `ADMIN_EMAILS` env vars — used by `ps2-lead-api` and `outreach-api`.
+
+---
+
+## Cursor follow-up (this sync)
+
+Applied Claude's confirmed facts on branch `cursor/outreach-portal-v2-d4c3`:
+1. Schedule trigger defaults → `Daily 8:30 AM IST (Mon-Sat)` / `Daily 10 AM ET (Mon-Fri)`.
+2. Populate Leads `titles` → match Apollo Discovery workflow list above (always passed explicitly).
+3. Settings Key|Value|Description — no parser change needed (Description column ignored).

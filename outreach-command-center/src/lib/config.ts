@@ -42,9 +42,10 @@ export function loadConfig(): AppConfig {
     apolloWorkflowId:
       import.meta.env.VITE_N8N_APOLLO_WORKFLOW_ID?.trim() || 'lMK8RlkBJS4V8aAH',
     indiaTriggerNodeName:
-      import.meta.env.VITE_N8N_INDIA_TRIGGER_NODE?.trim() || 'Daily India Outreach',
+      import.meta.env.VITE_N8N_INDIA_TRIGGER_NODE?.trim() ||
+      'Daily 8:30 AM IST (Mon-Sat)',
     usTriggerNodeName:
-      import.meta.env.VITE_N8N_US_TRIGGER_NODE?.trim() || 'Daily US Outreach',
+      import.meta.env.VITE_N8N_US_TRIGGER_NODE?.trim() || 'Daily 10 AM ET (Mon-Fri)',
     tabs: {
       india: import.meta.env.VITE_SHEET_INDIA?.trim() || 'India Leads',
       us: import.meta.env.VITE_SHEET_US?.trim() || 'US Leads',
