@@ -9,9 +9,11 @@ import type {
   Execution,
   Lead,
   LogEntry,
+  OutreachSettings,
   SheetData,
   WorkflowStatus,
 } from '../types';
+import { DEFAULT_SETTINGS } from './parse';
 
 const INDIA_INDUSTRIES = [
   'EMS', 'Textiles', 'Auto Components', 'Pharma', 'Chemicals',
@@ -22,8 +24,8 @@ const US_INDUSTRIES = [
   'Retail', 'Real Estate', 'Energy',
 ];
 const STATUSES = [
-  'New', 'Sent', 'FU1_Sent', 'FU2_Sent', 'Replied',
-  'Interested', 'Not Interested', 'Unsubscribe',
+  'Pending', 'In_Sequence', 'Completed', 'Rejected',
+  'Replied', 'Interested', 'Not Interested',
 ];
 const TITLES = ['Managing Director', 'CEO', 'VP Sales', 'Head of Ops', 'Founder'];
 const US_STATES = ['CA', 'TX', 'NY', 'FL', 'IL', 'WA', 'MA', 'GA'];
@@ -39,7 +41,7 @@ function makeRng(seed: number) {
 function daysAgoIso(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() - days);
-  return d.toISOString();
+  return d.toISOString().slice(0, 10);
 }
 
 function buildLeads(
@@ -55,27 +57,39 @@ function buildLeads(
     const hasApollo = rng() > 0.15;
     const hasEmail = hasApollo && rng() > 0.2;
     const industry = industries[Math.floor(rng() * industries.length)];
+    const step =
+      status === 'Pending' || status === 'Rejected' ? 0
+      : status === 'Completed' ? 10
+      : status === 'In_Sequence' ? 1 + Math.floor(rng() * 4)
+      : status === 'Replied' || status === 'Interested' ? 2 + Math.floor(rng() * 3)
+      : 0;
+    const apolloId = hasApollo ? `apollo_${campaign}_${i + 1}` : '';
     leads.push({
       Company_Name: `${campaign === 'India' ? 'Bharat' : 'Acme'} ${industry.replace(/\s+/g, '')} ${i + 1}`,
+      Contact_Name: `Contact ${i + 1}`,
+      Title: TITLES[Math.floor(rng() * TITLES.length)],
+      Email: hasEmail ? `contact${i + 1}@example.com` : '',
       Industry: industry,
       City: campaign === 'India' ? 'Pune' : 'Austin',
-      Contact_Name: `Contact ${i + 1}`,
-      Email: hasEmail ? `contact${i + 1}@example.com` : '',
-      Title: TITLES[Math.floor(rng() * TITLES.length)],
+      State: campaign === 'US' ? US_STATES[Math.floor(rng() * US_STATES.length)] : '',
+      Country: campaign === 'India' ? 'India' : 'United States',
+      Website: '',
+      LinkedIn_URL: hasApollo ? `https://linkedin.com/in/contact-${i + 1}` : '',
+      Apollo_ID: apolloId,
+      Apollo_Person_ID: apolloId,
+      Added_Date: daysAgoIso(Math.floor(rng() * 30)),
       Status: status,
-      Sent_Date: status !== 'New' ? daysAgoIso(Math.floor(rng() * 30)) : '',
-      FU1_Date: ['FU1_Sent', 'FU2_Sent', 'Replied', 'Interested'].includes(status)
-        ? daysAgoIso(Math.floor(rng() * 20)) : '',
-      FU2_Date: ['FU2_Sent', 'Replied', 'Interested'].includes(status)
-        ? daysAgoIso(Math.floor(rng() * 10)) : '',
-      Apollo_Person_ID: hasApollo ? `apollo_${campaign}_${i + 1}` : '',
+      Sequence_Step: String(step),
+      Next_Send_Date: status === 'In_Sequence' ? daysAgoIso(0) : '',
       Notes:
         status === 'Interested' ? 'Asked for a call next week.'
         : status === 'Replied' ? 'Replied asking for pricing.'
         : '',
-      State: campaign === 'US' ? US_STATES[Math.floor(rng() * US_STATES.length)] : undefined,
+      Sent_Date: '',
+      FU1_Date: '',
+      FU2_Date: '',
       campaign,
-      _rowIndex: i + 2, // header is row 1
+      _rowIndex: i + 2,
     });
   }
   return leads;
@@ -83,7 +97,7 @@ function buildLeads(
 
 function buildLog(seed: number): LogEntry[] {
   const rng = makeRng(seed);
-  const types = ['Initial', 'Follow-up 1', 'Follow-up 2'];
+  const types = ['Initial', 'Follow-up 1', 'Follow-up 2', 'Follow-up 3'];
   const log: LogEntry[] = [];
   for (let day = 0; day < 30; day += 1) {
     const sends = Math.floor(rng() * 8);
@@ -110,18 +124,31 @@ function buildLog(seed: number): LogEntry[] {
   return log;
 }
 
+export function getMockSettings(): OutreachSettings {
+  return {
+    ...DEFAULT_SETTINGS,
+    _rows: {
+      India_Daily_Cap: 2,
+      US_Daily_Cap: 3,
+      FU_Interval_Days: 4,
+      Max_Sequence_Steps: 5,
+    },
+  };
+}
+
 export function getMockData(): SheetData {
   return {
     indiaLeads: buildLeads('India', 120, INDIA_INDUSTRIES, 12345),
     usLeads: buildLeads('US', 95, US_INDUSTRIES, 67890),
     emailLog: buildLog(2468),
+    settings: getMockSettings(),
   };
 }
 
 export function getMockWorkflows(): Record<Campaign, WorkflowStatus> {
   return {
-    India: { id: 'yrYIauoO1q46DORb', name: 'India Outreach Sequence', active: true, updatedAt: daysAgoIso(1) },
-    US: { id: '41O5a05zrxyWqpe2', name: 'US Outreach Sequence', active: false, updatedAt: daysAgoIso(3) },
+    India: { id: 'c2JyDKolZaIhUlzs', name: 'PHT – India Outreach v2', active: true, updatedAt: daysAgoIso(1) },
+    US: { id: 'fHFG8B2mhToK6bid', name: 'PHT – US Outreach v2', active: false, updatedAt: daysAgoIso(3) },
   };
 }
 

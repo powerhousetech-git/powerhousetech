@@ -7,8 +7,14 @@ interface AddLeadFormProps {
 }
 
 const STATUS_OPTIONS = [
-  'New', 'Sent', 'FU1_Sent', 'FU2_Sent', 'Replied',
-  'Interested', 'Not Interested', 'Unsubscribe',
+  'Pending',
+  'In_Sequence',
+  'Completed',
+  'Rejected',
+  'Replied',
+  'Interested',
+  'Not Interested',
+  'Unsubscribe',
 ];
 
 const EMPTY: NewLeadInput = {
@@ -16,10 +22,12 @@ const EMPTY: NewLeadInput = {
   Company_Name: '',
   Industry: '',
   City: '',
+  State: '',
+  Country: '',
   Contact_Name: '',
   Email: '',
   Title: '',
-  Status: 'New',
+  Status: 'In_Sequence',
   Notes: '',
 };
 
@@ -42,7 +50,12 @@ export function AddLeadForm({ onAdd }: AddLeadFormProps) {
     if (!canSubmit || submitting) return;
     setSubmitting(true);
     try {
-      await onAdd(form);
+      await onAdd({
+        ...form,
+        Country:
+          form.Country.trim() ||
+          (form.campaign === 'India' ? 'India' : 'United States'),
+      });
       toast.success(`Added lead: ${form.Company_Name}`);
       setForm({ ...EMPTY, campaign: form.campaign });
     } catch (err) {
@@ -54,15 +67,11 @@ export function AddLeadForm({ onAdd }: AddLeadFormProps) {
 
   return (
     <section className="card p-4 sm:p-5">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between"
-      >
+      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between">
         <div className="text-left">
           <h2 className="text-base font-semibold text-slate-100">Add Lead</h2>
           <p className="mt-0.5 text-xs text-slate-400">
-            Append a new lead directly to the sheet (no workflow trigger)
+            Append a known contact (default Status = In_Sequence, no workflow trigger)
           </p>
         </div>
         <span className="text-slate-400">{open ? '▲' : '▼'}</span>
@@ -112,6 +121,9 @@ export function AddLeadForm({ onAdd }: AddLeadFormProps) {
           <Field label="City">
             <input className="input" value={form.City} onChange={(e) => set('City', e.target.value)} />
           </Field>
+          <Field label="State">
+            <input className="input" value={form.State} onChange={(e) => set('State', e.target.value)} />
+          </Field>
           <Field label="Contact Name" required>
             <input
               className="input"
@@ -138,11 +150,7 @@ export function AddLeadForm({ onAdd }: AddLeadFormProps) {
             />
           </Field>
           <Field label="Status">
-            <select
-              className="input"
-              value={form.Status}
-              onChange={(e) => set('Status', e.target.value)}
-            >
+            <select className="input" value={form.Status} onChange={(e) => set('Status', e.target.value)}>
               {STATUS_OPTIONS.map((s) => (
                 <option key={s} value={s}>
                   {s}
@@ -150,15 +158,6 @@ export function AddLeadForm({ onAdd }: AddLeadFormProps) {
               ))}
             </select>
           </Field>
-          <div className="sm:col-span-2">
-            <Field label="Notes">
-              <textarea
-                className="input min-h-[72px]"
-                value={form.Notes}
-                onChange={(e) => set('Notes', e.target.value)}
-              />
-            </Field>
-          </div>
 
           <div className="flex items-center gap-3 sm:col-span-2">
             <button type="submit" className="btn-primary" disabled={!canSubmit || submitting}>

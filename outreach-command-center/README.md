@@ -40,13 +40,15 @@ Browser (React, /command-center)
 - Signed-out users are redirected to `/portal?returnTo=/command-center`.
 - Non-admins get an "access restricted" screen.
 
-## Features
+## Features (v2)
 
-Workflow control (status, activate/deactivate, **Run Now**, last-5 executions +
-JSON modal, 15s polling), analytics KPIs, tabbed pipeline funnel, **Add Lead**
-(append), lead table with inline **Status/Notes** writes (optimistic + revert),
-daily send volume, Interested/Replied tracker (**Mark Interested**), email log
-(recent 100), Apollo efficiency. Dark/light theme, toasts, skeletons, and a
+Workflow control (status, activate/deactivate, **Run Now** with confirm →
+`run-india-outreach-v2` / `run-us-outreach-v2`), **Populate Leads** (Apollo
+Discovery webhook with credit estimate + confirm), **Pending Approvals**
+(Pending → In_Sequence / Rejected), **Settings** sheet read/write (daily caps,
+FU interval, max steps), sequence progress + next-send in the lead table,
+analytics KPIs, pipeline funnel, Add Lead, daily send volume, Interested/Replied
+tracker, email log, Apollo efficiency. Dark/light theme, toasts, skeletons, and
 sample-data preview mode.
 
 ## Deploy

@@ -22,10 +22,11 @@ export interface AppConfig {
   n8nBaseUrl: string;
   indiaWorkflowId: string;
   usWorkflowId: string;
-  /** n8n Schedule Trigger node names used by Run Now. */
+  apolloWorkflowId: string;
+  /** n8n Schedule Trigger node names used by Run Now (display / fallback). */
   indiaTriggerNodeName: string;
   usTriggerNodeName: string;
-  tabs: { india: string; us: string; emailLog: string };
+  tabs: { india: string; us: string; emailLog: string; settings: string };
 }
 
 export function loadConfig(): AppConfig {
@@ -33,17 +34,23 @@ export function loadConfig(): AppConfig {
     spreadsheetId: import.meta.env.VITE_SPREADSHEET_ID?.trim() || '',
     n8nBaseUrl:
       import.meta.env.VITE_N8N_BASE_URL?.trim() || 'https://shreyas-sinha.app.n8n.cloud',
-    // Letter O, not zero — confirmed against n8n (GET/activate 200).
-    indiaWorkflowId: import.meta.env.VITE_N8N_INDIA_WORKFLOW_ID?.trim() || 'yrYIauoO1q46DORb',
-    usWorkflowId: import.meta.env.VITE_N8N_US_WORKFLOW_ID?.trim() || '41O5a05zrxyWqpe2',
+    // v2 workflows (Claude 2026-10-03). Override via env if IDs change.
+    indiaWorkflowId:
+      import.meta.env.VITE_N8N_INDIA_WORKFLOW_ID?.trim() || 'c2JyDKolZaIhUlzs',
+    usWorkflowId:
+      import.meta.env.VITE_N8N_US_WORKFLOW_ID?.trim() || 'fHFG8B2mhToK6bid',
+    apolloWorkflowId:
+      import.meta.env.VITE_N8N_APOLLO_WORKFLOW_ID?.trim() || 'lMK8RlkBJS4V8aAH',
     indiaTriggerNodeName:
-      import.meta.env.VITE_N8N_INDIA_TRIGGER_NODE?.trim() || 'Daily 8:30 AM IST (Mon-Sat)',
+      import.meta.env.VITE_N8N_INDIA_TRIGGER_NODE?.trim() ||
+      'Daily 8:30 AM IST (Mon-Sat)',
     usTriggerNodeName:
-      import.meta.env.VITE_N8N_US_TRIGGER_NODE?.trim() || 'Daily 9 AM EST (Mon-Fri)',
+      import.meta.env.VITE_N8N_US_TRIGGER_NODE?.trim() || 'Daily 10 AM ET (Mon-Fri)',
     tabs: {
       india: import.meta.env.VITE_SHEET_INDIA?.trim() || 'India Leads',
       us: import.meta.env.VITE_SHEET_US?.trim() || 'US Leads',
       emailLog: import.meta.env.VITE_SHEET_EMAIL_LOG?.trim() || 'Email Log',
+      settings: import.meta.env.VITE_SHEET_SETTINGS?.trim() || 'Settings',
     },
   };
 }

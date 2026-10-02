@@ -7,7 +7,7 @@
  * can write back to the exact cell. Header is row 1, first data row is row 2.
  */
 
-import type { Campaign, Lead, LogEntry } from '../types';
+import type { Campaign, Lead, LogEntry, OutreachSettings } from '../types';
 
 function headerIndex(header: string[]): Record<string, number> {
   const map: Record<string, number> = {};
@@ -33,20 +33,29 @@ export function parseLeads(values: string[][], campaign: Campaign): Lead[] {
   for (let i = 1; i < values.length; i += 1) {
     const row = values[i] ?? [];
     if (!row.some((c) => (c ?? '').trim() !== '')) continue; // skip blank rows
+    const apolloId =
+      cell(row, h['Apollo_ID']) || cell(row, h['Apollo_Person_ID']);
     leads.push({
       Company_Name: cell(row, h['Company_Name']),
+      Contact_Name: cell(row, h['Contact_Name']),
+      Title: cell(row, h['Title']),
+      Email: cell(row, h['Email']),
       Industry: cell(row, h['Industry']),
       City: cell(row, h['City']),
-      Contact_Name: cell(row, h['Contact_Name']),
-      Email: cell(row, h['Email']),
-      Title: cell(row, h['Title']),
+      State: cell(row, h['State']),
+      Country: cell(row, h['Country']) || (campaign === 'India' ? 'India' : 'United States'),
+      Website: cell(row, h['Website']),
+      LinkedIn_URL: cell(row, h['LinkedIn_URL']),
+      Apollo_ID: apolloId,
+      Apollo_Person_ID: apolloId,
+      Added_Date: cell(row, h['Added_Date']),
       Status: cell(row, h['Status']),
+      Sequence_Step: cell(row, h['Sequence_Step']),
+      Next_Send_Date: cell(row, h['Next_Send_Date']),
+      Notes: cell(row, h['Notes']),
       Sent_Date: cell(row, h['Sent_Date']),
       FU1_Date: cell(row, h['FU1_Date']),
       FU2_Date: cell(row, h['FU2_Date']),
-      Apollo_Person_ID: cell(row, h['Apollo_Person_ID']),
-      Notes: cell(row, h['Notes']),
-      State: campaign === 'US' ? cell(row, h['State']) : undefined,
       campaign,
       _rowIndex: i + 1, // values[i] is sheet row i+1 (values[0] = row 1 header)
     });
@@ -55,25 +64,32 @@ export function parseLeads(values: string[][], campaign: Campaign): Lead[] {
 }
 
 /**
- * The canonical column order used when appending a new lead row so the values
- * line up with the sheet's columns. Mirrors the sheet spec.
+ * Canonical column order for appending a new lead row (matches Claude sheet v2).
+ * Extra legacy columns are not written on append — the sheet headers define the
+ * authoritative layout; we only fill the v2 set.
  */
-export const LEAD_COLUMNS_INDIA = [
+export const LEAD_COLUMNS = [
   'Company_Name',
+  'Contact_Name',
+  'Title',
+  'Email',
   'Industry',
   'City',
-  'Contact_Name',
-  'Email',
-  'Title',
+  'State',
+  'Country',
+  'Website',
+  'LinkedIn_URL',
+  'Apollo_ID',
+  'Added_Date',
   'Status',
-  'Sent_Date',
-  'FU1_Date',
-  'FU2_Date',
-  'Apollo_Person_ID',
-  'Notes',
+  'Sequence_Step',
+  'Next_Send_Date',
 ] as const;
 
-export const LEAD_COLUMNS_US = [...LEAD_COLUMNS_INDIA, 'State'] as const;
+/** @deprecated Use LEAD_COLUMNS — kept for call sites that still distinguish. */
+export const LEAD_COLUMNS_INDIA = LEAD_COLUMNS;
+/** @deprecated Use LEAD_COLUMNS — US and India share the same headers in v2. */
+export const LEAD_COLUMNS_US = LEAD_COLUMNS;
 
 /** Parse the "Email Log" tab into typed {@link LogEntry} rows. */
 export function parseLog(values: string[][]): LogEntry[] {
@@ -95,9 +111,70 @@ export function parseLog(values: string[][]): LogEntry[] {
     }));
 }
 
+export const DEFAULT_SETTINGS: Omit<OutreachSettings, '_rows'> = {
+  India_Daily_Cap: 30,
+  US_Daily_Cap: 30,
+  FU_Interval_Days: 3,
+  Max_Sequence_Steps: 10,
+};
+
+const SETTINGS_KEYS = [
+  'India_Daily_Cap',
+  'US_Daily_Cap',
+  'FU_Interval_Days',
+  'Max_Sequence_Steps',
+] as const;
+
+type SettingsKey = (typeof SETTINGS_KEYS)[number];
+
+function parseIntSafe(raw: string, fallback: number): number {
+  const n = Number.parseInt(String(raw).trim(), 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
 /**
- * Returns the A1 column letter for a header name in a leads tab, e.g. "Status"
- * -> "G". Used to target a single cell for inline updates.
+ * Parse the Settings tab. Supports:
+ *   A) Key | Value rows (preferred)
+ *   B) Single header row with India_Daily_Cap / US_Daily_Cap / … as columns
+ */
+export function parseSettings(values: string[][]): OutreachSettings {
+  const settings: OutreachSettings = {
+    ...DEFAULT_SETTINGS,
+    _rows: {},
+  };
+  if (!values || values.length === 0) return settings;
+
+  const header = (values[0] ?? []).map((c) => String(c ?? '').trim());
+  const h = headerIndex(header);
+
+  // Format B: columns named like the keys.
+  const hasWideHeader = SETTINGS_KEYS.some((k) => h[k] !== undefined);
+  if (hasWideHeader && values.length >= 2) {
+    const row = values[1] ?? [];
+    for (const key of SETTINGS_KEYS) {
+      if (h[key] === undefined) continue;
+      settings[key] = parseIntSafe(cell(row, h[key]), DEFAULT_SETTINGS[key]);
+      settings._rows[key] = 2;
+    }
+    return settings;
+  }
+
+  // Format A: Key | Value (or Setting | Value).
+  const keyIdx = h['Key'] ?? h['Setting'] ?? h['Name'] ?? 0;
+  const valIdx = h['Value'] ?? h['Val'] ?? 1;
+  for (let i = 1; i < values.length; i += 1) {
+    const row = values[i] ?? [];
+    const key = cell(row, keyIdx) as SettingsKey;
+    if (!SETTINGS_KEYS.includes(key)) continue;
+    settings[key] = parseIntSafe(cell(row, valIdx), DEFAULT_SETTINGS[key]);
+    settings._rows[key] = i + 1;
+  }
+  return settings;
+}
+
+/**
+ * Returns the A1 column letter for a 0-based column index, e.g. 0 -> "A".
+ * Used to target a single cell for inline updates.
  */
 export function columnLetter(index: number): string {
   let n = index;

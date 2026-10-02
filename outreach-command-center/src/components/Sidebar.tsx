@@ -7,6 +7,9 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'overview', label: 'Overview', icon: '▧' },
   { id: 'workflows', label: 'Workflow Control', icon: '⚙' },
+  { id: 'populate', label: 'Populate Leads', icon: '⊕' },
+  { id: 'approvals', label: 'Pending Approvals', icon: '✓' },
+  { id: 'settings', label: 'Settings', icon: '☰' },
   { id: 'funnel', label: 'Pipeline Funnel', icon: '⧗' },
   { id: 'addlead', label: 'Add Lead', icon: '＋' },
   { id: 'leads', label: 'Lead Table', icon: '▤' },
@@ -21,9 +24,16 @@ interface SidebarProps {
   onSelect: (id: string) => void;
   mobileOpen: boolean;
   onCloseMobile: () => void;
+  pendingCount?: number;
 }
 
-export function Sidebar({ active, onSelect, mobileOpen, onCloseMobile }: SidebarProps) {
+export function Sidebar({
+  active,
+  onSelect,
+  mobileOpen,
+  onCloseMobile,
+  pendingCount = 0,
+}: SidebarProps) {
   const nav = (
     <nav className="flex flex-col gap-1 p-3">
       {NAV_ITEMS.map((item) => {
@@ -47,7 +57,12 @@ export function Sidebar({ active, onSelect, mobileOpen, onCloseMobile }: Sidebar
             <span className="grid h-6 w-6 place-items-center text-base" aria-hidden>
               {item.icon}
             </span>
-            {item.label}
+            <span className="flex-1">{item.label}</span>
+            {item.id === 'approvals' && pendingCount > 0 && (
+              <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-300 ring-1 ring-amber-500/30">
+                {pendingCount}
+              </span>
+            )}
           </button>
         );
       })}

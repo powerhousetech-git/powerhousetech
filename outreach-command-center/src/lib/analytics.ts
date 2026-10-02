@@ -17,40 +17,38 @@ export interface FunnelStage {
 }
 
 /**
- * Cumulative funnel: each stage counts every lead that has reached at least
- * that stage. A lead that has "Replied" also counts toward Sent, FU1_Sent, etc.
+ * Cumulative funnel for sheet schema v2:
+ * Pending → In_Sequence → Completed → Replied → Interested
+ * Legacy statuses still count toward In_Sequence / Completed when present.
  */
 export function computeFunnel(leads: Lead[]): FunnelStage[] {
-  // Downstream statuses that imply a lead has passed through each stage.
-  const reached = {
-    New: new Set(['New']),
-    Sent: new Set([
-      'Sent',
-      'FU1_Sent',
-      'FU2_Sent',
-      'Replied',
-      'Interested',
-      'Not Interested',
-    ]),
-    FU1_Sent: new Set(['FU1_Sent', 'FU2_Sent', 'Replied', 'Interested']),
-    FU2_Sent: new Set(['FU2_Sent', 'Replied', 'Interested']),
-    Replied: new Set(['Replied', 'Interested']),
-    Interested: new Set(['Interested']),
-  };
+  const inSequence = new Set([
+    'In_Sequence',
+    'Sent',
+    'FU1_Sent',
+    'FU2_Sent',
+    'Completed',
+    'Replied',
+    'Interested',
+    'Not Interested',
+  ]);
+  const completedish = new Set(['Completed', 'Replied', 'Interested']);
+  const replied = new Set(['Replied', 'Interested']);
+  const interested = new Set(['Interested']);
+  const pending = new Set(['Pending', 'New']);
 
-  const order: Array<{ key: keyof typeof reached; label: string }> = [
-    { key: 'New', label: 'New' },
-    { key: 'Sent', label: 'Sent' },
-    { key: 'FU1_Sent', label: 'Follow-up 1' },
-    { key: 'FU2_Sent', label: 'Follow-up 2' },
-    { key: 'Replied', label: 'Replied' },
-    { key: 'Interested', label: 'Interested' },
+  const order: Array<{ key: string; label: string; match: (l: Lead) => boolean }> = [
+    { key: 'Pending', label: 'Pending', match: (l) => pending.has(l.Status) },
+    { key: 'In_Sequence', label: 'In Sequence', match: (l) => inSequence.has(l.Status) },
+    { key: 'Completed', label: 'Completed', match: (l) => completedish.has(l.Status) },
+    { key: 'Replied', label: 'Replied', match: (l) => replied.has(l.Status) },
+    { key: 'Interested', label: 'Interested', match: (l) => interested.has(l.Status) },
   ];
 
-  const counts = order.map(({ key, label }) => ({
+  const counts = order.map(({ key, label, match }) => ({
     key,
     label,
-    count: leads.filter((l) => reached[key].has(l.Status)).length,
+    count: leads.filter(match).length,
   }));
 
   return counts.map((stage, i) => {
@@ -84,7 +82,6 @@ export function computeDailySends(log: LogEntry[], days = 30): DailySendPoint[] 
   );
 
   for (const entry of log) {
-    // Only count successful sends toward volume.
     if (entry.Status && entry.Status.toLowerCase() === 'failed') continue;
     const d = parseDate(entry.Timestamp);
     if (!d) continue;
@@ -95,8 +92,10 @@ export function computeDailySends(log: LogEntry[], days = 30): DailySendPoint[] 
     const type = entry.Email_Type;
     if (type === 'Initial' || type === 'Follow-up 1' || type === 'Follow-up 2') {
       point[type] += 1;
+    } else if (/^Follow-up\s+\d+$/i.test(type)) {
+      // Fold FU3+ into Follow-up 2 for the chart series.
+      point['Follow-up 2'] += 1;
     } else {
-      // Unknown/blank types still count toward the daily total via Initial-ish.
       point.Initial += 1;
     }
     point.total += 1;
@@ -119,10 +118,9 @@ export function emailsSentToday(log: LogEntry[]): number {
 
 export interface IndustryRow {
   industry: string;
-  New: number;
-  Sent: number;
-  FU1_Sent: number;
-  FU2_Sent: number;
+  Pending: number;
+  In_Sequence: number;
+  Completed: number;
   Replied: number;
   total: number;
 }
@@ -136,10 +134,9 @@ export function computeIndustryBreakdown(leads: Lead[], limit = 10): IndustryRow
     if (!byIndustry.has(industry)) {
       byIndustry.set(industry, {
         industry,
-        New: 0,
-        Sent: 0,
-        FU1_Sent: 0,
-        FU2_Sent: 0,
+        Pending: 0,
+        In_Sequence: 0,
+        Completed: 0,
         Replied: 0,
         total: 0,
       });
@@ -148,17 +145,18 @@ export function computeIndustryBreakdown(leads: Lead[], limit = 10): IndustryRow
     row.total += 1;
 
     switch (lead.Status) {
+      case 'Pending':
       case 'New':
-        row.New += 1;
+        row.Pending += 1;
         break;
+      case 'In_Sequence':
       case 'Sent':
-        row.Sent += 1;
-        break;
       case 'FU1_Sent':
-        row.FU1_Sent += 1;
-        break;
       case 'FU2_Sent':
-        row.FU2_Sent += 1;
+        row.In_Sequence += 1;
+        break;
+      case 'Completed':
+        row.Completed += 1;
         break;
       case 'Replied':
       case 'Interested':
@@ -184,13 +182,13 @@ export interface ApolloStats {
 
 /**
  * Apollo reveal efficiency:
- *  - attempted = leads with a non-empty Apollo_Person_ID
+ *  - attempted = leads with a non-empty Apollo_ID
  *  - revealed  = attempted leads that also produced a non-empty Email
  */
 export function computeApolloStats(leads: Lead[]): ApolloStats {
-  const attempted = leads.filter((l) => l.Apollo_Person_ID.trim() !== '').length;
+  const attempted = leads.filter((l) => (l.Apollo_ID || l.Apollo_Person_ID).trim() !== '').length;
   const revealed = leads.filter(
-    (l) => l.Apollo_Person_ID.trim() !== '' && l.Email.trim() !== '',
+    (l) => (l.Apollo_ID || l.Apollo_Person_ID).trim() !== '' && l.Email.trim() !== '',
   ).length;
   const successRate = attempted > 0 ? (revealed / attempted) * 100 : 0;
   return { attempted, revealed, successRate };
@@ -200,7 +198,27 @@ export function computeApolloStats(leads: Lead[]): ApolloStats {
 
 /** Leads whose status is Replied or Interested. */
 export function repliedOrInterested(leads: Lead[]): Lead[] {
-  return leads.filter(
-    (l) => l.Status === 'Replied' || l.Status === 'Interested',
-  );
+  return leads.filter((l) => l.Status === 'Replied' || l.Status === 'Interested');
+}
+
+/** Leads awaiting human approval before sequence start. */
+export function pendingApprovals(leads: Lead[]): Lead[] {
+  return leads.filter((l) => l.Status === 'Pending');
+}
+
+/** Human-readable sequence progress label. */
+export function sequenceLabel(stepRaw: string, maxSteps = 10): string {
+  const step = Number.parseInt(stepRaw || '0', 10);
+  if (!Number.isFinite(step) || step < 0) return '—';
+  if (step === 0) return 'Initial queued';
+  if (step === 1) return 'Initial sent · FU1 next';
+  if (step >= maxSteps) return `Done (step ${step})`;
+  return `FU${step - 1} sent · FU${step} next`;
+}
+
+/** 0..1 progress fraction for Sequence_Step vs Max_Sequence_Steps. */
+export function sequenceProgress(stepRaw: string, maxSteps = 10): number {
+  const step = Number.parseInt(stepRaw || '0', 10);
+  if (!Number.isFinite(step) || maxSteps <= 0) return 0;
+  return Math.min(1, Math.max(0, step / maxSteps));
 }
