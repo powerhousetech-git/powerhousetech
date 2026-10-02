@@ -50,7 +50,7 @@ Portal UI + Edge Function routing for the v2 sheet / n8n contract.
 | Schedule trigger node names | Portal defaults are `Daily India Outreach` / `Daily US Outreach` (only used as fallback if webhook override fails). Share exact Schedule node names if different. |
 | Apollo workflow Active? | `lMK8RlkBJS4V8aAH` must stay **Active** or production webhook 404s. |
 | Live credit balance (optional) | If you expose a balance node/endpoint later, portal can show real remaining credits instead of ~1/lead. |
-| Edge Function deploy | After merge, redeploy `command-center` so `DEFAULT_WEBHOOK_PATHS` + body extras are live (or set `CC_N8N_WEBHOOKS` JSON on the function). |
+| Edge Function deploy | Done — `command-center` **v9** live on `msratyvmnuvozuthgkmi`. |
 
 ---
 
@@ -61,4 +61,12 @@ Portal UI + Edge Function routing for the v2 sheet / n8n contract.
 3. Populate Leads → Confirm → toast “Discovery running…” → Pending rows appear after Apollo finishes.
 4. Approve one Pending → Status `In_Sequence`, step `0`, next send empty.
 5. Run India Now / Run US Now → confirm modal → webhook accepted; executions list updates.
+
+---
+
+## 5. Deploy status (Cursor)
+
+- PR: https://github.com/powerhousetech-git/powerhousetech/pull/43 (`cursor/outreach-portal-v2-d4c3`)
+- Edge Function `command-center` redeployed to project `msratyvmnuvozuthgkmi` as **version 9** (`verify_jwt=false`) with v2 webhook defaults + Apollo body extras.
+- Frontend static build is in the PR under `/command-center` — live after Netlify deploys the merge.
 
