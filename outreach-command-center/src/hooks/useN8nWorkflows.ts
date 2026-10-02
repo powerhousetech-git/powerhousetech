@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Campaign, Execution, WorkflowStatus } from '../types';
+import type { ApolloDiscoveryInput, Campaign, Execution, WorkflowStatus } from '../types';
 import { IS_MOCK, loadConfig } from '../lib/config';
 import {
   getExecution,
   getWorkflow,
   listExecutions,
+  runApolloDiscovery,
   runWorkflow,
   setWorkflowActive,
 } from '../lib/n8nClient';
@@ -24,6 +25,8 @@ export interface UseN8nResult {
   refresh: () => void;
   toggleActive: (campaign: Campaign) => Promise<void>;
   run: (campaign: Campaign) => Promise<string>;
+  runApollo: (input: ApolloDiscoveryInput) => Promise<string>;
+  apolloBusy: boolean;
   fetchExecutionDetail: (id: string) => Promise<Execution>;
 }
 
@@ -42,6 +45,7 @@ export function useN8nWorkflows(enabled: boolean = true): UseN8nResult {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [apolloBusy, setApolloBusy] = useState(false);
 
   const patch = useCallback((campaign: Campaign, next: Partial<WorkflowState>) => {
     setWorkflows((prev) => ({ ...prev, [campaign]: { ...prev[campaign], ...next } }));
@@ -81,7 +85,6 @@ export function useN8nWorkflows(enabled: boolean = true): UseN8nResult {
     void refresh();
   }, [enabled, refresh]);
 
-  // Poll every 15s while any execution is running.
   const workflowsRef = useRef(workflows);
   workflowsRef.current = workflows;
   useEffect(() => {
@@ -158,7 +161,6 @@ export function useN8nWorkflows(enabled: boolean = true): UseN8nResult {
           campaign === 'India' ? config.indiaTriggerNodeName : config.usTriggerNodeName;
         const { executionId } = await runWorkflow(wf.id, triggerNodeName);
         void loadOne(campaign);
-        // Webhook-triggered runs can take a moment to appear in /executions.
         window.setTimeout(() => void loadOne(campaign), 2500);
         return executionId;
       } finally {
@@ -167,6 +169,20 @@ export function useN8nWorkflows(enabled: boolean = true): UseN8nResult {
     },
     [config.indiaTriggerNodeName, config.usTriggerNodeName, loadOne, patch],
   );
+
+  const runApollo = useCallback(async (input: ApolloDiscoveryInput): Promise<string> => {
+    setApolloBusy(true);
+    try {
+      if (IS_MOCK) {
+        await new Promise((r) => setTimeout(r, 500));
+        return `apollo-mock-${Date.now()}`;
+      }
+      const { executionId } = await runApolloDiscovery(input);
+      return executionId;
+    } finally {
+      setApolloBusy(false);
+    }
+  }, []);
 
   const fetchExecutionDetail = useCallback(async (id: string): Promise<Execution> => {
     if (IS_MOCK) {
@@ -183,6 +199,8 @@ export function useN8nWorkflows(enabled: boolean = true): UseN8nResult {
     refresh: () => void refresh(),
     toggleActive,
     run,
+    runApollo,
+    apolloBusy,
     fetchExecutionDetail,
   };
 }

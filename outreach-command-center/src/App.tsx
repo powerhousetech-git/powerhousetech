@@ -13,11 +13,13 @@ import ReplyTracker from './components/ReplyTracker';
 import EmailLogTable from './components/EmailLogTable';
 import ApolloEfficiency from './components/ApolloEfficiency';
 import AccessGate from './components/AccessGate';
+import PopulateLeads from './components/PopulateLeads';
+import { PendingApprovals, SettingsPanel } from './components/PendingApprovals';
 import { useSheetData } from './hooks/useSheetData';
 import { useN8nWorkflows } from './hooks/useN8nWorkflows';
 import { useTheme } from './hooks/useTheme';
 import { useToast } from './components/Toast';
-import { emailsSentToday } from './lib/analytics';
+import { emailsSentToday, pendingApprovals } from './lib/analytics';
 import { COLORS } from './lib/theme';
 import { IS_MOCK } from './lib/config';
 import { UNAUTHORIZED_EVENT } from './lib/apiClient';
@@ -29,8 +31,6 @@ const TABS: CampaignSelection[] = ['Both', 'India', 'US'];
 type GateState = 'checking' | 'authed' | 'denied';
 
 export default function App() {
-  // Access is gated by the main site's Google admin sign-in (no separate
-  // password). Mock mode skips the gate for local/sample previews.
   const [gate, setGate] = useState<GateState>(IS_MOCK ? 'authed' : 'checking');
 
   useEffect(() => {
@@ -101,6 +101,9 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
   const funnelLeads = useMemo(() => selectLeads(funnelTab), [selectLeads, funnelTab]);
   const leadTableLeads = useMemo(() => selectLeads(leadTab), [selectLeads, leadTab]);
   const allLeads = useMemo(() => selectLeads('Both'), [selectLeads]);
+  const pending = useMemo(() => pendingApprovals(allLeads), [allLeads]);
+  const settings = data?.settings;
+  const maxSteps = settings?.Max_Sequence_Steps ?? 10;
 
   const kpis = useMemo(() => {
     const indiaCount = data?.indiaLeads.length ?? 0;
@@ -130,6 +133,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
         toast.success(`Execution started: ${execId || '(queued)'}`);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to trigger workflow.');
+        throw err;
       }
     },
     [n8n, toast],
@@ -169,7 +173,13 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
 
   return (
     <div className="flex min-h-screen bg-surface-950">
-      <Sidebar active={active} onSelect={goTo} mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
+      <Sidebar
+        active={active}
+        onSelect={goTo}
+        mobileOpen={mobileOpen}
+        onCloseMobile={() => setMobileOpen(false)}
+        pendingCount={pending.length}
+      />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Header
@@ -197,27 +207,72 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
               <StatCard label="Emails Sent Today" value={kpis.sentToday.toLocaleString()} accent="default" icon="✉" loading={loadingData} />
               <StatCard label="Interested Leads" value={kpis.interested.toLocaleString()} accent="positive" icon="★" loading={loadingData} />
             </div>
+            {settings && (
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <CapChip label="India cap" value={settings.India_Daily_Cap} />
+                <CapChip label="US cap" value={settings.US_Daily_Cap} />
+                <CapChip label="FU interval (days)" value={settings.FU_Interval_Days} />
+                <CapChip label="Max steps" value={settings.Max_Sequence_Steps} />
+              </div>
+            )}
           </section>
 
           <section id="workflows" className="scroll-mt-24">
-            <Panel title="Workflow Control" subtitle="n8n outreach sequences — status, run, and recent executions">
+            <Panel title="Workflow Control" subtitle="n8n outreach v2 — status, run, and recent executions">
               {n8n.error ? (
                 <ErrorBanner title="Could not reach n8n" message={n8n.error} onRetry={n8n.refresh} inline />
               ) : (
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  <WorkflowCard state={n8n.workflows.India} accent={COLORS.india} onToggleActive={() => handleToggle('India')} onRun={() => handleRun('India')} onOpenExecution={openExecution} />
-                  <WorkflowCard state={n8n.workflows.US} accent={COLORS.us} onToggleActive={() => handleToggle('US')} onRun={() => handleRun('US')} onOpenExecution={openExecution} />
+                  <WorkflowCard
+                    state={n8n.workflows.India}
+                    accent={COLORS.india}
+                    smtpLabel="SMTP account 1 · reply/bcc shreyas@powerhousetech.in"
+                    onToggleActive={() => handleToggle('India')}
+                    onRun={() => handleRun('India')}
+                    onOpenExecution={openExecution}
+                  />
+                  <WorkflowCard
+                    state={n8n.workflows.US}
+                    accent={COLORS.us}
+                    smtpLabel="SMTP account 2 · reply/bcc yash@powerhousetech.in"
+                    onToggleActive={() => handleToggle('US')}
+                    onRun={() => handleRun('US')}
+                    onOpenExecution={openExecution}
+                  />
                 </div>
               )}
             </Panel>
+          </section>
+
+          <section id="populate" className="scroll-mt-24">
+            <PopulateLeads
+              busy={n8n.apolloBusy}
+              onRun={n8n.runApollo}
+              onDone={() => {
+                window.setTimeout(() => sheets.refresh(), 4000);
+              }}
+            />
           </section>
 
           {loadingData ? (
             <LoadingSkeleton />
           ) : (
             <>
+              <section id="approvals" className="scroll-mt-24">
+                <PendingApprovals
+                  leads={pending}
+                  maxSteps={maxSteps}
+                  onApprove={sheets.approveLeads}
+                  onReject={sheets.rejectLeads}
+                />
+              </section>
+
+              <section id="settings" className="scroll-mt-24">
+                {settings && <SettingsPanel settings={settings} onSave={sheets.saveSettings} />}
+              </section>
+
               <section id="funnel" className="scroll-mt-24">
-                <Panel title="Pipeline Funnel" subtitle="Cumulative stages" actions={<Tabs value={funnelTab} onChange={setFunnelTab} />}>
+                <Panel title="Pipeline Funnel" subtitle="Pending → In Sequence → Completed" actions={<Tabs value={funnelTab} onChange={setFunnelTab} />}>
                   <PipelineFunnel leads={funnelLeads} accent={funnelAccent} />
                 </Panel>
               </section>
@@ -227,8 +282,13 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
               </section>
 
               <section id="leads" className="scroll-mt-24">
-                <Panel title="Lead Table" subtitle="Filter, search, and edit status/notes inline" actions={<Tabs value={leadTab} onChange={setLeadTab} />}>
-                  <LeadTable leads={leadTableLeads} showCampaign={leadTab === 'Both'} onUpdate={sheets.updateLeadField} />
+                <Panel title="Lead Table" subtitle="Sequence progress + next send date" actions={<Tabs value={leadTab} onChange={setLeadTab} />}>
+                  <LeadTable
+                    leads={leadTableLeads}
+                    showCampaign={leadTab === 'Both'}
+                    maxSteps={maxSteps}
+                    onUpdate={sheets.updateLeadField}
+                  />
                 </Panel>
               </section>
 
@@ -259,12 +319,21 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
           )}
 
           <footer className="pb-8 pt-2 text-center text-xs text-slate-600">
-            PowerhouseTech · Outreach Command Center · Google Sheets (read/write) + n8n
+            PowerhouseTech · Outreach Command Center v2 · Google Sheets + n8n
           </footer>
         </main>
       </div>
 
       <ExecutionModal open={execOpen} loading={execLoading} execution={execData} error={execError} onClose={() => setExecOpen(false)} />
+    </div>
+  );
+}
+
+function CapChip({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-surface-700/60 bg-surface-900/60 px-3 py-2">
+      <p className="text-[11px] uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-0.5 text-lg font-semibold tabular-nums text-slate-100">{value}</p>
     </div>
   );
 }

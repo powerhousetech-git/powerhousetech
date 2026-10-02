@@ -1,15 +1,15 @@
 /**
- * n8n access — through the server-side proxy (`/api/n8n`). The API key stays in
- * the serverless function's env. The client sends the sub-path (after
- * `/api/v1/`), including any query string, URL-encoded in `path`.
+ * n8n access — through the server-side proxy. The API key stays in the
+ * serverless function's env. The client sends the sub-path (after `/api/v1/`),
+ * including any query string, URL-encoded in `path`.
  *
  * Only reads status/executions and triggers runs / (de)activation — never edits
  * workflow logic.
  */
 
-import type { Execution, ExecutionStatus, WorkflowStatus } from '../types';
+import type { ApolloDiscoveryInput, Execution, ExecutionStatus, WorkflowStatus } from '../types';
 import { apiFetch } from './apiClient';
-import { COMMAND_CENTER_API } from './config';
+import { COMMAND_CENTER_API, loadConfig } from './config';
 
 function n8nUrl(subPath: string): string {
   return `${COMMAND_CENTER_API}?target=n8n&path=${encodeURIComponent(subPath)}`;
@@ -56,15 +56,35 @@ export async function setWorkflowActive(
 
 export async function runWorkflow(
   workflowId: string,
-  triggerNodeName: string,
+  triggerNodeName?: string,
+  extras?: Record<string, unknown>,
 ): Promise<{ executionId: string }> {
-  // The proxy intercepts /run (n8n Cloud 405s a bare POST) and forwards
-  // triggerNodeName to /execute, then /run, then a discovered webhook.
+  // The proxy intercepts /run (n8n Cloud 405s a bare POST) and forwards to the
+  // v2 webhook override (or /execute → discovered webhook).
   const data = await apiFetch<{ executionId?: string; id?: string }>(
     n8nUrl(`workflows/${workflowId}/run`),
-    { method: 'POST', body: { triggerNodeName } },
+    {
+      method: 'POST',
+      body: {
+        ...(triggerNodeName ? { triggerNodeName } : {}),
+        ...(extras || {}),
+      },
+    },
   );
   return { executionId: String(data.executionId ?? data.id ?? '') };
+}
+
+/** Fire the Apollo Discovery workflow via its production webhook. */
+export async function runApolloDiscovery(
+  input: ApolloDiscoveryInput,
+): Promise<{ executionId: string }> {
+  const cfg = loadConfig();
+  return runWorkflow(cfg.apolloWorkflowId, undefined, {
+    per_page: input.per_page,
+    location: input.location,
+    ...(input.titles?.length ? { titles: input.titles } : {}),
+    ...(input.keywords ? { keywords: input.keywords } : {}),
+  });
 }
 
 export async function listExecutions(workflowId: string, limit = 10): Promise<Execution[]> {

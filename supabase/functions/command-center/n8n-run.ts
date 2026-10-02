@@ -114,6 +114,40 @@ export function parseWebhookOverrides(raw: string | undefined): Record<string, s
   }
 }
 
+/**
+ * Production webhook paths (Claude 2026-10-03 v2 + legacy v1 fallbacks).
+ * Override at runtime via CC_N8N_WEBHOOKS JSON map if paths change.
+ */
+export const DEFAULT_WEBHOOK_PATHS: Record<string, string> = {
+  // v2
+  c2JyDKolZaIhUlzs: 'run-india-outreach-v2',
+  fHFG8B2mhToK6bid: 'run-us-outreach-v2',
+  lMK8RlkBJS4V8aAH: 'run-apollo-discovery',
+  // legacy v1
+  yrYIauoO1q46DORb: 'run-india-outreach',
+  '41O5a05zrxyWqpe2': 'run-us-outreach',
+};
+
+export function webhookOverrideFor(
+  workflowId: string,
+  envOverrides: Record<string, string>,
+): string | undefined {
+  return envOverrides[workflowId] || DEFAULT_WEBHOOK_PATHS[workflowId];
+}
+
+/** Extra fields the portal may send on Run Now / Apollo Discovery. */
+export function readWebhookExtras(raw: string | undefined): Record<string, unknown> {
+  if (!raw?.trim()) return {};
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const { triggerNodeName: _t, ...rest } = parsed;
+    return rest;
+  } catch {
+    return {};
+  }
+}
+
 export function buildTriggerPayload(triggerNodeName?: string): string {
   if (!triggerNodeName) return '{}';
   return JSON.stringify({
@@ -173,6 +207,8 @@ export async function runN8nWorkflow(opts: {
   workflowId: string;
   triggerNodeName?: string;
   webhookOverride?: string;
+  /** Merged into the webhook POST body (Apollo per_page/location, etc.). */
+  webhookExtras?: Record<string, unknown>;
   fetchImpl?: typeof fetch;
 }): Promise<RunResult> {
   const fetchImpl = opts.fetchImpl ?? fetch;
@@ -182,6 +218,7 @@ export async function runN8nWorkflow(opts: {
     source: 'command-center',
     triggeredAt: new Date().toISOString(),
     triggerNodeName: opts.triggerNodeName || undefined,
+    ...(opts.webhookExtras || {}),
   });
 
   if (opts.webhookOverride?.trim()) {
