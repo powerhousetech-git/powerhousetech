@@ -27,20 +27,22 @@ export function PopulateLeads({ busy, onRun, onDone }: PopulateLeadsProps) {
   const [campaign, setCampaign] = useState<Campaign>('India');
   const [perPage, setPerPage] = useState(25);
   const [keywords, setKeywords] = useState('');
+  const [location, setLocation] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const location = campaign === 'India' ? 'India' : 'United States';
   const creditEstimate = useMemo(() => Math.max(1, Math.min(100, perPage)), [perPage]);
+  const locationHint = campaign === 'India' ? 'India' : 'United States';
 
   const start = async () => {
     setSubmitting(true);
     try {
       const input: ApolloDiscoveryInput = {
-        location,
+        campaign,
         per_page: creditEstimate,
         titles: DEFAULT_TITLES,
         ...(keywords.trim() ? { keywords: keywords.trim() } : {}),
+        ...(location.trim() ? { location: location.trim() } : {}),
       };
       const id = await onRun(input);
       toast.success(`Discovery running in background${id ? ` (${id})` : ''}.`);
@@ -64,9 +66,9 @@ export function PopulateLeads({ busy, onRun, onDone }: PopulateLeadsProps) {
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-slate-400">Campaign / location</span>
+          <span className="mb-1 block text-xs font-medium text-slate-400">Campaign</span>
           <div className="inline-flex rounded-lg border border-surface-700 bg-surface-950 p-0.5">
             {(['India', 'US'] as Campaign[]).map((c) => (
               <button
@@ -106,7 +108,19 @@ export function PopulateLeads({ busy, onRun, onDone }: PopulateLeadsProps) {
             className="input"
             value={keywords}
             onChange={(e) => setKeywords(e.target.value)}
-            placeholder="EMS, manufacturing…"
+            placeholder="SaaS, EMS…"
+          />
+        </label>
+
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-slate-400">
+            Location override (optional)
+          </span>
+          <input
+            className="input"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder={`default: ${locationHint}`}
           />
         </label>
       </div>
@@ -137,11 +151,18 @@ export function PopulateLeads({ busy, onRun, onDone }: PopulateLeadsProps) {
             <p>
               This will search Apollo and reveal emails for up to{' '}
               <strong className="text-slate-100">{creditEstimate}</strong> new{' '}
-              <strong className="text-slate-100">{location}</strong> leads.
+              <strong className="text-slate-100">{campaign}</strong> leads
+              {location.trim() ? (
+                <>
+                  {' '}
+                  in <strong className="text-slate-100">{location.trim()}</strong>
+                </>
+              ) : null}
+              .
             </p>
             <p className="text-slate-400">
               Estimated cost: ~{creditEstimate} credit{creditEstimate === 1 ? '' : 's'} (~1 per new
-              lead). New rows arrive as Status = Pending.
+              lead). Deduped across India + US tabs. New rows arrive as Status = Pending.
             </p>
           </div>
         }

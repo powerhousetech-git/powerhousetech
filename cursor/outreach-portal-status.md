@@ -9,7 +9,7 @@
 | Workflow | n8n ID | Status |
 |---|---|---|
 | PHT – India Outreach v2 | `c2JyDKolZaIhUlzs` | ✅ Active |
-| PHT – Apollo Discovery | `lMK8RlkBJS4V8aAH` | ✅ Active |
+| PHT – Apollo Discovery | `lMK8RlkBJS4V8aAH` | ✅ Active (rebuilt 2026-10-03) |
 | PHT – US Outreach v2 | `fHFG8B2mhToK6bid` | ✅ Active |
 
 **Portal PR:** https://github.com/powerhousetech-git/powerhousetech/pull/43 (`cursor/outreach-portal-v2-d4c3`)  
@@ -26,14 +26,40 @@
 - **Live credit balance:** Not available yet — fixed `~1 credit × per_page` estimate is fine.
 - **Apollo title defaults:** Aligned. Portal always sends `titles` matching the workflow:
   `['CEO','Founder','Co-Founder','CTO','Managing Director','President','Owner','Director','VP']`.
+- **Apollo credential type:** `httpCustomAuth` (credential ID: `xCJ7vFVXAzEoOtNF`, name: "Apollo API Key"). Not `httpTemplatedCustomAuth`. Portal does not touch n8n credentials.
+
+---
+
+## Apollo Discovery webhook body (as of rebuild)
+
+```json
+{
+  "campaign": "India",
+  "titles": ["CEO", "..."],
+  "keywords": "SaaS",
+  "location": "Mumbai",
+  "per_page": 25
+}
+```
+
+- `campaign` — **required** `"India"` | `"US"`
+- `titles` — optional; portal always sends the standard DM list
+- `keywords` — optional
+- `location` — optional city/region override (n8n defaults country from campaign)
+- `per_page` — optional, default 25, max 100
+
+Dedup runs across **both** India Leads and US Leads.  
+Leads land as `Status: Pending, Sequence_Step: 0`.
+
+**Cursor applied:** Populate Leads now POSTs `campaign` (required) + optional `location` override field; no longer sends country as `location`.
 
 ---
 
 ## What Cursor shipped (v2 portal)
 
-- **Populate Leads** — credit estimate, Confirm modal, POST to Apollo Discovery webhook (always passes `titles`)
+- **Populate Leads** — credit estimate, Confirm modal, POST to Apollo Discovery webhook (`campaign` + titles + optional keywords/location)
 - **Pending Approvals** — Approve (→ In_Sequence, step 0, empty next date) / Reject (→ Rejected, kept for audit)
-- **Settings panel** — read/write all 4 settings keys live from sheet (Key|Value|; Description ignored)
+- **Settings panel** — read/write all 4 settings keys live from sheet
 - **Sequence progress** — step bar + next-send date in Lead Table
 - **Run Now confirm** — India / US webhook cards with confirm modal
 - **Edge proxy** — webhooks routed through Edge Function (not browser-direct); same Firebase admin gate
@@ -64,12 +90,3 @@ Pending → In_Sequence → Completed
 
 ## Security reminder
 Do NOT touch `N8N_API_KEY` or `ADMIN_EMAILS` env vars — used by `ps2-lead-api` and `outreach-api`.
-
----
-
-## Cursor follow-up (this sync)
-
-Applied Claude's confirmed facts on branch `cursor/outreach-portal-v2-d4c3`:
-1. Schedule trigger defaults → `Daily 8:30 AM IST (Mon-Sat)` / `Daily 10 AM ET (Mon-Fri)`.
-2. Populate Leads `titles` → match Apollo Discovery workflow list above (always passed explicitly).
-3. Settings Key|Value|Description — no parser change needed (Description column ignored).

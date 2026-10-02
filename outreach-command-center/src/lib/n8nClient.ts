@@ -80,10 +80,11 @@ export async function runApolloDiscovery(
 ): Promise<{ executionId: string }> {
   const cfg = loadConfig();
   return runWorkflow(cfg.apolloWorkflowId, undefined, {
+    campaign: input.campaign,
     per_page: input.per_page,
-    location: input.location,
     ...(input.titles?.length ? { titles: input.titles } : {}),
     ...(input.keywords ? { keywords: input.keywords } : {}),
+    ...(input.location?.trim() ? { location: input.location.trim() } : {}),
   });
 }
 

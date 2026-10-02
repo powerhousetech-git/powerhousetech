@@ -133,8 +133,11 @@ export interface WorkflowMeta {
 }
 
 export interface ApolloDiscoveryInput {
-  location: 'India' | 'United States' | string;
+  /** Required by Apollo Discovery webhook — which leads tab to write. */
+  campaign: Campaign;
   per_page: number;
   titles?: string[];
   keywords?: string;
+  /** Optional city/region override (e.g. "Mumbai"). Country defaults from campaign in n8n. */
+  location?: string;
 }
