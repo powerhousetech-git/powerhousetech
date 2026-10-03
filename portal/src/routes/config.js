@@ -12,6 +12,7 @@ const router = express.Router();
 function serialize(config) {
   return {
     cadenceDays: normalizeCadence(config.cadenceDays),
+    systemEnabled: Boolean(config.systemEnabled),
     updatedAt: config.updatedAt.toISOString(),
   };
 }
